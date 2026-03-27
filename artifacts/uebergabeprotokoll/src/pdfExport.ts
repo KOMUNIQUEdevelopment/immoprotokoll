@@ -8,6 +8,30 @@ function safeText(s: string): string {
   return (s || "").replace(/\u2013/g, "-").replace(/\u2014/g, "--");
 }
 
+const FLOOR_LABEL: Record<string, string> = {
+  EG: "Erdgeschoss (EG)",
+  OG: "Obergeschoss (OG)",
+  DG: "Dachgeschoss (DG)",
+  UG: "Untergeschoss (UG)",
+  "Außen": "Außenbereiche",
+};
+
+const FLOOR_SAFE: Record<string, string> = {
+  EG: "Erdgeschoss_(EG)",
+  OG: "Obergeschoss_(OG)",
+  DG: "Dachgeschoss_(DG)",
+  UG: "Untergeschoss_(UG)",
+  "Außen": "Aussenbereiche",
+};
+
+export function getFloorLabel(floor: string): string {
+  return FLOOR_LABEL[floor] ?? floor;
+}
+
+export function getFloorSafe(floor: string): string {
+  return FLOOR_SAFE[floor] ?? floor.replace(/\s+/g, "_");
+}
+
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
 export async function exportToPDF(protocol: ProtocolData): Promise<void> {
@@ -295,7 +319,8 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
 function addPhotosBlock(
   doc: jsPDF,
   photos: RoomPhoto[],
-  _roomName: string,
+  roomName: string,
+  floorLabel: string,
   margin: number,
   contentW: number,
   usableH: number,
@@ -305,13 +330,9 @@ function addPhotosBlock(
   let y = getY();
 
   const photoW = contentW;
-  const photoH = Math.round(photoW * 0.65); // 3:2 landscape – readable at half-A4 height
+  const photoH = Math.round(photoW * 0.65);
   const captionH = 8;
   const rowH = photoH + captionH + 10;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(90, 90, 90);
 
   for (let i = 0; i < photos.length; i++) {
     if (y + rowH > usableH) {
@@ -337,7 +358,10 @@ function addPhotosBlock(
       hour: "2-digit",
       minute: "2-digit",
     });
-    doc.text(ts, margin, y + photoH + 5);
+    const caption = floorLabel
+      ? `${safeText(floorLabel)} – ${safeText(roomName)} · ${ts}`
+      : `${safeText(roomName)} · ${ts}`;
+    doc.text(caption, margin, y + photoH + 5);
 
     y += rowH;
   }
