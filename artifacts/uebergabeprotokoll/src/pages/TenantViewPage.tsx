@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ProtocolData, getPersonRole } from "../types";
+import { ProtocolData, RoomData, getPersonRole } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,29 +21,48 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const FLOOR_LABEL: Record<string, string> = {
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const FLOOR_LABELS: Record<string, string> = {
   EG: "Erdgeschoss (EG)",
   OG: "Obergeschoss (OG)",
   DG: "Dachgeschoss (DG)",
-  UG: "Untergeschoss (UG)",
+  UG: "Untergeschoss / Keller",
   Außen: "Außenbereiche",
 };
 
 const CONDITION_STYLE: Record<string, string> = {
-  "sehr gut": "bg-green-100 text-green-700 border-green-200",
-  gut: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Mängel: "bg-red-100 text-red-700 border-red-200",
+  "sehr gut": "bg-green-500 text-white border-green-500",
+  gut: "bg-yellow-500 text-white border-yellow-500",
+  Mängel: "bg-red-500 text-white border-red-500",
 };
 
-interface TenantViewPageProps {
-  protocolId: string;
-}
+// ── Shared UI components ─────────────────────────────────────────────────────
 
-type LoadState = "loading" | "loaded" | "not-found" | "error";
+function SectionHeader({
+  title,
+  open,
+  onToggle,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground rounded-xl font-semibold text-sm"
+    >
+      {title}
+      {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+    </button>
+  );
+}
 
 function CollapsibleSection({
   title,
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: {
   title: string;
@@ -52,28 +71,144 @@ function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-card text-left hover:bg-muted/50 transition-colors"
-      >
-        <span className="font-semibold text-sm">{title}</span>
-        {open ? (
-          <ChevronUp size={15} className="text-muted-foreground" />
-        ) : (
-          <ChevronDown size={15} className="text-muted-foreground" />
-        )}
-      </button>
-      {open && <div className="px-4 py-4 space-y-3 bg-background">{children}</div>}
+    <div className="mb-4">
+      <SectionHeader title={title} open={open} onToggle={() => setOpen((o) => !o)} />
+      {open && <div className="mt-3 space-y-3">{children}</div>}
     </div>
   );
 }
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
+      {children}
+    </label>
+  );
+}
+
+function ReadField({
+  label,
+  value,
+  fullWidth = false,
+}: {
+  label: string;
+  value: string | undefined | null;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? "col-span-full" : ""}>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="min-h-[36px] px-3 py-2 bg-muted/40 border border-border rounded-lg text-sm text-foreground">
+        {value?.trim() ? value : <span className="text-muted-foreground/50 italic">—</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Read-only room card ───────────────────────────────────────────────────────
+
+function RoomCard({ room }: { room: RoomData }) {
+  const [open, setOpen] = useState(false);
+
+  const condition = room.bodenZustand;
+  const hasPhotos = room.photos.length > 0;
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/40 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-sm truncate">{room.name}</span>
+          {condition && (
+            <span
+              className={`text-[11px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${
+                CONDITION_STYLE[condition] ?? "bg-muted text-muted-foreground border-border"
+              }`}
+            >
+              {condition}
+            </span>
+          )}
+          {hasPhotos && (
+            <span className="text-[11px] text-muted-foreground shrink-0">
+              📷 {room.photos.length}
+            </span>
+          )}
+        </div>
+        {open ? (
+          <ChevronUp size={15} className="text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronDown size={15} className="text-muted-foreground shrink-0" />
+        )}
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-3 border-t border-border">
+          <div className="grid grid-cols-2 gap-3">
+            <ReadField label="Gesamtzustand / Boden" value={room.bodenZustand} />
+            <ReadField label="Wände / Decken" value={room.waendeDecken} />
+            <ReadField label="Fenster / Türen" value={room.fensterTueren} />
+            <ReadField label="Elektrik" value={room.elektrik} />
+            <ReadField label="Heizung" value={room.heizung} />
+          </div>
+
+          {room.maengelSchaeden?.trim() ? (
+            <div>
+              <FieldLabel>Mängel / Schäden</FieldLabel>
+              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 whitespace-pre-wrap">
+                {room.maengelSchaeden}
+              </div>
+            </div>
+          ) : (
+            <ReadField label="Mängel / Schäden" value="" />
+          )}
+
+          <ReadField label="Notizen" value={room.notizen} fullWidth />
+
+          {hasPhotos ? (
+            <div>
+              <FieldLabel>Fotos ({room.photos.length})</FieldLabel>
+              <div className="grid grid-cols-3 gap-2">
+                {room.photos.map((ph) => (
+                  <img
+                    key={ph.id}
+                    src={ph.dataUrl}
+                    alt={ph.caption || room.name}
+                    className="w-full aspect-square object-cover rounded-lg border border-border"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <FieldLabel>Fotos</FieldLabel>
+              <p className="text-sm text-muted-foreground/50 italic px-1">Keine Fotos vorhanden</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface TenantViewPageProps {
+  protocolId: string;
+}
+
+type LoadState = "loading" | "loaded" | "not-found" | "error";
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const [protocol, setProtocol] = useState<ProtocolData | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">(
+    "connecting"
+  );
 
   const [pendingSig, setPendingSig] = useState<Record<string, string | null>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
@@ -172,11 +307,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const getSignature = (personId: string) =>
     protocol?.personSignatures.find((s) => s.personId === personId)?.signatureDataUrl ?? null;
 
-  const meterIcon: Record<string, React.ReactNode> = {
-    Strom: <Zap size={13} />,
-    Wasser: <Droplets size={13} />,
-    Gas: <Flame size={13} />,
-  };
+  // ── Loading / error states ──────────────────────────────────────────────────
 
   if (loadState === "loading") {
     return (
@@ -212,10 +343,13 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-sm w-full bg-card border border-border rounded-2xl p-6 space-y-4 text-center shadow-md">
           <AlertTriangle size={24} className="text-destructive" />
-          <p className="text-sm text-muted-foreground">
-            Verbindungsfehler. Bitte Seite neu laden.
-          </p>
-          <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="gap-1.5">
+          <p className="text-sm text-muted-foreground">Verbindungsfehler. Bitte Seite neu laden.</p>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+          >
             <RefreshCw size={13} />
             Neu laden
           </Button>
@@ -224,13 +358,22 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
     );
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   const floors = ["EG", "OG", "DG", "UG", "Außen"];
   const tenants = protocol.uebernehmer.filter((p) => p.name);
-  const allTenantsSigned = tenants.length > 0 && tenants.every((p) => !!getSignature(p.id));
+  const allTenantsSigned =
+    tenants.length > 0 && tenants.every((p) => !!getSignature(p.id));
+
+  const meterIcons: Record<string, React.ReactNode> = {
+    Strom: <Zap size={13} />,
+    Wasser: <Droplets size={13} />,
+    Gas: <Flame size={13} />,
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="bg-primary text-primary-foreground sticky top-0 z-40 shadow-md">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-start justify-between gap-3">
@@ -272,326 +415,305 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
         </div>
       </header>
 
-      {/* Mieter-Hinweis */}
+      {/* ── Notice bar ──────────────────────────────────────────────────────── */}
       <div className="bg-blue-50 border-b border-blue-200">
         <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-start gap-2">
-          <div className="text-blue-600 shrink-0 mt-0.5">
-            <PenLine size={14} />
-          </div>
+          <PenLine size={14} className="text-blue-600 shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700 leading-snug">
-            <strong>Mieter-Ansicht</strong> – Dieses Protokoll ist schreibgeschützt. Sie können
-            am Ende Ihre Unterschrift leisten, die automatisch synchronisiert wird.
+            <strong>Mieter-Ansicht</strong> – Dieses Protokoll ist schreibgeschützt. Es wird
+            automatisch aktualisiert wenn der Vermieter Änderungen vornimmt. Am Ende können
+            Sie Ihre Unterschrift leisten.
           </p>
         </div>
       </div>
 
-      {/* Content */}
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 space-y-4">
-        {/* Allgemeine Informationen */}
-        <CollapsibleSection title="Allgemeine Informationen">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {protocol.mietobjekt && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Mietobjekt</p>
-                <p className="font-medium">{protocol.mietobjekt}</p>
-              </div>
-            )}
-            {protocol.adresse && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Adresse</p>
-                <p className="font-medium">{protocol.adresse}</p>
-              </div>
-            )}
-            {protocol.datum && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Datum</p>
-                <p className="font-medium">{protocol.datum}</p>
-              </div>
-            )}
-            {protocol.schluessel && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                  <Key size={10} /> Schlüssel
-                </p>
-                <p className="font-medium">{protocol.schluessel}</p>
-              </div>
-            )}
-          </div>
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
+      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4">
+        <div className="space-y-2">
 
-          {/* Persons */}
-          <div className="mt-3 space-y-1.5">
-            {[...protocol.uebergeber, ...protocol.uebernehmer]
-              .filter((p) => p.name)
-              .map((p) => {
-                const side = protocol.uebergeber.some((u) => u.id === p.id)
-                  ? "uebergeber"
-                  : "uebernehmer";
-                const signed = !!getSignature(p.id);
-                return (
-                  <div key={p.id} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                          side === "uebergeber"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
-                      >
-                        {getPersonRole(p, side)}
+          {/* 1 ── Allgemeine Informationen ─────────────────────────────────── */}
+          <CollapsibleSection title="Allgemeine Informationen" defaultOpen={true}>
+            <div className="px-1 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <ReadField label="Mietobjekt" value={protocol.mietobjekt} />
+                <ReadField label="Datum der Übergabe" value={protocol.datum} />
+              </div>
+              <ReadField label="Adresse" value={protocol.adresse} fullWidth />
+
+              {/* Vermieter */}
+              <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Übergeber (Vermieter)
+                </p>
+                {protocol.uebergeber.filter((p) => p.name).length > 0 ? (
+                  protocol.uebergeber.filter((p) => p.name).map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                          {getPersonRole(p, "uebergeber")}
+                        </span>
+                        {p.name}
                       </span>
-                      {p.name}
-                    </span>
-                    {signed && (
-                      <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                      {!!getSignature(p.id) && (
+                        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground/50 italic">Noch nicht eingetragen</p>
+                )}
+              </div>
+
+              {/* Mieter */}
+              <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Übernehmer (Mieter)
+                </p>
+                {protocol.uebernehmer.filter((p) => p.name).length > 0 ? (
+                  protocol.uebernehmer.filter((p) => p.name).map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                          {getPersonRole(p, "uebernehmer")}
+                        </span>
+                        {p.name}
+                      </span>
+                      {!!getSignature(p.id) && (
+                        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground/50 italic">Noch nicht eingetragen</p>
+                )}
+              </div>
+
+              <ReadField label="Schlüsselübergabe" value={protocol.schluessel} />
+              <ReadField label="Details / Besonderheiten" value={protocol.schluesselDetails} />
+            </div>
+          </CollapsibleSection>
+
+          {/* 2 ── Zählerstände ─────────────────────────────────────────────── */}
+          <CollapsibleSection title="Zählerstände">
+            <div className="px-1 space-y-2">
+              {protocol.meterReadings.map((meter, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-sm font-medium w-20 shrink-0 flex items-center gap-1.5">
+                    {meterIcons[meter.type] ?? null}
+                    {meter.type}
+                  </span>
+                  <div className="flex-1 min-h-[36px] px-3 py-2 bg-muted/40 border border-border rounded-lg text-sm tabular-nums">
+                    {meter.stand?.trim() ? (
+                      `${meter.stand} ${meter.einheit}`
+                    ) : (
+                      <span className="text-muted-foreground/50 italic">—</span>
                     )}
                   </div>
-                );
-              })}
-          </div>
-        </CollapsibleSection>
-
-        {/* Zählerstände */}
-        {protocol.meterReadings.some((m) => m.stand) && (
-          <CollapsibleSection title="Zählerstände">
-            <div className="space-y-2">
-              {protocol.meterReadings.map((m, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    {meterIcon[m.type] ?? null}
-                    {m.type}
-                  </span>
-                  <span className="font-semibold tabular-nums">
-                    {m.stand} {m.einheit}
-                  </span>
                 </div>
               ))}
             </div>
           </CollapsibleSection>
-        )}
 
-        {/* Küche */}
-        {(protocol.allgemeinerZustandKueche || protocol.kitchenPhotos?.length > 0) && (
-          <CollapsibleSection title="Küche">
-            {protocol.allgemeinerZustandKueche && (
-              <p className="text-sm text-muted-foreground">{protocol.allgemeinerZustandKueche}</p>
-            )}
-            {protocol.kitchenPhotos?.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {protocol.kitchenPhotos.map((ph) => (
-                  <img
-                    key={ph.id}
-                    src={ph.dataUrl}
-                    alt={ph.caption || "Foto"}
-                    className="w-full aspect-square object-cover rounded-lg border border-border"
-                  />
-                ))}
-              </div>
-            )}
-          </CollapsibleSection>
-        )}
-
-        {/* Räume je Stockwerk */}
-        {floors.map((floor) => {
-          const rooms = protocol.rooms.filter((r) => r.floor === floor);
-          if (rooms.length === 0) return null;
-          const hasContent = rooms.some(
-            (r) =>
-              r.bodenZustand ||
-              r.maengelSchaeden ||
-              r.notizen ||
-              r.waendeDecken ||
-              r.photos.length > 0
-          );
-          if (!hasContent) return null;
-          return (
-            <CollapsibleSection key={floor} title={FLOOR_LABEL[floor] ?? floor} defaultOpen={false}>
-              <div className="space-y-4">
-                {rooms.map((room) => {
-                  const hasRoomContent =
-                    room.bodenZustand ||
-                    room.maengelSchaeden ||
-                    room.notizen ||
-                    room.waendeDecken ||
-                    room.photos.length > 0;
-                  if (!hasRoomContent) return null;
-                  return (
-                    <div key={room.id} className="border border-border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-sm">{room.name}</p>
-                        {room.bodenZustand && (
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
-                              CONDITION_STYLE[room.bodenZustand] ?? "bg-muted text-muted-foreground border-border"
-                            }`}
-                          >
-                            {room.bodenZustand}
-                          </span>
+          {/* 3 ── Küche ────────────────────────────────────────────────────── */}
+          <CollapsibleSection title="Küche – Geräte & Zustand">
+            <div className="px-1 space-y-3">
+              {/* Appliances */}
+              {protocol.appliances?.length > 0 && (
+                <div className="space-y-2">
+                  {protocol.appliances.map((app, i) => (
+                    <div key={i} className="grid grid-cols-2 gap-2 items-center">
+                      <span className="text-sm font-medium">{app.name}</span>
+                      <div className="min-h-[36px] px-3 py-2 bg-muted/40 border border-border rounded-lg text-sm">
+                        {app.zustand?.trim() || (
+                          <span className="text-muted-foreground/50 italic">—</span>
                         )}
                       </div>
-                      {room.waendeDecken && (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium">Wände/Decken:</span> {room.waendeDecken}
-                        </p>
-                      )}
-                      {room.fensterTueren && (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium">Fenster/Türen:</span> {room.fensterTueren}
-                        </p>
-                      )}
-                      {room.maengelSchaeden && (
-                        <p className="text-xs text-red-700 bg-red-50 rounded p-2 border border-red-200">
-                          <span className="font-medium">Mängel/Schäden:</span> {room.maengelSchaeden}
-                        </p>
-                      )}
-                      {room.notizen && (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium">Notizen:</span> {room.notizen}
-                        </p>
-                      )}
-                      {room.photos.length > 0 && (
-                        <div className="grid grid-cols-3 gap-1.5 mt-1">
-                          {room.photos.map((ph) => (
-                            <img
-                              key={ph.id}
-                              src={ph.dataUrl}
-                              alt={ph.caption || room.name}
-                              className="w-full aspect-square object-cover rounded-md border border-border"
-                            />
-                          ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ReadField label="Allgemeiner Zustand Küche" value={protocol.allgemeinerZustandKueche} />
+
+              {/* Kitchen photos */}
+              <div>
+                <FieldLabel>Fotos Küche</FieldLabel>
+                {protocol.kitchenPhotos?.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {protocol.kitchenPhotos.map((ph) => (
+                      <img
+                        key={ph.id}
+                        src={ph.dataUrl}
+                        alt={ph.caption || "Küche"}
+                        className="w-full aspect-square object-cover rounded-lg border border-border"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground/50 italic px-1">
+                    Keine Fotos vorhanden
+                  </p>
+                )}
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 4 ── Räume je Stockwerk ───────────────────────────────────────── */}
+          {floors.map((floor) => {
+            const rooms = protocol.rooms.filter((r) => r.floor === floor);
+            if (rooms.length === 0) return null;
+            return (
+              <CollapsibleSection key={floor} title={FLOOR_LABELS[floor] ?? floor}>
+                <div className="px-1 space-y-2">
+                  {rooms.map((room) => (
+                    <RoomCard key={room.id} room={room} />
+                  ))}
+                </div>
+              </CollapsibleSection>
+            );
+          })}
+
+          {/* 5 ── Zusatzvereinbarungen ─────────────────────────────────────── */}
+          <CollapsibleSection
+            title={
+              protocol.zusatzvereinbarungTitle ||
+              "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen"
+            }
+          >
+            <div className="px-1 space-y-4">
+              {(protocol.zusatzvereinbarungen ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground/50 italic">
+                  Keine Einträge vorhanden
+                </p>
+              ) : (
+                protocol.zusatzvereinbarungen.map((z, idx) => (
+                  <div
+                    key={z.id}
+                    className="border border-border rounded-xl bg-card overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b border-border">
+                      <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">
+                        {idx + 1}.
+                      </span>
+                      <span className="text-sm font-semibold">{z.title}</span>
+                    </div>
+                    <div className="px-3 py-2">
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {z.content?.trim() || (
+                          <span className="italic text-muted-foreground/50">Kein Inhalt</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* 6 ── Unterschriften ───────────────────────────────────────────── */}
+          <div className="mb-4 border-2 border-primary/20 rounded-xl overflow-hidden">
+            <div className="bg-primary/5 px-4 py-3 border-b border-primary/20 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <PenLine size={16} className="text-primary" />
+                  <h2 className="font-bold text-sm text-primary">Ihre Unterschrift</h2>
+                  {allTenantsSigned && (
+                    <CheckCircle2 size={15} className="text-green-500" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Durch Ihre Unterschrift bestätigen Sie die Kenntnisnahme des Protokolls
+                  einschließlich aller Zusatzvereinbarungen.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-4 py-4 space-y-5">
+              {tenants.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic text-center py-4">
+                  Keine Mieter im Protokoll eingetragen.
+                </p>
+              ) : (
+                tenants.map((person) => {
+                  const existingSig = getSignature(person.id);
+                  const pending = pendingSig[person.id];
+                  const isSubmitting = submitting[person.id] ?? false;
+                  const hasJustSigned = justSigned[person.id] ?? false;
+
+                  return (
+                    <div key={person.id} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                          Mieter
+                        </span>
+                        <span className="font-semibold text-sm">{person.name}</span>
+                        {existingSig && (
+                          <CheckCircle2 size={14} className="text-green-500 ml-auto" />
+                        )}
+                      </div>
+
+                      {existingSig ? (
+                        <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-2">
+                          <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                            <CheckCircle2 size={12} />
+                            {hasJustSigned
+                              ? "Unterschrift erfolgreich gespeichert!"
+                              : "Bereits unterschrieben"}
+                          </p>
+                          <img
+                            src={existingSig}
+                            alt="Unterschrift"
+                            className="max-h-20 border border-green-200 rounded bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <SignatureCanvasComponent
+                            value={pending ?? null}
+                            onChange={(dataUrl) =>
+                              setPendingSig((s) => ({ ...s, [person.id]: dataUrl }))
+                            }
+                            label="Hier unterschreiben"
+                          />
+                          <Button
+                            onClick={() => handleSign(person.id)}
+                            disabled={!pending || isSubmitting}
+                            className="w-full gap-2"
+                            size="sm"
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <Loader2 size={13} className="animate-spin" />
+                                Wird gespeichert…
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={13} />
+                                Unterschrift bestätigen & synchronisieren
+                              </>
+                            )}
+                          </Button>
                         </div>
                       )}
                     </div>
                   );
-                })}
-              </div>
-            </CollapsibleSection>
-          );
-        })}
+                })
+              )}
 
-        {/* Zusatzvereinbarungen */}
-        {protocol.zusatzvereinbarungen?.length > 0 && (
-          <CollapsibleSection
-            title={protocol.zusatzvereinbarungTitle || "Zusatzvereinbarungen"}
-            defaultOpen={false}
-          >
-            <div className="space-y-3">
-              {protocol.zusatzvereinbarungen.map((z, i) => (
-                <div key={z.id} className="text-sm">
-                  <p className="font-semibold text-sm mb-1">
-                    {i + 1}. {z.title}
-                  </p>
-                  {z.content && (
-                    <p className="text-muted-foreground text-xs leading-relaxed whitespace-pre-wrap">
-                      {z.content}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CollapsibleSection>
-        )}
-
-        {/* ── Unterschriften ──────────────────────────────────────────── */}
-        <div className="border-2 border-primary/20 rounded-xl overflow-hidden">
-          <div className="bg-primary/5 px-4 py-3 border-b border-primary/20">
-            <div className="flex items-center gap-2">
-              <PenLine size={16} className="text-primary" />
-              <h2 className="font-bold text-sm text-primary">Ihre Unterschrift</h2>
               {allTenantsSigned && (
-                <CheckCircle2 size={15} className="text-green-500 ml-auto" />
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <CheckCircle2 size={20} className="text-green-500 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-green-700">
+                    Alle Mieter haben unterschrieben
+                  </p>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    Die Unterschriften wurden automatisch synchronisiert.
+                  </p>
+                </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Durch Ihre Unterschrift bestätigen Sie die Kenntnisnahme des Protokolls
-              einschließlich aller Zusatzvereinbarungen.
-            </p>
-          </div>
-
-          <div className="px-4 py-4 space-y-5">
-            {tenants.length === 0 && (
-              <p className="text-sm text-muted-foreground italic text-center py-4">
-                Keine Mieter im Protokoll eingetragen.
-              </p>
-            )}
-
-            {tenants.map((person) => {
-              const existingSig = getSignature(person.id);
-              const pending = pendingSig[person.id];
-              const isSubmitting = submitting[person.id] ?? false;
-              const hasJustSigned = justSigned[person.id] ?? false;
-
-              return (
-                <div key={person.id} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
-                      Mieter
-                    </span>
-                    <span className="font-semibold text-sm">{person.name}</span>
-                    {existingSig && (
-                      <CheckCircle2 size={14} className="text-green-500 ml-auto" />
-                    )}
-                  </div>
-
-                  {existingSig ? (
-                    <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-2">
-                      <p className="text-xs text-green-700 font-medium flex items-center gap-1">
-                        <CheckCircle2 size={12} />
-                        {hasJustSigned ? "Unterschrift erfolgreich gespeichert!" : "Bereits unterschrieben"}
-                      </p>
-                      <img
-                        src={existingSig}
-                        alt="Unterschrift"
-                        className="max-h-20 border border-green-200 rounded bg-white"
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <SignatureCanvasComponent
-                        value={pending ?? null}
-                        onChange={(dataUrl) =>
-                          setPendingSig((s) => ({ ...s, [person.id]: dataUrl }))
-                        }
-                        label="Hier unterschreiben"
-                      />
-                      <Button
-                        onClick={() => handleSign(person.id)}
-                        disabled={!pending || isSubmitting}
-                        className="w-full gap-2"
-                        size="sm"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 size={13} className="animate-spin" />
-                            Wird gespeichert…
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 size={13} />
-                            Unterschrift bestätigen & synchronisieren
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {allTenantsSigned && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                <CheckCircle2 size={20} className="text-green-500 mx-auto mb-1" />
-                <p className="text-sm font-semibold text-green-700">
-                  Alle Mieter haben unterschrieben
-                </p>
-                <p className="text-xs text-green-600 mt-0.5">
-                  Die Unterschriften wurden automatisch synchronisiert.
-                </p>
-              </div>
-            )}
           </div>
         </div>
-
-        <div className="h-6" />
       </main>
     </div>
   );
