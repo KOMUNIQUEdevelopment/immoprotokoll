@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ProtocolData, RoomData, ZusatzvereinbarungEntry } from "../types";
+import { getFloorLabel } from "../pdfExport";
 import RoomSection from "../components/RoomSection";
 import PersonList from "../components/PersonList";
 import AutoGrowTextarea from "../components/AutoGrowTextarea";
@@ -205,6 +206,7 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                   key={room.id}
                   room={room}
                   onChange={(updated) => updateRoom(room.id, updated)}
+                  floorLabel={getFloorLabel(floor)}
                 />
               ))}
             </div>

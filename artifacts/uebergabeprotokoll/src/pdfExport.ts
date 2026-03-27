@@ -146,7 +146,7 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
 
   // Kitchen photos
   if (protocol.kitchenPhotos?.length) {
-    addPhotosBlock(doc, protocol.kitchenPhotos, "Kueche", margin, contentW, usableH, () => y, (v) => { y = v; });
+    addPhotosBlock(doc, protocol.kitchenPhotos, "Küche", "", margin, contentW, usableH, () => y, (v) => { y = v; });
   }
 
   // ── Rooms by floor ────────────────────────────────────────────────────────
@@ -191,7 +191,8 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
       }
 
       if (room.photos.length > 0) {
-        addPhotosBlock(doc, room.photos, safeText(room.name), margin, contentW, usableH, () => y, (v) => { y = v; });
+        const roomFloorLabel = FLOOR_LABEL[room.floor] ?? FLOOR_LABEL["Außen"] ?? room.floor;
+        addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; });
       }
 
       y += 3;
@@ -378,10 +379,12 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
 
   const usedNames = new Map<string, number>();
 
-  const addPhotos = (photos: RoomPhoto[], roomName: string) => {
-    const safeRoom = roomName
-      .replace(/[\/\\:\*\?"<>\|]/g, "")
-      .replace(/\s+/g, "_");
+  const toSafeSegment = (s: string) =>
+    s.replace(/[\/\\:\*\?"<>\|]/g, "").replace(/\s+/g, "_");
+
+  const addPhotos = (photos: RoomPhoto[], floorSafe: string, roomName: string) => {
+    const safeRoom = toSafeSegment(roomName);
+    const prefix = floorSafe ? `${floorSafe}_${safeRoom}` : safeRoom;
 
     photos.forEach((photo) => {
       const d = new Date(photo.timestamp);
@@ -396,7 +399,7 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
       ].join("-");
 
       const ext = photo.dataUrl.startsWith("data:image/png") ? "png" : "jpg";
-      const baseName = `${safeRoom}_${ts}`;
+      const baseName = `${prefix}_${ts}`;
       const count = usedNames.get(baseName) ?? 0;
       usedNames.set(baseName, count + 1);
       const filename = count === 0 ? `${baseName}.${ext}` : `${baseName}_${count + 1}.${ext}`;
@@ -407,12 +410,12 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
   };
 
   if (protocol.kitchenPhotos?.length) {
-    addPhotos(protocol.kitchenPhotos, "Küche");
+    addPhotos(protocol.kitchenPhotos, "", "Küche");
   }
 
   for (const room of protocol.rooms) {
     if (room.photos.length > 0) {
-      addPhotos(room.photos, room.name);
+      addPhotos(room.photos, FLOOR_SAFE[room.floor] ?? toSafeSegment(room.floor), room.name);
     }
   }
 

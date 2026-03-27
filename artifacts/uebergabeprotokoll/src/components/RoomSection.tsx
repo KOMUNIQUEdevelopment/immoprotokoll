@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 interface RoomSectionProps {
   room: RoomData;
   onChange: (updated: RoomData) => void;
+  floorLabel?: string;
 }
 
 const CONDITIONS: Condition[] = ["sehr gut", "gut", "Mängel"];
@@ -45,7 +46,7 @@ function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c:
   );
 }
 
-export default function RoomSection({ room, onChange }: RoomSectionProps) {
+export default function RoomSection({ room, onChange, floorLabel }: RoomSectionProps) {
   const [open, setOpen] = useState(false);
 
   const update = (field: keyof RoomData, value: unknown) => {
@@ -201,6 +202,7 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
               photos={room.photos}
               onChange={(photos) => update("photos", photos)}
               roomName={room.name}
+              floorLabel={floorLabel}
             />
           </div>
         </div>
