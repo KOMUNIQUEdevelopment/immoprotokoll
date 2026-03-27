@@ -64,7 +64,18 @@ export function useProtocolsStore() {
         Object.entries(remoteProtocols).map(([id, p]) => [id, migrateProtocol(p as Record<string, unknown>)])
       );
 
-      if (Object.keys(migrated).length === 0) {
+      const serverIsEmpty = Object.keys(migrated).length === 0;
+
+      if (serverIsEmpty && Object.keys(prev).length > 0) {
+        setTimeout(() => {
+          Object.values(prev).forEach(p => {
+            wsSendRef.current?.({ type: "update", protocol: p });
+          });
+        }, 100);
+        return prev;
+      }
+
+      if (serverIsEmpty) {
         return prev;
       }
 
@@ -73,6 +84,9 @@ export function useProtocolsStore() {
       Object.entries(prev).forEach(([id, localP]) => {
         if (!merged[id]) {
           merged[id] = localP;
+          setTimeout(() => {
+            wsSendRef.current?.({ type: "update", protocol: localP });
+          }, 100);
         } else {
           const remoteP = merged[id];
           const rooms = remoteP.rooms.map(remoteRoom => {
