@@ -179,6 +179,56 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
     }
   }
 
+  // ── Zusatzvereinbarung ────────────────────────────────────────────────────
+  const zvEntries = protocol.zusatzvereinbarungen ?? [];
+  if (zvEntries.length > 0) {
+    addPage();
+    const zvTitle = protocol.zusatzvereinbarungTitle || "Zusatzvereinbarung";
+    h1(safeText(zvTitle));
+
+    const renderMultiLine = (text: string) => {
+      const paras = text.split("\n");
+      const lineH = 5;
+      for (const para of paras) {
+        if (para.trim() === "") {
+          y += lineH * 0.6;
+        } else {
+          const lines = doc.splitTextToSize(safeText(para), contentW);
+          checkPage(lines.length * lineH + 2);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 30, 30);
+          doc.text(lines, margin, y);
+          y += lines.length * lineH;
+        }
+      }
+    };
+
+    for (let i = 0; i < zvEntries.length; i++) {
+      const entry = zvEntries[i];
+      checkPage(30);
+      // Entry title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(40, 40, 100);
+      doc.text(`${i + 1}. ${safeText(entry.title)}`, margin, y);
+      y += 7;
+      // Entry content
+      renderMultiLine(entry.content);
+      y += 5;
+      // Thin divider between entries (except last)
+      if (i < zvEntries.length - 1) {
+        checkPage(4);
+        doc.setDrawColor(210, 210, 225);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y - 2, margin + contentW, y - 2);
+        y += 2;
+      }
+    }
+
+    y += 6;
+  }
+
   // ── Signatures page ───────────────────────────────────────────────────────
   addPage();
   h1("Unterschriften");

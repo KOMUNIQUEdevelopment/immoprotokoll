@@ -74,6 +74,8 @@ export interface ProtocolData {
   allgemeinerZustandKueche: string;
   kitchenPhotos: RoomPhoto[];
   rooms: RoomData[];
+  zusatzvereinbarungTitle: string;
+  zusatzvereinbarungen: ZusatzvereinbarungEntry[];
   signaturOrt: string;
   signaturDatum: string;
   personSignatures: PersonSignature[];
@@ -154,6 +156,45 @@ export const DEFAULT_METER_READINGS: MeterReading[] = [
   { type: "Gas", stand: "", einheit: "m³" },
 ];
 
+export const DEFAULT_ZUSATZVEREINBARUNGEN: ZusatzvereinbarungEntry[] = [
+  {
+    id: "zv-altbau",
+    title: "Altbautypische Eigenschaften",
+    content:
+      "Dem Mieter ist bekannt, dass es sich bei dem Objekt um eine Altbau-Villa handelt. Daraus können sich typische Eigenschaften ergeben, insbesondere:\n- Unebenheiten bei Böden und Wänden\n- Teilweise hellhörige Räume\n- Ältere Fenster mit möglicher leichter Zugluft\n- Temperaturunterschiede innerhalb des Hauses\n- Altersbedingte Gebrauchsspuren an Bauteilen\n\nDiese Eigenschaften stellen keinen Mangel dar, soweit sie den üblichen Zustand eines Altbaus widerspiegeln.",
+  },
+  {
+    id: "zv-zustand",
+    title: "Zustand bei Übergabe",
+    content:
+      "Das Objekt wird in dem im Übergabeprotokoll dokumentierten Zustand übergeben. Der Mieter bestätigt, dass ihm der Zustand bekannt ist und keine darüber hinausgehenden Ansprüche bestehen, sofern keine verdeckten Mängel vorliegen.",
+  },
+  {
+    id: "zv-arbeiten",
+    title: "Offene Arbeiten durch Vermieter",
+    content:
+      "Folgende Arbeiten werden nach der Übergabe noch durch den Vermieter ausgeführt:\n- Austausch von Fenstergriffen (aufgrund von leichter Schwergängigkeit)\n- Räumung Zaun in Garage\n\nDie Arbeiten erfolgen nach vorheriger Information der Mieterin.",
+  },
+  {
+    id: "zv-schluessel",
+    title: "Schlüsselregelung (Übergangsphase)",
+    content:
+      "Die Vermieter behalten vorübergehend einen Schlüssel zum Objekt, um notwendige kleinere Arbeiten durchzuführen.\n\nDabei gilt:\n- Der Mieter wird vor jedem Zutritt informiert\n- Zutritt erfolgt nur nach vorheriger Information\n- Die Nutzung beschränkt sich ausschliesslich auf die genannten Arbeiten\n\nNach Abschluss der Arbeiten wird der Schlüssel übergeben.",
+  },
+  {
+    id: "zv-fotos",
+    title: "Fotos & Dokumentation",
+    content:
+      "Die bei der Übergabe erstellten Fotos sind Bestandteil des Übergabeprotokolls. Sie dienen der Dokumentation des Zustands bei Übergabe.",
+  },
+  {
+    id: "zv-schluss",
+    title: "Schlussbestätigung",
+    content:
+      "Beide Parteien bestätigen mit ihrer Unterschrift, dass:\n- das Objekt gemeinsam besichtigt wurde\n- alle wesentlichen Punkte besprochen wurden\n- das Übergabeprotokoll vollständig und korrekt ist",
+  },
+];
+
 export function createDefaultProtocol(): ProtocolData {
   return {
     id: crypto.randomUUID(),
@@ -170,6 +211,8 @@ export function createDefaultProtocol(): ProtocolData {
     allgemeinerZustandKueche: "",
     kitchenPhotos: [],
     rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
+    zusatzvereinbarungTitle: "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen",
+    zusatzvereinbarungen: DEFAULT_ZUSATZVEREINBARUNGEN.map(e => ({ ...e })),
     signaturOrt: "",
     signaturDatum: "28.03.2026",
     personSignatures: [],
@@ -205,6 +248,8 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     data.personSignatures = sigs.map(s => ({ personId: s.id, signatureDataUrl: s.signatureDataUrl }));
   }
   if (!data.kitchenPhotos) data.kitchenPhotos = [];
+  if (!data.zusatzvereinbarungTitle) data.zusatzvereinbarungTitle = "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen";
+  if (!data.zusatzvereinbarungen) data.zusatzvereinbarungen = DEFAULT_ZUSATZVEREINBARUNGEN.map(e => ({ ...e }));
 
   const REMOVED_ROOM_IDS = new Set(["garage-stellplatz", "terrasse-garten"]);
   let rooms = ((data.rooms as RoomData[]) || []).filter(r => !REMOVED_ROOM_IDS.has(r.id));
