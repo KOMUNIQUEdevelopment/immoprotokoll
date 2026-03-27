@@ -6,7 +6,21 @@ import { useProtocolStore } from "./store";
 import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import { exportToPDF } from "./pdfExport";
-import { Save, FileDown, ClipboardList, PenLine, CheckCircle2 } from "lucide-react";
+import { usePwaInstall } from "./hooks/usePwaInstall";
+import { useSwUpdate } from "./hooks/useSwUpdate";
+import { useSync } from "./hooks/useSync";
+import {
+  Save,
+  FileDown,
+  ClipboardList,
+  PenLine,
+  CheckCircle2,
+  Download,
+  Wifi,
+  WifiOff,
+  X,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const queryClient = new QueryClient();
@@ -24,12 +38,18 @@ function formatRelative(date: Date | null): string {
 type Tab = "protokoll" | "unterschriften";
 
 function AppContent() {
-  const { protocol, updateProtocol, manualSave, isSaving, lastSaved } = useProtocolStore();
+  const { protocol, updateProtocol, receiveRemote, manualSave, isSaving, lastSaved, wsSendRef } =
+    useProtocolStore();
   const [activeTab, setActiveTab] = useState<Tab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
-  const headerTitle = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Übergabeprotokoll";
+  const { canInstall, install } = usePwaInstall();
+  const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
+  const { status: syncStatus } = useSync({ onReceive: receiveRemote, sendRef: wsSendRef });
+
+  const headerTitle =
+    [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Übergabeprotokoll";
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -52,8 +72,8 @@ function AppContent() {
   const allSigned =
     protocol.uebergeber.length > 0 &&
     protocol.uebernehmer.length > 0 &&
-    [...protocol.uebergeber, ...protocol.uebernehmer].every(
-      p => protocol.personSignatures.some(s => s.personId === p.id && s.signatureDataUrl !== null)
+    [...protocol.uebergeber, ...protocol.uebernehmer].every((p) =>
+      protocol.personSignatures.some((s) => s.personId === p.id && s.signatureDataUrl !== null)
     );
 
   return (
@@ -67,11 +87,37 @@ function AppContent() {
               <p className="text-xs text-muted-foreground truncate">{headerTitle}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* Sync status indicator */}
+              <span
+                title={
+                  syncStatus === "connected"
+                    ? "Echtzeit-Sync aktiv"
+                    : syncStatus === "connecting"
+                    ? "Verbinde..."
+                    : "Offline"
+                }
+                className="hidden sm:flex items-center"
+              >
+                {syncStatus === "connected" ? (
+                  <Wifi size={13} className="text-green-500" />
+                ) : (
+                  <WifiOff size={13} className="text-muted-foreground" />
+                )}
+              </span>
+
               {lastSaved && (
                 <span className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">
                   {isSaving ? "Speichert..." : `Gespeichert ${formatRelative(lastSaved)}`}
                 </span>
               )}
+
+              {canInstall && (
+                <Button variant="outline" size="sm" onClick={install} className="gap-1.5">
+                  <Download size={14} />
+                  <span className="hidden sm:inline">Installieren</span>
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 size="sm"
@@ -79,15 +125,15 @@ function AppContent() {
                 disabled={isSaving}
                 className="gap-1.5"
               >
-                {isSaving ? <CheckCircle2 size={14} className="text-green-500" /> : <Save size={14} />}
+                {isSaving ? (
+                  <CheckCircle2 size={14} className="text-green-500" />
+                ) : (
+                  <Save size={14} />
+                )}
                 <span className="hidden sm:inline">{isSaving ? "OK" : "Speichern"}</span>
               </Button>
-              <Button
-                size="sm"
-                onClick={handleExport}
-                disabled={isExporting}
-                className="gap-1.5"
-              >
+
+              <Button size="sm" onClick={handleExport} disabled={isExporting} className="gap-1.5">
                 <FileDown size={14} />
                 PDF
               </Button>
@@ -145,6 +191,35 @@ function AppContent() {
           <span className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-md">
             Automatisch gespeichert
           </span>
+        </div>
+      )}
+
+      {/* SW Update popup */}
+      {needsUpdate && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0 sm:right-4">
+          <div className="flex items-center gap-3 bg-card border border-border rounded-2xl shadow-xl px-4 py-3 min-w-[280px]">
+            <button
+              type="button"
+              onClick={dismissUpdate}
+              className="p-1 rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors shrink-0"
+              title="Schließen"
+            >
+              <X size={12} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Update verfügbar</p>
+              <p className="text-xs text-muted-foreground">Eine neue Version ist bereit.</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={applyUpdate}
+              className="shrink-0 gap-1.5 font-semibold"
+            >
+              <RefreshCw size={13} />
+              Aktualisieren
+            </Button>
+          </div>
         </div>
       )}
     </div>

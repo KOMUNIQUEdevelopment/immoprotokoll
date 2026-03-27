@@ -30,6 +30,7 @@ export function useProtocolStore() {
     return null;
   });
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsSendRef = useRef<((data: ProtocolData) => void) | null>(null);
 
   const save = useCallback((data: ProtocolData) => {
     const withTimestamp = { ...data, lastSaved: new Date().toISOString() };
@@ -53,10 +54,25 @@ export function useProtocolStore() {
     setProtocol(prev => {
       const next = updater(prev);
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = setTimeout(() => save(next), 1500);
+      autoSaveTimer.current = setTimeout(() => {
+        save(next);
+        wsSendRef.current?.(next);
+      }, 1500);
       return next;
     });
   }, [save]);
 
-  return { protocol, updateProtocol, manualSave, isSaving, lastSaved };
+  const receiveRemote = useCallback((remote: ProtocolData) => {
+    setProtocol(prev => {
+      const rooms = prev.rooms.map(prevRoom => {
+        const remoteRoom = remote.rooms?.find(r => r.id === prevRoom.id);
+        return remoteRoom ? { ...remoteRoom, photos: prevRoom.photos } : prevRoom;
+      });
+      const merged = { ...remote, rooms };
+      save(merged);
+      return merged;
+    });
+  }, [save]);
+
+  return { protocol, updateProtocol, receiveRemote, manualSave, isSaving, lastSaved, wsSendRef };
 }
