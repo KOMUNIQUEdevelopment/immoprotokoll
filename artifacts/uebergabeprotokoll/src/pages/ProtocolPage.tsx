@@ -233,6 +233,7 @@ interface ZusatzvereinbarungSectionProps {
 }
 
 function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEntriesChange }: ZusatzvereinbarungSectionProps) {
+  const [open, setOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(sectionTitle);
 
@@ -258,75 +259,96 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
     setEditingTitle(false);
   };
 
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTitleDraft(sectionTitle);
+    setEditingTitle(true);
+  };
+
   return (
     <div className="mb-4">
-      {/* Section header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl">
+      {/* Section header – styled like CollapsibleSection */}
+      <button
+        type="button"
+        onClick={() => !editingTitle && setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground rounded-xl font-semibold text-sm"
+      >
         {editingTitle ? (
-          <>
-            <input
-              autoFocus
-              value={titleDraft}
-              onChange={e => setTitleDraft(e.target.value)}
-              onBlur={commitTitle}
-              onKeyDown={e => { if (e.key === "Enter") commitTitle(); if (e.key === "Escape") { setTitleDraft(sectionTitle); setEditingTitle(false); } }}
-              className="flex-1 bg-transparent border-b border-primary-foreground/50 outline-none text-sm font-semibold placeholder:text-primary-foreground/50"
-            />
-          </>
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => {
+              e.stopPropagation();
+              if (e.key === "Enter") commitTitle();
+              if (e.key === "Escape") { setTitleDraft(sectionTitle); setEditingTitle(false); }
+            }}
+            className="flex-1 bg-transparent border-b border-primary-foreground/50 outline-none text-sm font-semibold text-left"
+          />
         ) : (
+          <span className="flex-1 text-left truncate">{sectionTitle}</span>
+        )}
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          {!editingTitle && (
+            <span
+              role="button"
+              onClick={startEdit}
+              className="p-1 rounded hover:bg-primary-foreground/10 transition-colors"
+              title="Titel bearbeiten"
+            >
+              <Pencil size={13} className="opacity-70" />
+            </span>
+          )}
+          {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </div>
+      </button>
+
+      {/* Entries – only visible when open */}
+      {open && (
+        <div className="mt-3 space-y-4 px-1">
+          {entries.map((entry, idx) => (
+            <div key={entry.id} className="border border-border rounded-xl bg-card overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b border-border">
+                <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">{idx + 1}.</span>
+                <Input
+                  value={entry.title}
+                  onChange={e => updateEntry(entry.id, { title: e.target.value })}
+                  className="flex-1 h-7 text-sm font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0"
+                  placeholder="Titel"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeEntry(entry.id)}
+                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                  title="Abschnitt entfernen"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="px-3 py-2">
+                <AutoGrowTextarea
+                  value={entry.content}
+                  onChange={e => updateEntry(entry.id, { content: e.target.value })}
+                  placeholder="Inhalt des Abschnitts..."
+                  className="text-sm leading-relaxed"
+                />
+              </div>
+            </div>
+          ))}
+
+          {/* Add button */}
           <button
             type="button"
-            className="flex-1 text-left font-semibold text-sm flex items-center gap-2 group"
-            onClick={() => { setTitleDraft(sectionTitle); setEditingTitle(true); }}
+            onClick={addEntry}
+            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
           >
-            <span className="flex-1">{sectionTitle}</span>
-            <Pencil size={13} className="opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+            <Plus size={15} />
+            Abschnitt hinzufügen
           </button>
-        )}
-      </div>
-
-      {/* Entries */}
-      <div className="mt-3 space-y-4 px-1">
-        {entries.map((entry, idx) => (
-          <div key={entry.id} className="border border-border rounded-xl bg-card overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b border-border">
-              <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">{idx + 1}.</span>
-              <Input
-                value={entry.title}
-                onChange={e => updateEntry(entry.id, { title: e.target.value })}
-                className="flex-1 h-7 text-sm font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0"
-                placeholder="Titel"
-              />
-              <button
-                type="button"
-                onClick={() => removeEntry(entry.id)}
-                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                title="Abschnitt entfernen"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="px-3 py-2">
-              <AutoGrowTextarea
-                value={entry.content}
-                onChange={e => updateEntry(entry.id, { content: e.target.value })}
-                placeholder="Inhalt des Abschnitts..."
-                className="text-sm leading-relaxed"
-              />
-            </div>
-          </div>
-        ))}
-
-        {/* Add button */}
-        <button
-          type="button"
-          onClick={addEntry}
-          className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-        >
-          <Plus size={15} />
-          Abschnitt hinzufügen
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

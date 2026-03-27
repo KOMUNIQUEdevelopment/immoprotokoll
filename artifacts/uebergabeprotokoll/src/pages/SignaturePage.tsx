@@ -100,6 +100,15 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
 
   return (
     <div className="space-y-6">
+      {/* Note */}
+      <div className="bg-muted/60 border border-border rounded-xl px-4 py-3 flex items-start gap-2">
+        <span className="text-muted-foreground mt-0.5 shrink-0 text-base">ℹ</span>
+        <p className="text-sm text-muted-foreground">
+          <strong className="text-foreground">Hinweis:</strong>{" "}
+          Unterschriften gelten für das gesamte Protokoll einschliesslich der Zusatzvereinbarungen.
+        </p>
+      </div>
+
       {/* Location & Date */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
         <h3 className="font-semibold text-sm">Ort und Datum</h3>

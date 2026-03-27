@@ -257,6 +257,20 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
   // ── Signatures page ───────────────────────────────────────────────────────
   addPage();
   h1("Unterschriften");
+
+  // Note
+  checkPage(14);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(
+    safeText("Hinweis: Unterschriften gelten fuer das gesamte Protokoll einschliesslich der Zusatzvereinbarungen."),
+    margin,
+    y,
+    { maxWidth: contentW }
+  );
+  y += 10;
+
   field("Ort", protocol.signaturOrt || "-");
   field("Datum", protocol.signaturDatum || "-");
   y += 10;
