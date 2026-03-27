@@ -50,7 +50,9 @@ function AppContent() {
     backToList,
     deleteProtocol,
     updateProtocol,
+    receiveInit,
     receiveRemote,
+    receiveDelete,
     manualSave,
     isSaving,
     lastSaved,
@@ -63,7 +65,12 @@ function AppContent() {
   const { toast } = useToast();
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
-  const { status: syncStatus } = useSync({ onReceive: receiveRemote, sendRef: wsSendRef });
+  const { status: syncStatus } = useSync({
+    onInit: receiveInit,
+    onUpdate: receiveRemote,
+    onDelete: receiveDelete,
+    sendRef: wsSendRef,
+  });
 
   const headerTitle = currentProtocol
     ? [currentProtocol.mietobjekt, currentProtocol.adresse].filter(Boolean).join(", ") ||

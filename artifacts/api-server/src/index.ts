@@ -16,8 +16,11 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const server = createServer(app);
-
 const wss = new WebSocketServer({ noServer: true });
+
+const MAX_PAYLOAD = 50 * 1024 * 1024;
+
+const serverProtocols: Record<string, unknown> = {};
 
 server.on("upgrade", (request, socket, head) => {
   if (request.url === "/api/sync") {
@@ -32,12 +35,36 @@ server.on("upgrade", (request, socket, head) => {
 wss.on("connection", (ws) => {
   logger.info({ clients: wss.clients.size }, "WebSocket client connected");
 
+  try {
+    ws.send(JSON.stringify({ type: "init", protocols: serverProtocols }));
+  } catch (err) {
+    logger.error({ err }, "Failed to send init to new client");
+  }
+
   ws.on("message", (data) => {
     const payload = data.toString();
-    if (payload.length > 50 * 1024 * 1024) {
+    if (payload.length > MAX_PAYLOAD) {
       logger.warn("Payload too large, ignoring");
       return;
     }
+
+    let msg: { type: string; protocol?: { id: string }; id?: string };
+    try {
+      msg = JSON.parse(payload);
+    } catch {
+      return;
+    }
+
+    if (msg.type === "update" && msg.protocol && msg.protocol.id) {
+      serverProtocols[msg.protocol.id] = msg.protocol;
+      logger.info({ id: msg.protocol.id, total: Object.keys(serverProtocols).length }, "Protocol updated");
+    } else if (msg.type === "delete" && msg.id) {
+      delete serverProtocols[msg.id];
+      logger.info({ id: msg.id, total: Object.keys(serverProtocols).length }, "Protocol deleted");
+    } else {
+      return;
+    }
+
     wss.clients.forEach((client) => {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
         client.send(payload);

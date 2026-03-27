@@ -3,17 +3,27 @@ import { ProtocolData } from "../types";
 
 export type SyncStatus = "disconnected" | "connected" | "connecting";
 
+export type SyncMessage =
+  | { type: "update"; protocol: ProtocolData }
+  | { type: "delete"; id: string };
+
 interface UseSyncOptions {
-  onReceive: (data: ProtocolData) => void;
-  sendRef: React.MutableRefObject<((data: ProtocolData) => void) | null>;
+  onInit: (protocols: Record<string, ProtocolData>) => void;
+  onUpdate: (protocol: ProtocolData) => void;
+  onDelete: (id: string) => void;
+  sendRef: React.MutableRefObject<((msg: SyncMessage) => void) | null>;
 }
 
-export function useSync({ onReceive, sendRef }: UseSyncOptions) {
+export function useSync({ onInit, onUpdate, onDelete, sendRef }: UseSyncOptions) {
   const [status, setStatus] = useState<SyncStatus>("connecting");
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onReceiveRef = useRef(onReceive);
-  onReceiveRef.current = onReceive;
+  const onInitRef = useRef(onInit);
+  const onUpdateRef = useRef(onUpdate);
+  const onDeleteRef = useRef(onDelete);
+  onInitRef.current = onInit;
+  onUpdateRef.current = onUpdate;
+  onDeleteRef.current = onDelete;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -35,8 +45,14 @@ export function useSync({ onReceive, sendRef }: UseSyncOptions) {
 
     ws.onmessage = (event) => {
       try {
-        const remote = JSON.parse(event.data) as ProtocolData;
-        onReceiveRef.current(remote);
+        const msg = JSON.parse(event.data);
+        if (msg.type === "init" && msg.protocols) {
+          onInitRef.current(msg.protocols as Record<string, ProtocolData>);
+        } else if (msg.type === "update" && msg.protocol) {
+          onUpdateRef.current(msg.protocol as ProtocolData);
+        } else if (msg.type === "delete" && msg.id) {
+          onDeleteRef.current(msg.id as string);
+        }
       } catch {}
     };
 
@@ -61,10 +77,10 @@ export function useSync({ onReceive, sendRef }: UseSyncOptions) {
   }, [connect, sendRef]);
 
   useEffect(() => {
-    sendRef.current = (data: ProtocolData) => {
+    sendRef.current = (msg: SyncMessage) => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) return;
       try {
-        wsRef.current.send(JSON.stringify(data));
+        wsRef.current.send(JSON.stringify(msg));
       } catch {}
     };
   }, [sendRef]);
