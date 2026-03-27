@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData, getPersonRole } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -265,6 +265,120 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
   );
 }
 
+// ── Share Link Modal ──────────────────────────────────────────────────────────
+
+interface ShareLinkModalProps {
+  protocol: ProtocolData;
+  onClose: () => void;
+}
+
+function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${window.location.origin}${window.location.pathname.split("#")[0]}#/view/${protocol.id}`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const el = document.createElement("input");
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 animate-in fade-in zoom-in-95"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-full bg-primary/10 shrink-0">
+            <Link size={18} className="text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-base">Mieter-Link teilen</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {protocol.mietobjekt || "Protokoll"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground hover:bg-muted transition-colors shrink-0 ml-auto"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {!protocol.syncEnabled && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-700 leading-snug">
+              <strong>Sync ist nicht aktiviert.</strong> Aktiviere erst Sync für dieses
+              Protokoll, damit der Link für die Mieterin funktioniert.
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Mieter-Link
+          </p>
+          <div className="flex gap-2">
+            <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground truncate border border-border">
+              {shareUrl}
+            </div>
+            <button
+              type="button"
+              onClick={copyLink}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors shrink-0 ${
+                copied
+                  ? "bg-green-50 border-green-300 text-green-700"
+                  : "bg-background border-border hover:bg-muted"
+              }`}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? "Kopiert!" : "Kopieren"}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-muted/50 rounded-xl p-3 space-y-1.5 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground text-xs">Was die Mieterin sehen kann:</p>
+          <ul className="space-y-1 list-none">
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Alle Protokollinhalte (schreibgeschützt)</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Alle Fotos und Raumzustände</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Zusatzvereinbarungen</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Eigene Unterschrift leisten (wird synchronisiert)</li>
+          </ul>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onClose} className="flex-1">
+            Schließen
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => window.open(shareUrl, "_blank")}
+            className="flex-1 gap-1.5"
+          >
+            <ExternalLink size={13} />
+            Ansicht öffnen
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Delete Dialog ─────────────────────────────────────────────────────────────
 
 interface DeleteDialogProps {
@@ -344,6 +458,7 @@ export default function ProtocolListPage({
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -533,6 +648,16 @@ export default function ProtocolListPage({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setShareId(p.id)}
+                    className="gap-1"
+                    title="Mieter-Link erstellen"
+                  >
+                    <Link size={13} />
+                    <span className="hidden sm:inline">Teilen</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => onOpen(p.id)}
                     className="gap-1"
                   >
@@ -553,6 +678,14 @@ export default function ProtocolListPage({
           })
         )}
       </main>
+
+      {/* Share link modal */}
+      {shareId && protocols[shareId] && (
+        <ShareLinkModal
+          protocol={protocols[shareId]}
+          onClose={() => setShareId(null)}
+        />
+      )}
 
       {/* Preview modal */}
       {previewId && protocols[previewId] && (

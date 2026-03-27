@@ -81,6 +81,59 @@ wss.on("connection", (ws) => {
   });
 });
 
+// ── REST: Protokoll lesen (für Mieter-Ansicht) ───────────────────────────────
+app.get("/api/protocol/:id", (req, res) => {
+  const protocol = serverProtocols[req.params.id];
+  if (!protocol) {
+    res.status(404).json({ error: "Protokoll nicht gefunden" });
+    return;
+  }
+  res.json({ protocol });
+});
+
+// ── REST: Unterschrift eintragen & an alle WS-Clients senden ─────────────────
+app.post("/api/protocol/:id/sign", (req, res) => {
+  const { id } = req.params;
+  const { personId, signatureDataUrl } = req.body as {
+    personId?: string;
+    signatureDataUrl?: string;
+  };
+
+  if (!personId || !signatureDataUrl) {
+    res.status(400).json({ error: "personId und signatureDataUrl erforderlich" });
+    return;
+  }
+
+  const protocol = serverProtocols[id] as Record<string, unknown> & {
+    personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
+  } | undefined;
+
+  if (!protocol) {
+    res.status(404).json({ error: "Protokoll nicht gefunden" });
+    return;
+  }
+
+  const sigs = Array.isArray(protocol.personSignatures) ? [...protocol.personSignatures] : [];
+  const idx = sigs.findIndex((s) => s.personId === personId);
+  if (idx >= 0) {
+    sigs[idx] = { ...sigs[idx], signatureDataUrl };
+  } else {
+    sigs.push({ personId, signatureDataUrl });
+  }
+  protocol.personSignatures = sigs;
+  serverProtocols[id] = protocol;
+
+  const payload = JSON.stringify({ type: "update", protocol });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  });
+
+  logger.info({ id, personId }, "Tenant signature saved and broadcast");
+  res.json({ ok: true });
+});
+
 server.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

@@ -6,6 +6,7 @@ import { useProtocolsStore } from "./store";
 import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import ProtocolListPage from "./pages/ProtocolListPage";
+import TenantViewPage from "./pages/TenantViewPage";
 import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
@@ -370,6 +371,18 @@ function SwUpdatePopup({
 }
 
 export default function App() {
+  const hash = window.location.hash;
+  const viewMatch = hash.match(/^#\/view\/(.+)$/);
+
+  if (viewMatch) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TenantViewPage protocolId={viewMatch[1]} />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AppContent />
