@@ -3,6 +3,7 @@ import { ProtocolData } from "../types";
 import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InstallButton } from "../components/InstallButton";
 
 interface ProtocolListPageProps {
   protocols: Record<string, ProtocolData>;
@@ -129,10 +130,13 @@ export default function ProtocolListPage({
                 </p>
               </div>
             </div>
-            <Button size="sm" onClick={onCreate} className="gap-1.5">
-              <Plus size={15} />
-              Neu
-            </Button>
+            <div className="flex items-center gap-2">
+              <InstallButton />
+              <Button size="sm" onClick={onCreate} className="gap-1.5">
+                <Plus size={15} />
+                Neu
+              </Button>
+            </div>
           </div>
         </div>
       </header>

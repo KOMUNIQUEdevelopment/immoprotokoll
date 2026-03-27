@@ -7,16 +7,15 @@ import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import ProtocolListPage from "./pages/ProtocolListPage";
 import { exportToPDF } from "./pdfExport";
-import { usePwaInstall } from "./hooks/usePwaInstall";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
+import { InstallButton } from "./components/InstallButton";
 import {
   Save,
   FileDown,
   ClipboardList,
   PenLine,
   CheckCircle2,
-  Download,
   Wifi,
   WifiOff,
   X,
@@ -61,7 +60,6 @@ function AppContent() {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
-  const { canInstall, install } = usePwaInstall();
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
   const { status: syncStatus } = useSync({ onReceive: receiveRemote, sendRef: wsSendRef });
 
@@ -179,12 +177,7 @@ function AppContent() {
                 </span>
               )}
 
-              {canInstall && (
-                <Button variant="outline" size="sm" onClick={install} className="gap-1.5">
-                  <Download size={14} />
-                  <span className="hidden sm:inline">Installieren</span>
-                </Button>
-              )}
+              <InstallButton />
 
               <Button
                 variant="outline"

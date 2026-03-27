@@ -10,7 +10,10 @@ export function usePwaInstall() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
+    if (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true
+    ) {
       setIsInstalled(true);
     }
 
@@ -30,15 +33,26 @@ export function usePwaInstall() {
     };
   }, []);
 
-  const install = async () => {
-    if (!promptEvent) return;
-    await promptEvent.prompt();
-    const { outcome } = await promptEvent.userChoice;
-    if (outcome === "accepted") {
-      setIsInstalled(true);
-      setPromptEvent(null);
+  const install = async (): Promise<"native" | "manual"> => {
+    if (promptEvent) {
+      await promptEvent.prompt();
+      const { outcome } = await promptEvent.userChoice;
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+        setPromptEvent(null);
+      }
+      return "native";
     }
+    return "manual";
   };
 
-  return { canInstall: !!promptEvent && !isInstalled, install, isInstalled };
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  return {
+    canInstall: !isInstalled,
+    hasNativePrompt: !!promptEvent,
+    install,
+    isInstalled,
+    isIos,
+  };
 }
