@@ -149,6 +149,21 @@ export function useProtocolsStore() {
     });
   }, []);
 
+  const renameProtocol = useCallback((id: string, name: string) => {
+    setProtocols(prev => {
+      if (!prev[id]) return prev;
+      const trimmed = name.trim();
+      if (!trimmed) return prev;
+      const updated = { ...prev[id], mietobjekt: trimmed, lastSaved: new Date().toISOString() };
+      const next = { ...prev, [id]: updated };
+      persistAll(next);
+      if (updated.syncEnabled) {
+        wsSendRef.current?.({ type: "update", protocol: updated });
+      }
+      return next;
+    });
+  }, []);
+
   const createNew = useCallback(() => {
     const p = createDefaultProtocol();
     setProtocols(prev => {
@@ -232,6 +247,7 @@ export function useProtocolsStore() {
     switchTo,
     backToList,
     deleteProtocol,
+    renameProtocol,
     updateProtocol,
     toggleSync,
     receiveInit,

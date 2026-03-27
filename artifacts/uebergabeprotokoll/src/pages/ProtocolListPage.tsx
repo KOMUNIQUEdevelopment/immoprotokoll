@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -11,6 +11,7 @@ interface ProtocolListPageProps {
   onCreate: () => void;
   onDelete: (id: string) => void;
   onToggleSync: (id: string) => void;
+  onRename: (id: string, name: string) => void;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -101,8 +102,33 @@ export default function ProtocolListPage({
   onCreate,
   onDelete,
   onToggleSync,
+  onRename,
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
+
+  const startRename = (p: ProtocolData) => {
+    setRenamingId(p.id);
+    setRenameValue(p.mietobjekt || "");
+  };
+
+  const commitRename = () => {
+    if (renamingId && renameValue.trim()) {
+      onRename(renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+  };
+
+  const cancelRename = () => setRenamingId(null);
 
   const sorted = Object.values(protocols).sort((a, b) => {
     const ta = a.lastSaved ? new Date(a.lastSaved).getTime() : 0;
@@ -175,15 +201,55 @@ export default function ProtocolListPage({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm leading-snug truncate">{title}</p>
-                    {p.syncEnabled && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5 shrink-0">
-                        <Cloud size={9} />
-                        Sync
-                      </span>
-                    )}
-                  </div>
+                  {renamingId === p.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") commitRename();
+                          if (e.key === "Escape") cancelRename();
+                        }}
+                        onBlur={commitRename}
+                        className="h-7 text-sm font-semibold py-0 px-2"
+                      />
+                      <button
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); commitRename(); }}
+                        className="p-1 rounded text-emerald-600 hover:bg-emerald-50 shrink-0"
+                        title="Speichern"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); cancelRename(); }}
+                        className="p-1 rounded text-muted-foreground hover:bg-muted shrink-0"
+                        title="Abbrechen"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 group/title">
+                      <p className="font-semibold text-sm leading-snug truncate">{title}</p>
+                      {p.syncEnabled && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5 shrink-0">
+                          <Cloud size={9} />
+                          Sync
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => startRename(p)}
+                        className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
+                        title="Bezeichnung ändern"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  )}
                   {subtitle && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
                   )}

@@ -51,6 +51,7 @@ function AppContent() {
     switchTo,
     backToList,
     deleteProtocol,
+    renameProtocol,
     updateProtocol,
     toggleSync,
     receiveInit,
@@ -154,6 +155,7 @@ function AppContent() {
           onCreate={handleCreate}
           onDelete={deleteProtocol}
           onToggleSync={toggleSync}
+          onRename={renameProtocol}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
       </>
