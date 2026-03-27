@@ -75,20 +75,26 @@ export interface ProtocolData {
 }
 
 export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
+  // EG
   { id: "eg-bibliothek", name: "Bibliothek", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "eg-salon", name: "Salon", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "eg-wohnkueche", name: "Wohnküche", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "eg-speisekammer", name: "Speisekammer", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "eg-flur", name: "Flur / Halle", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "eg-wc", name: "WC", floor: "EG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  // OG
   { id: "og-schlafzimmer", name: "Schlafzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "og-kinderzimmer", name: "Kinderzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "og-wohnzimmer", name: "Wohnzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "og-bad", name: "Bad / WC", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "og-terrasse", name: "Terrasse", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  // DG
   { id: "dg-zimmer1", name: "Zimmer 1", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-zimmer2", name: "Zimmer 2", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-kueche", name: "Küche", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-bad", name: "Bad", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "ug-hobbyraum", name: "Hobbyraum", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "dg-wc", name: "WC", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  // UG / Keller – Hobbyraum zuletzt
   { id: "keller-technik", name: "Keller / Technik", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   {
     id: "ug-kohlekeller-aufzug",
@@ -117,8 +123,11 @@ export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
     waschmaschinenZustand: "",
     waschmaschinenNotizen: "",
   },
-  { id: "garage-stellplatz", name: "Garage / Stellplatz", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "terrasse-garten", name: "Terrasse / Garten", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "ug-hobbyraum", name: "Hobbyraum", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  // Außen
+  { id: "aussen-garage", name: "Garage", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-terrasse-eg", name: "Terrasse (EG)", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-terrasse-garage", name: "Terrasse (Garage)", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
 ];
 
 export const DEFAULT_APPLIANCES: ApplianceEntry[] = [
@@ -172,10 +181,22 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     const sigs = (data.signatures as Array<{ id: string; signatureDataUrl: string | null }> | undefined) || [];
     data.personSignatures = sigs.map(s => ({ personId: s.id, signatureDataUrl: s.signatureDataUrl }));
   }
-  const existingRoomIds = new Set((data.rooms as RoomData[]).map(r => r.id));
+  const REMOVED_ROOM_IDS = new Set(["garage-stellplatz", "terrasse-garten"]);
+  let rooms = (data.rooms as RoomData[]).filter(r => !REMOVED_ROOM_IDS.has(r.id));
+  const existingRoomIds = new Set(rooms.map(r => r.id));
   const missingRooms = DEFAULT_ROOMS.filter(r => !existingRoomIds.has(r.id)).map(r => ({ ...r, photos: [] }));
   if (missingRooms.length > 0) {
-    (data.rooms as RoomData[]).push(...missingRooms);
+    rooms.push(...missingRooms);
   }
+  const defaultOrder = DEFAULT_ROOMS.map(r => r.id);
+  rooms.sort((a, b) => {
+    const ai = defaultOrder.indexOf(a.id);
+    const bi = defaultOrder.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  data.rooms = rooms;
   return { ...def, ...(data as Partial<ProtocolData>) } as ProtocolData;
 }
