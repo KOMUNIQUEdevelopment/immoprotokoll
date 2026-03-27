@@ -1,23 +1,34 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { ProtocolData, createDefaultProtocol } from "./types";
+import { useState, useCallback, useRef } from "react";
+import { ProtocolData, createDefaultProtocol, migrateProtocol } from "./types";
 
 const STORAGE_KEY = "uebergabeprotokoll_data";
 
+function loadFromStorage(): ProtocolData {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return migrateProtocol(parsed);
+    }
+  } catch (e) {
+    console.warn("Failed to load saved data", e);
+  }
+  return createDefaultProtocol();
+}
+
 export function useProtocolStore() {
-  const [protocol, setProtocol] = useState<ProtocolData>(() => {
+  const [protocol, setProtocol] = useState<ProtocolData>(loadFromStorage);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.lastSaved) return new Date(parsed.lastSaved);
       }
-    } catch (e) {
-      console.warn("Failed to load saved data", e);
-    }
-    return createDefaultProtocol();
+    } catch {}
+    return null;
   });
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback((data: ProtocolData) => {
@@ -46,18 +57,6 @@ export function useProtocolStore() {
       return next;
     });
   }, [save]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.lastSaved) {
-          setLastSaved(new Date(parsed.lastSaved));
-        }
-      } catch {}
-    }
-  }, []);
 
   return { protocol, updateProtocol, manualSave, isSaving, lastSaved };
 }

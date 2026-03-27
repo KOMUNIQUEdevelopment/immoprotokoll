@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { ProtocolData, RoomData } from "../types";
 import RoomSection from "../components/RoomSection";
+import PersonList from "../components/PersonList";
+import AutoGrowTextarea from "../components/AutoGrowTextarea";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface ProtocolPageProps {
@@ -31,20 +32,17 @@ function CollapsibleSection({ title, children, defaultOpen = false }: {
   );
 }
 
-function fieldClass(label: string, children: React.ReactNode) {
+function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div>
-      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-        {label}
-      </label>
+    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
       {children}
-    </div>
+    </label>
   );
 }
 
 export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageProps) {
-  const set = (field: keyof ProtocolData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    updateProtocol(p => ({ ...p, [field]: e.target.value }));
+  const setField = (field: keyof ProtocolData, value: unknown) => {
+    updateProtocol(p => ({ ...p, [field]: value }));
   };
 
   const floors = ["EG", "OG", "DG", "UG", "Außen"];
@@ -67,15 +65,73 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
     <div className="space-y-2">
       {/* General Info */}
       <CollapsibleSection title="Allgemeine Informationen" defaultOpen={true}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-1">
-          {fieldClass("Adresse", <Input value={protocol.adresse} onChange={set("adresse")} placeholder="Straße, PLZ Ort" />)}
-          {fieldClass("Datum der Übergabe", <Input value={protocol.datum} onChange={set("datum")} placeholder="TT.MM.JJJJ" />)}
-          {fieldClass("Übergeber (Vermieter)", <Input value={protocol.uebergeber} onChange={set("uebergeber")} placeholder="Name des Übergebers" />)}
-          {fieldClass("Übernehmer (Mieter)", <Input value={protocol.uebernehmer} onChange={set("uebernehmer")} placeholder="Name des Übernehmers" />)}
-        </div>
         <div className="px-1 space-y-3">
-          {fieldClass("Schlüsselübergabe", <Input value={protocol.schluessel} onChange={set("schluessel")} placeholder="Anzahl und Art der Schlüssel" />)}
-          {fieldClass("Details / Besonderheiten", <Textarea value={protocol.schluesselDetails} onChange={set("schluesselDetails")} placeholder="z.B. 3× Haustürschlüssel, 2× Briefkastenschlüssel..." className="min-h-[60px] resize-none text-sm" />)}
+          {/* Mietobjekt + Adresse */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Mietobjekt</FieldLabel>
+              <Input
+                value={protocol.mietobjekt}
+                onChange={(e) => setField("mietobjekt", e.target.value)}
+                placeholder="Art des Mietobjekts"
+              />
+            </div>
+            <div>
+              <FieldLabel>Datum der Übergabe</FieldLabel>
+              <Input
+                value={protocol.datum}
+                onChange={(e) => setField("datum", e.target.value)}
+                placeholder="TT.MM.JJJJ"
+              />
+            </div>
+          </div>
+
+          <div>
+            <FieldLabel>Adresse</FieldLabel>
+            <Input
+              value={protocol.adresse}
+              onChange={(e) => setField("adresse", e.target.value)}
+              placeholder="Straße, PLZ Ort"
+            />
+          </div>
+
+          {/* Übergeber */}
+          <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
+            <PersonList
+              label="Übergeber (Vermieter)"
+              persons={protocol.uebergeber}
+              onChange={(persons) => setField("uebergeber", persons)}
+              roleLabel={(g) => g === "f" ? "Vermieterin" : "Vermieter"}
+            />
+          </div>
+
+          {/* Übernehmer */}
+          <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
+            <PersonList
+              label="Übernehmer (Mieter)"
+              persons={protocol.uebernehmer}
+              onChange={(persons) => setField("uebernehmer", persons)}
+              roleLabel={(g) => g === "f" ? "Mieterin" : "Mieter"}
+            />
+          </div>
+
+          {/* Keys */}
+          <div>
+            <FieldLabel>Schlüsselübergabe</FieldLabel>
+            <Input
+              value={protocol.schluessel}
+              onChange={(e) => setField("schluessel", e.target.value)}
+              placeholder="Anzahl und Art der Schlüssel"
+            />
+          </div>
+          <div>
+            <FieldLabel>Details / Besonderheiten</FieldLabel>
+            <AutoGrowTextarea
+              value={protocol.schluesselDetails}
+              onChange={(e) => setField("schluesselDetails", e.target.value)}
+              placeholder="z.B. 3× Haustürschlüssel, 2× Briefkastenschlüssel..."
+            />
+          </div>
         </div>
       </CollapsibleSection>
 
@@ -90,7 +146,7 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                 onChange={(e) => {
                   const updated = [...protocol.meterReadings];
                   updated[i] = { ...meter, stand: e.target.value };
-                  updateProtocol(p => ({ ...p, meterReadings: updated }));
+                  setField("meterReadings", updated);
                 }}
                 placeholder={`Stand in ${meter.einheit}`}
                 className="text-sm"
@@ -112,21 +168,21 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                 onChange={(e) => {
                   const updated = [...protocol.appliances];
                   updated[i] = { ...app, zustand: e.target.value };
-                  updateProtocol(p => ({ ...p, appliances: updated }));
+                  setField("appliances", updated);
                 }}
                 placeholder="Zustand"
                 className="text-sm"
               />
             </div>
           ))}
-          {fieldClass("Allgemeiner Zustand Küche",
-            <Textarea
+          <div>
+            <FieldLabel>Allgemeiner Zustand Küche</FieldLabel>
+            <AutoGrowTextarea
               value={protocol.allgemeinerZustandKueche}
-              onChange={set("allgemeinerZustandKueche")}
+              onChange={(e) => setField("allgemeinerZustandKueche", e.target.value)}
               placeholder="Allgemeinen Zustand der Küche beschreiben..."
-              className="min-h-[70px] resize-none text-sm"
             />
-          )}
+          </div>
         </div>
       </CollapsibleSection>
 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { RoomData, Condition } from "../types";
 import PhotoManager from "./PhotoManager";
-import { Textarea } from "@/components/ui/textarea";
+import AutoGrowTextarea from "./AutoGrowTextarea";
 import { Input } from "@/components/ui/input";
 
 interface RoomSectionProps {
@@ -12,6 +12,39 @@ interface RoomSectionProps {
 
 const CONDITIONS: Condition[] = ["sehr gut", "gut", "Mängel"];
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
+      {children}
+    </label>
+  );
+}
+
+function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c: Condition) => void }) {
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {CONDITIONS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(value === c ? "" : c)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+            value === c
+              ? c === "sehr gut"
+                ? "bg-green-500 text-white border-green-500"
+                : c === "gut"
+                ? "bg-yellow-500 text-white border-yellow-500"
+                : "bg-red-500 text-white border-red-500"
+              : "bg-background border-border text-foreground hover:bg-accent"
+          }`}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function RoomSection({ room, onChange }: RoomSectionProps) {
   const [open, setOpen] = useState(false);
 
@@ -20,6 +53,7 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
   };
 
   const hasContent = room.bodenZustand || room.maengelSchaeden || room.notizen || room.photos.length > 0;
+  const isWaschraum = room.id === "ug-waschraum";
 
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card">
@@ -29,12 +63,10 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent/30 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div>
-            <span className="font-semibold text-sm">{room.name}</span>
-            {hasContent && (
-              <span className="ml-2 inline-block w-2 h-2 rounded-full bg-primary" title="Ausgefüllt" />
-            )}
-          </div>
+          <span className="font-semibold text-sm">{room.name}</span>
+          {hasContent && (
+            <span className="inline-block w-2 h-2 rounded-full bg-primary" title="Ausgefüllt" />
+          )}
           {room.bodenZustand && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               room.bodenZustand === "sehr gut"
@@ -57,62 +89,32 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
         <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">
           {/* Boden Zustand */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              Boden Zustand
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {CONDITIONS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => update("bodenZustand", room.bodenZustand === c ? "" : c)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                    room.bodenZustand === c
-                      ? c === "sehr gut"
-                        ? "bg-green-500 text-white border-green-500"
-                        : c === "gut"
-                        ? "bg-yellow-500 text-white border-yellow-500"
-                        : "bg-red-500 text-white border-red-500"
-                      : "bg-background border-border text-foreground hover:bg-accent"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+            <FieldLabel>Boden Zustand</FieldLabel>
+            <ConditionButtons value={room.bodenZustand} onChange={(c) => update("bodenZustand", c)} />
           </div>
 
-          {/* Text fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                Wände / Decken
-              </label>
-              <Textarea
+              <FieldLabel>Wände / Decken</FieldLabel>
+              <AutoGrowTextarea
                 value={room.waendeDecken}
                 onChange={(e) => update("waendeDecken", e.target.value)}
                 placeholder="Zustand beschreiben..."
-                className="text-sm min-h-[70px] resize-none"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                Fenster / Türen
-              </label>
-              <Textarea
+              <FieldLabel>Fenster / Türen</FieldLabel>
+              <AutoGrowTextarea
                 value={room.fensterTueren}
                 onChange={(e) => update("fensterTueren", e.target.value)}
                 placeholder="Zustand beschreiben..."
-                className="text-sm min-h-[70px] resize-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                Elektrik
-              </label>
+              <FieldLabel>Elektrik</FieldLabel>
               <Input
                 value={room.elektrik}
                 onChange={(e) => update("elektrik", e.target.value)}
@@ -120,9 +122,7 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                Heizung
-              </label>
+              <FieldLabel>Heizung</FieldLabel>
               <Input
                 value={room.heizung}
                 onChange={(e) => update("heizung", e.target.value)}
@@ -132,34 +132,71 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-              Mängel / Schäden
-            </label>
-            <Textarea
+            <FieldLabel>Mängel / Schäden</FieldLabel>
+            <AutoGrowTextarea
               value={room.maengelSchaeden}
               onChange={(e) => update("maengelSchaeden", e.target.value)}
               placeholder="Mängel und Schäden beschreiben..."
-              className="text-sm min-h-[70px] resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-              Notizen
-            </label>
-            <Textarea
+            <FieldLabel>Notizen</FieldLabel>
+            <AutoGrowTextarea
               value={room.notizen}
               onChange={(e) => update("notizen", e.target.value)}
               placeholder="Weitere Notizen..."
-              className="text-sm min-h-[60px] resize-none"
             />
           </div>
 
+          {/* Waschraum special section */}
+          {isWaschraum && (
+            <div className="border border-border rounded-lg p-3 space-y-3 bg-muted/30">
+              <div>
+                <FieldLabel>Waschmaschine vorhanden?</FieldLabel>
+                <div className="flex gap-2">
+                  {[true, false].map((val) => (
+                    <button
+                      key={String(val)}
+                      type="button"
+                      onClick={() => update("waschmaschineVorhanden", val)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                        room.waschmaschineVorhanden === val
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {val ? "Ja" : "Nein"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {room.waschmaschineVorhanden === true && (
+                <>
+                  <div>
+                    <FieldLabel>Zustand der Waschmaschine</FieldLabel>
+                    <ConditionButtons
+                      value={room.waschmaschinenZustand ?? ""}
+                      onChange={(c) => update("waschmaschinenZustand", c)}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Notizen zur Waschmaschine</FieldLabel>
+                    <AutoGrowTextarea
+                      value={room.waschmaschinenNotizen ?? ""}
+                      onChange={(e) => update("waschmaschinenNotizen", e.target.value)}
+                      placeholder="z.B. Marke, Modell, Besonderheiten..."
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Photos */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              Fotos
-            </label>
+            <FieldLabel>Fotos</FieldLabel>
             <PhotoManager
               photos={room.photos}
               onChange={(photos) => update("photos", photos)}

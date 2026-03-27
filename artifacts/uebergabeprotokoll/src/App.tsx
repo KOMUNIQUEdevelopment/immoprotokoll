@@ -29,6 +29,8 @@ function AppContent() {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
+  const headerTitle = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Übergabeprotokoll";
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -47,21 +49,26 @@ function AppContent() {
     toast({ title: "Gespeichert", description: "Das Protokoll wurde gespeichert." });
   };
 
-  const allSigned = protocol.signatures.length > 0 && protocol.signatures.every(s => s.signatureDataUrl !== null);
+  const allSigned =
+    protocol.uebergeber.length > 0 &&
+    protocol.uebernehmer.length > 0 &&
+    [...protocol.uebergeber, ...protocol.uebernehmer].every(
+      p => protocol.personSignatures.some(s => s.personId === p.id && s.signatureDataUrl !== null)
+    );
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-40 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-bold text-base leading-tight">Übergabeprotokoll</h1>
-              <p className="text-xs text-muted-foreground truncate max-w-[180px]">{protocol.adresse || "Villa Albstadt"}</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="font-bold text-sm leading-tight">Übergabeprotokoll</h1>
+              <p className="text-xs text-muted-foreground truncate">{headerTitle}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {lastSaved && (
-                <span className="text-xs text-muted-foreground hidden sm:block">
+                <span className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">
                   {isSaving ? "Speichert..." : `Gespeichert ${formatRelative(lastSaved)}`}
                 </span>
               )}
@@ -73,7 +80,7 @@ function AppContent() {
                 className="gap-1.5"
               >
                 {isSaving ? <CheckCircle2 size={14} className="text-green-500" /> : <Save size={14} />}
-                {isSaving ? "OK" : "Speichern"}
+                <span className="hidden sm:inline">{isSaving ? "OK" : "Speichern"}</span>
               </Button>
               <Button
                 size="sm"
@@ -82,7 +89,7 @@ function AppContent() {
                 className="gap-1.5"
               >
                 <FileDown size={14} />
-                {isExporting ? "..." : "PDF"}
+                PDF
               </Button>
             </div>
           </div>
@@ -132,14 +139,12 @@ function AppContent() {
         )}
       </main>
 
-      {/* Auto-save indicator on mobile */}
-      {lastSaved && (
+      {/* Auto-save mobile toast */}
+      {isSaving && (
         <div className="sm:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-          {isSaving && (
-            <span className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-md">
-              Automatisch gespeichert...
-            </span>
-          )}
+          <span className="bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-md">
+            Automatisch gespeichert
+          </span>
         </div>
       )}
     </div>

@@ -19,6 +19,9 @@ export interface RoomData {
   maengelSchaeden: string;
   notizen: string;
   photos: RoomPhoto[];
+  waschmaschineVorhanden?: boolean;
+  waschmaschinenZustand?: Condition;
+  waschmaschinenNotizen?: string;
 }
 
 export interface ApplianceEntry {
@@ -33,21 +36,31 @@ export interface MeterReading {
   einheit: string;
 }
 
-export type SignerRole = "Mieter" | "Mieterin" | "Vermieter" | "Vermieterin";
+export type Gender = "m" | "f";
 
-export interface SignatureField {
+export interface Person {
   id: string;
   name: string;
-  role: SignerRole;
+  gender: Gender;
+}
+
+export function getPersonRole(person: Person, side: "uebergeber" | "uebernehmer"): string {
+  if (side === "uebergeber") return person.gender === "f" ? "Vermieterin" : "Vermieter";
+  return person.gender === "f" ? "Mieterin" : "Mieter";
+}
+
+export interface PersonSignature {
+  personId: string;
   signatureDataUrl: string | null;
 }
 
 export interface ProtocolData {
   id: string;
+  mietobjekt: string;
   adresse: string;
   datum: string;
-  uebergeber: string;
-  uebernehmer: string;
+  uebergeber: Person[];
+  uebernehmer: Person[];
   gesamtZustand: string;
   schluessel: string;
   schluesselDetails: string;
@@ -57,7 +70,7 @@ export interface ProtocolData {
   rooms: RoomData[];
   signaturOrt: string;
   signaturDatum: string;
-  signatures: SignatureField[];
+  personSignatures: PersonSignature[];
   lastSaved: string | null;
 }
 
@@ -77,6 +90,33 @@ export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
   { id: "dg-bad", name: "Bad", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "ug-hobbyraum", name: "Hobbyraum", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "keller-technik", name: "Keller / Technik", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  {
+    id: "ug-kohlekeller-aufzug",
+    name: "Kohlekeller / Aufzug",
+    floor: "UG",
+    bodenZustand: "",
+    waendeDecken: "",
+    fensterTueren: "",
+    elektrik: "OK",
+    heizung: "OK",
+    maengelSchaeden: "",
+    notizen: "Der Betrieb und die Nutzung des Warenaufzugs erfolgt auf eigene Gefahr. Der Vermieter übernimmt keine Haftung für Schäden, die durch die Nutzung des Aufzugs entstehen. Es besteht kein Anspruch auf Reparatur oder Instandhaltung des Aufzugs.",
+  },
+  {
+    id: "ug-waschraum",
+    name: "Waschraum",
+    floor: "UG",
+    bodenZustand: "",
+    waendeDecken: "",
+    fensterTueren: "",
+    elektrik: "OK",
+    heizung: "OK",
+    maengelSchaeden: "",
+    notizen: "",
+    waschmaschineVorhanden: undefined,
+    waschmaschinenZustand: "",
+    waschmaschinenNotizen: "",
+  },
   { id: "garage-stellplatz", name: "Garage / Stellplatz", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "terrasse-garten", name: "Terrasse / Garten", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
 ];
@@ -98,10 +138,11 @@ export const DEFAULT_METER_READINGS: MeterReading[] = [
 export function createDefaultProtocol(): ProtocolData {
   return {
     id: crypto.randomUUID(),
-    adresse: "Villa Albstadt Ebingen",
-    datum: new Date().toLocaleDateString("de-DE"),
-    uebergeber: "",
-    uebernehmer: "",
+    mietobjekt: "EFH, Altbau, Villa",
+    adresse: "Bitzer Steige 75, 79597 Albstadt",
+    datum: "28.03.2026",
+    uebergeber: [{ id: crypto.randomUUID(), name: "", gender: "m" }],
+    uebernehmer: [{ id: crypto.randomUUID(), name: "", gender: "f" }],
     gesamtZustand: "",
     schluessel: "",
     schluesselDetails: "",
@@ -110,8 +151,31 @@ export function createDefaultProtocol(): ProtocolData {
     allgemeinerZustandKueche: "",
     rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
     signaturOrt: "",
-    signaturDatum: new Date().toLocaleDateString("de-DE"),
-    signatures: [],
+    signaturDatum: "28.03.2026",
+    personSignatures: [],
     lastSaved: null,
   };
+}
+
+export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
+  const def = createDefaultProtocol();
+  if (typeof data.uebergeber === "string") {
+    const name = data.uebergeber as string;
+    data.uebergeber = [{ id: crypto.randomUUID(), name, gender: "m" }];
+  }
+  if (typeof data.uebernehmer === "string") {
+    const name = data.uebernehmer as string;
+    data.uebernehmer = [{ id: crypto.randomUUID(), name, gender: "m" }];
+  }
+  if (!data.mietobjekt) data.mietobjekt = def.mietobjekt;
+  if (!data.personSignatures) {
+    const sigs = (data.signatures as Array<{ id: string; signatureDataUrl: string | null }> | undefined) || [];
+    data.personSignatures = sigs.map(s => ({ personId: s.id, signatureDataUrl: s.signatureDataUrl }));
+  }
+  const existingRoomIds = new Set((data.rooms as RoomData[]).map(r => r.id));
+  const missingRooms = DEFAULT_ROOMS.filter(r => !existingRoomIds.has(r.id)).map(r => ({ ...r, photos: [] }));
+  if (missingRooms.length > 0) {
+    (data.rooms as RoomData[]).push(...missingRooms);
+  }
+  return { ...def, ...(data as Partial<ProtocolData>) } as ProtocolData;
 }
