@@ -44,9 +44,8 @@ export interface Person {
   gender: Gender;
 }
 
-export function getPersonRole(person: Person, side: "uebergeber" | "uebernehmer"): string {
-  if (side === "uebergeber") return person.gender === "f" ? "Vermieterin" : "Vermieter";
-  return person.gender === "f" ? "Mieterin" : "Mieter";
+export function getPersonRole(_person: Person, side: "uebergeber" | "uebernehmer"): string {
+  return side === "uebergeber" ? "Vermieter" : "Mieter";
 }
 
 export interface PersonSignature {

@@ -1,23 +1,21 @@
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Person, Gender } from "../types";
+import { Person } from "../types";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 interface PersonListProps {
   label: string;
   persons: Person[];
   onChange: (persons: Person[]) => void;
-  roleLabel: (gender: Gender) => string;
 }
 
-export default function PersonList({ label, persons, onChange, roleLabel }: PersonListProps) {
+export default function PersonList({ label, persons, onChange }: PersonListProps) {
   const addPerson = () => {
     onChange([...persons, { id: crypto.randomUUID(), name: "", gender: "m" }]);
   };
 
-  const updatePerson = (id: string, updates: Partial<Person>) => {
-    onChange(persons.map(p => p.id === id ? { ...p, ...updates } : p));
+  const updatePerson = (id: string, name: string) => {
+    onChange(persons.map(p => p.id === id ? { ...p, name } : p));
   };
 
   const removePerson = (id: string) => {
@@ -47,36 +45,10 @@ export default function PersonList({ label, persons, onChange, roleLabel }: Pers
           <div key={person.id} className="flex items-center gap-2">
             <Input
               value={person.name}
-              onChange={(e) => updatePerson(person.id, { name: e.target.value })}
+              onChange={(e) => updatePerson(person.id, e.target.value)}
               placeholder="Vorname Nachname"
               className="flex-1 text-sm"
             />
-            <div className="flex border border-border rounded-md overflow-hidden shrink-0">
-              <button
-                type="button"
-                onClick={() => updatePerson(person.id, { gender: "m" })}
-                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  person.gender === "m"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:bg-accent"
-                }`}
-                title="Männlich"
-              >
-                {roleLabel("m")}
-              </button>
-              <button
-                type="button"
-                onClick={() => updatePerson(person.id, { gender: "f" })}
-                className={`px-2.5 py-1.5 text-xs font-medium border-l border-border transition-colors ${
-                  person.gender === "f"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:bg-accent"
-                }`}
-                title="Weiblich"
-              >
-                {roleLabel("f")}
-              </button>
-            </div>
             {persons.length > 1 && (
               <button
                 type="button"

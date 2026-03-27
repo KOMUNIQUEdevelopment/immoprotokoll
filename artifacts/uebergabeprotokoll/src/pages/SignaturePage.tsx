@@ -82,8 +82,8 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
     }));
   };
 
-  const addPerson = (side: "uebergeber" | "uebernehmer", gender: "m" | "f") => {
-    const newPerson: Person = { id: crypto.randomUUID(), name: "", gender };
+  const addPerson = (side: "uebergeber" | "uebernehmer") => {
+    const newPerson: Person = { id: crypto.randomUUID(), name: "", gender: "m" };
     updateProtocol(p => ({
       ...p,
       [side]: [...(p[side] as Person[]), newPerson],
@@ -146,25 +146,14 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
             )}
           </h3>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => addPerson("uebergeber", "m")}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              <Plus size={12} />
-              Vermieter
-            </button>
-            <span className="text-muted-foreground">·</span>
-            <button
-              type="button"
-              onClick={() => addPerson("uebergeber", "f")}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              <Plus size={12} />
-              Vermieterin
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => addPerson("uebergeber")}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            <Plus size={12} />
+            Person hinzufügen
+          </button>
         </div>
 
         {protocol.uebergeber.map((person, i) => (
@@ -176,7 +165,7 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebergeber", person.id, name)}
             onRemove={protocol.uebergeber.length > 1 ? () => removePerson("uebergeber", person.id) : undefined}
-            onAdd={() => addPerson("uebergeber", "m")}
+            onAdd={() => addPerson("uebergeber")}
             isLast={i === protocol.uebergeber.length - 1}
           />
         ))}
@@ -191,25 +180,14 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
             )}
           </h3>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => addPerson("uebernehmer", "m")}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              <Plus size={12} />
-              Mieter
-            </button>
-            <span className="text-muted-foreground">·</span>
-            <button
-              type="button"
-              onClick={() => addPerson("uebernehmer", "f")}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              <Plus size={12} />
-              Mieterin
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => addPerson("uebernehmer")}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            <Plus size={12} />
+            Person hinzufügen
+          </button>
         </div>
 
         {protocol.uebernehmer.map((person, i) => (
@@ -221,7 +199,7 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebernehmer", person.id, name)}
             onRemove={protocol.uebernehmer.length > 1 ? () => removePerson("uebernehmer", person.id) : undefined}
-            onAdd={() => addPerson("uebernehmer", "m")}
+            onAdd={() => addPerson("uebernehmer")}
             isLast={i === protocol.uebernehmer.length - 1}
           />
         ))}

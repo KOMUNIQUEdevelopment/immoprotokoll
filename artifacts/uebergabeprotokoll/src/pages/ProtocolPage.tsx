@@ -101,7 +101,6 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
               label="Übergeber (Vermieter)"
               persons={protocol.uebergeber}
               onChange={(persons) => setField("uebergeber", persons)}
-              roleLabel={(g) => g === "f" ? "Vermieterin" : "Vermieter"}
             />
           </div>
 
@@ -111,7 +110,6 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
               label="Übernehmer (Mieter)"
               persons={protocol.uebernehmer}
               onChange={(persons) => setField("uebernehmer", persons)}
-              roleLabel={(g) => g === "f" ? "Mieterin" : "Mieter"}
             />
           </div>
 
