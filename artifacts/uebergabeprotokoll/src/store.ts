@@ -175,6 +175,40 @@ export function useProtocolsStore() {
     return p.id;
   }, []);
 
+  const duplicateProtocol = useCallback((id: string) => {
+    setProtocols(prev => {
+      const source = prev[id];
+      if (!source) return prev;
+      const newId = crypto.randomUUID();
+      const copy: ProtocolData = {
+        ...JSON.parse(JSON.stringify(source)),
+        id: newId,
+        mietobjekt: (source.mietobjekt ? source.mietobjekt + " (Kopie)" : "Kopie"),
+        syncEnabled: false,
+        lastSaved: new Date().toISOString(),
+        personSignatures: [],
+        rooms: source.rooms.map(r => ({
+          ...r,
+          id: crypto.randomUUID(),
+          photos: r.photos.map(ph => ({ ...ph, id: crypto.randomUUID() })),
+        })),
+        kitchenPhotos: (source.kitchenPhotos ?? []).map(ph => ({
+          ...ph,
+          id: crypto.randomUUID(),
+        })),
+        uebergeber: source.uebergeber.map(p => ({ ...p, id: crypto.randomUUID() })),
+        uebernehmer: source.uebernehmer.map(p => ({ ...p, id: crypto.randomUUID() })),
+        zusatzvereinbarungen: (source.zusatzvereinbarungen ?? []).map(z => ({
+          ...z,
+          id: crypto.randomUUID(),
+        })),
+      };
+      const next = { ...prev, [newId]: copy };
+      persistAll(next);
+      return next;
+    });
+  }, []);
+
   const switchTo = useCallback((id: string) => {
     setCurrentId(id);
   }, []);
