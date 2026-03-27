@@ -6,7 +6,7 @@ import PersonList from "../components/PersonList";
 import AutoGrowTextarea from "../components/AutoGrowTextarea";
 import PhotoManager from "../components/PhotoManager";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, Plus, X, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, X, Pencil, Trash2 } from "lucide-react";
 
 interface ProtocolPageProps {
   protocol: ProtocolData;
@@ -246,7 +246,9 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
     onEntriesChange([...entries, newEntry]);
   };
 
-  const removeEntry = (id: string) => {
+  const removeEntry = (id: string, title: string) => {
+    const label = title.trim() || "diesen Abschnitt";
+    if (!window.confirm(`„${label}" wirklich löschen?`)) return;
     onEntriesChange(entries.filter(e => e.id !== id));
   };
 
@@ -320,11 +322,11 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
                 />
                 <button
                   type="button"
-                  onClick={() => removeEntry(entry.id)}
+                  onClick={() => removeEntry(entry.id, entry.title)}
                   className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                  title="Abschnitt entfernen"
+                  title="Abschnitt löschen"
                 >
-                  <X size={14} />
+                  <Trash2 size={14} />
                 </button>
               </div>
               <div className="px-3 py-2">
