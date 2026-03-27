@@ -554,6 +554,15 @@ export default function ProtocolListPage({
         )}
       </main>
 
+      {/* Preview modal */}
+      {previewId && protocols[previewId] && (
+        <ProtocolPreviewModal
+          protocol={protocols[previewId]}
+          onClose={() => setPreviewId(null)}
+          onEdit={() => { onOpen(previewId); setPreviewId(null); }}
+        />
+      )}
+
       {/* Delete confirmation dialog */}
       {deleteTarget && protocols[deleteTarget] && (
         <DeleteDialog
