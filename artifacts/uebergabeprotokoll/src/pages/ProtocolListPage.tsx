@@ -1,9 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ProtocolData } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check } from "lucide-react";
+import { ProtocolData, getPersonRole } from "../types";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
+
+const FLOOR_LABEL: Record<string, string> = {
+  EG: "Erdgeschoss (EG)",
+  OG: "Obergeschoss (OG)",
+  DG: "Dachgeschoss (DG)",
+  UG: "Untergeschoss (UG)",
+  "Außen": "Außenbereiche",
+};
 
 interface ProtocolListPageProps {
   protocols: Record<string, ProtocolData>;
@@ -28,6 +36,236 @@ function formatDate(iso: string | null | undefined): string {
     return "—";
   }
 }
+
+// ── Preview Modal ────────────────────────────────────────────────────────────
+
+interface ProtocolPreviewModalProps {
+  protocol: ProtocolData;
+  onClose: () => void;
+  onEdit: () => void;
+}
+
+function PreviewSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModalProps) {
+  const floors = ["EG", "OG", "DG", "UG", "Außen"];
+  const totalPhotos =
+    (protocol.kitchenPhotos?.length ?? 0) +
+    protocol.rooms.reduce((s, r) => s + r.photos.length, 0);
+
+  const allPersons = [...protocol.uebergeber, ...protocol.uebernehmer];
+  const signedCount = allPersons.filter(p =>
+    protocol.personSignatures.some(s => s.personId === p.id && s.signatureDataUrl)
+  ).length;
+  const allSigned = signedCount === allPersons.length && allPersons.length > 0;
+
+  const meterIcon: Record<string, React.ReactNode> = {
+    Strom: <Zap size={12} />,
+    Wasser: <Droplets size={12} />,
+    Gas: <Flame size={12} />,
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="relative mt-auto sm:m-auto w-full sm:max-w-lg max-h-[92dvh] sm:max-h-[88vh] bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header banner */}
+        <div className="bg-primary text-primary-foreground px-5 py-4 shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-bold text-base leading-tight truncate">
+                {protocol.mietobjekt || "Übergabeprotokoll"}
+              </h2>
+              {protocol.adresse && (
+                <p className="text-primary-foreground/80 text-xs mt-0.5 flex items-center gap-1 truncate">
+                  <MapPin size={11} />
+                  {protocol.adresse}
+                </p>
+              )}
+              {protocol.datum && (
+                <p className="text-primary-foreground/80 text-xs mt-0.5 flex items-center gap-1">
+                  <Calendar size={11} />
+                  Übergabe: {protocol.datum}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors shrink-0"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Persons */}
+          <PreviewSection title="Beteiligte Personen">
+            <div className="space-y-2">
+              {protocol.uebergeber.filter(p => p.name).map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
+                    {getPersonRole(p, "uebergeber")}
+                  </span>
+                  <span className="truncate">{p.name}</span>
+                </div>
+              ))}
+              {protocol.uebernehmer.filter(p => p.name).map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                    {getPersonRole(p, "uebernehmer")}
+                  </span>
+                  <span className="truncate">{p.name}</span>
+                </div>
+              ))}
+              {allPersons.filter(p => p.name).length === 0 && (
+                <p className="text-sm text-muted-foreground italic">Keine Personen eingetragen</p>
+              )}
+            </div>
+          </PreviewSection>
+
+          {/* Key & meter readings side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            {protocol.schluessel && (
+              <PreviewSection title="Schlüssel">
+                <div className="flex items-start gap-1.5 text-sm">
+                  <Key size={13} className="text-muted-foreground mt-0.5 shrink-0" />
+                  <span>{protocol.schluessel}</span>
+                </div>
+              </PreviewSection>
+            )}
+            <PreviewSection title="Zählerstände">
+              <div className="space-y-1">
+                {protocol.meterReadings.map((m, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm gap-2">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      {meterIcon[m.type] ?? null}
+                      {m.type}
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {m.stand ? `${m.stand} ${m.einheit}` : <span className="text-muted-foreground/50">—</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </PreviewSection>
+          </div>
+
+          {/* Rooms per floor */}
+          <PreviewSection title="Raumzustand">
+            <div className="space-y-3">
+              {floors.map(floor => {
+                const rooms = protocol.rooms.filter(r => r.floor === floor);
+                if (rooms.length === 0) return null;
+                return (
+                  <div key={floor}>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                      {FLOOR_LABEL[floor] ?? floor}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {rooms.map(room => {
+                        const hasPhotos = room.photos.length > 0;
+                        const hasContent = room.bodenZustand || room.maengelSchaeden || room.notizen;
+                        return (
+                          <div
+                            key={room.id}
+                            className={`flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg text-xs border ${
+                              hasContent || hasPhotos
+                                ? "bg-card border-border"
+                                : "bg-muted/30 border-border/50 text-muted-foreground"
+                            }`}
+                          >
+                            <span className="truncate font-medium">{room.name}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {room.bodenZustand && (
+                                <span className={`w-2 h-2 rounded-full ${
+                                  room.bodenZustand === "sehr gut" ? "bg-green-500"
+                                  : room.bodenZustand === "gut" ? "bg-yellow-500"
+                                  : "bg-red-500"
+                                }`} title={room.bodenZustand} />
+                              )}
+                              {hasPhotos && (
+                                <span className="flex items-center gap-0.5 text-muted-foreground">
+                                  <Image size={10} />
+                                  {room.photos.length}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PreviewSection>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-muted/50 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-primary">{totalPhotos}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Fotos</p>
+            </div>
+            <div className="bg-muted/50 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-primary">
+                {protocol.rooms.filter(r => r.bodenZustand || r.maengelSchaeden).length}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Räume ausgefüllt</p>
+            </div>
+            <div className={`rounded-xl p-3 text-center ${allSigned ? "bg-green-50 border border-green-200" : "bg-muted/50"}`}>
+              <p className={`text-lg font-bold ${allSigned ? "text-green-600" : "text-primary"}`}>
+                {signedCount}/{allPersons.length}
+              </p>
+              <p className={`text-[11px] mt-0.5 ${allSigned ? "text-green-600" : "text-muted-foreground"}`}>
+                {allSigned ? "✓ Unterschriften" : "Unterschriften"}
+              </p>
+            </div>
+          </div>
+
+          {/* Zusatzvereinbarungen */}
+          {(protocol.zusatzvereinbarungen?.length ?? 0) > 0 && (
+            <PreviewSection title={protocol.zusatzvereinbarungTitle || "Zusatzvereinbarungen"}>
+              <div className="space-y-1">
+                {protocol.zusatzvereinbarungen.map((z, i) => (
+                  <div key={z.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="text-xs font-bold w-4 shrink-0">{i + 1}.</span>
+                    <span className="truncate">{z.title}</span>
+                  </div>
+                ))}
+              </div>
+            </PreviewSection>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="border-t border-border px-5 py-3 flex gap-2 shrink-0 bg-card">
+          <Button variant="outline" size="sm" onClick={onClose} className="flex-1 sm:flex-none">
+            Schließen
+          </Button>
+          <Button size="sm" onClick={onEdit} className="flex-1 gap-1.5">
+            <Pencil size={13} />
+            Bearbeiten
+            <ChevronRight size={13} className="-ml-0.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete Dialog ─────────────────────────────────────────────────────────────
 
 interface DeleteDialogProps {
   protocol: ProtocolData;
@@ -105,6 +343,7 @@ export default function ProtocolListPage({
   onRename,
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -281,6 +520,16 @@ export default function ProtocolListPage({
                       </>
                     )}
                   </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewId(p.id)}
+                    className="gap-1"
+                    title="Vorschau"
+                  >
+                    <Eye size={13} />
+                    <span className="hidden sm:inline">Vorschau</span>
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
