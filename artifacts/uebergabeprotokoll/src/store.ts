@@ -278,6 +278,7 @@ export function useProtocolsStore() {
     currentId,
     isEditing: currentId !== null,
     createNew,
+    duplicateProtocol,
     switchTo,
     backToList,
     deleteProtocol,

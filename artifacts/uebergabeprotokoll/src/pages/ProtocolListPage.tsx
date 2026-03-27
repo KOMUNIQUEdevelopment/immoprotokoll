@@ -18,6 +18,7 @@ interface ProtocolListPageProps {
   onOpen: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onToggleSync: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onLogout?: () => void;
@@ -454,6 +455,7 @@ export default function ProtocolListPage({
   onOpen,
   onCreate,
   onDelete,
+  onDuplicate,
   onToggleSync,
   onRename,
   onLogout,
@@ -666,6 +668,16 @@ export default function ProtocolListPage({
                   >
                     <Link size={13} />
                     <span className="hidden sm:inline">Teilen</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDuplicate(p.id)}
+                    className="gap-1"
+                    title="Protokoll duplizieren"
+                  >
+                    <Copy size={13} />
+                    <span className="hidden sm:inline">Duplizieren</span>
                   </Button>
                   <Button
                     variant="outline"

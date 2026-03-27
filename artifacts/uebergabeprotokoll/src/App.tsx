@@ -51,6 +51,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     currentId,
     isEditing,
     createNew,
+    duplicateProtocol,
     switchTo,
     backToList,
     deleteProtocol,
@@ -157,6 +158,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
           onOpen={handleOpen}
           onCreate={handleCreate}
           onDelete={deleteProtocol}
+          onDuplicate={duplicateProtocol}
           onToggleSync={toggleSync}
           onRename={renameProtocol}
           onLogout={onLogout}
