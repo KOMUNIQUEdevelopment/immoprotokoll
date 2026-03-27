@@ -3,6 +3,7 @@ import { ProtocolData, RoomData } from "../types";
 import RoomSection from "../components/RoomSection";
 import PersonList from "../components/PersonList";
 import AutoGrowTextarea from "../components/AutoGrowTextarea";
+import PhotoManager from "../components/PhotoManager";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -179,6 +180,13 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
               value={protocol.allgemeinerZustandKueche}
               onChange={(e) => setField("allgemeinerZustandKueche", e.target.value)}
               placeholder="Allgemeinen Zustand der Küche beschreiben..."
+            />
+          </div>
+          <div>
+            <FieldLabel>Fotos Küche</FieldLabel>
+            <PhotoManager
+              photos={protocol.kitchenPhotos ?? []}
+              onChange={(photos) => setField("kitchenPhotos", photos)}
             />
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useProtocolsStore } from "./store";
 import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import ProtocolListPage from "./pages/ProtocolListPage";
-import { exportToPDF } from "./pdfExport";
+import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
 import { InstallButton } from "./components/InstallButton";
@@ -21,6 +21,7 @@ import {
   X,
   RefreshCw,
   ArrowLeft,
+  FolderArchive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -58,6 +59,7 @@ function AppContent() {
 
   const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
   const { toast } = useToast();
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
@@ -83,6 +85,27 @@ function AppContent() {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleZipExport = async () => {
+    if (!currentProtocol) return;
+    const totalPhotos =
+      (currentProtocol.kitchenPhotos?.length ?? 0) +
+      currentProtocol.rooms.reduce((s, r) => s + r.photos.length, 0);
+    if (totalPhotos === 0) {
+      toast({ title: "Keine Fotos", description: "Es sind noch keine Fotos vorhanden." });
+      return;
+    }
+    setIsZipping(true);
+    try {
+      await exportPhotosAsZip(currentProtocol);
+      toast({ title: "ZIP erstellt", description: `${totalPhotos} Foto${totalPhotos !== 1 ? "s" : ""} exportiert.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Export fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+    } finally {
+      setIsZipping(false);
     }
   };
 
@@ -192,6 +215,18 @@ function AppContent() {
                   <Save size={14} />
                 )}
                 <span className="hidden sm:inline">{isSaving ? "OK" : "Speichern"}</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleZipExport}
+                disabled={isZipping}
+                className="gap-1.5"
+                title="Alle Fotos als ZIP exportieren"
+              >
+                <FolderArchive size={14} />
+                <span className="hidden sm:inline">{isZipping ? "..." : "Fotos"}</span>
               </Button>
 
               <Button

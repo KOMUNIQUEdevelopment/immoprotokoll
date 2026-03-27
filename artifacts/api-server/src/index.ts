@@ -34,7 +34,7 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (data) => {
     const payload = data.toString();
-    if (payload.length > 10 * 1024 * 1024) {
+    if (payload.length > 50 * 1024 * 1024) {
       logger.warn("Payload too large, ignoring");
       return;
     }

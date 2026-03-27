@@ -130,11 +130,16 @@ export function useProtocolsStore() {
       setProtocols(prev => {
         if (!prev[currentId]) return prev;
         const current = prev[currentId];
+        // Merge photos: use remote photos if available, fall back to local
         const rooms = current.rooms.map(prevRoom => {
           const remoteRoom = remote.rooms?.find(r => r.id === prevRoom.id);
-          return remoteRoom ? { ...remoteRoom, photos: prevRoom.photos } : prevRoom;
+          if (!remoteRoom) return prevRoom;
+          const photos = remoteRoom.photos?.length ? remoteRoom.photos : prevRoom.photos;
+          return { ...remoteRoom, photos };
         });
-        const merged = { ...remote, rooms };
+        const kitchenPhotos =
+          remote.kitchenPhotos?.length ? remote.kitchenPhotos : current.kitchenPhotos;
+        const merged = { ...remote, rooms, kitchenPhotos };
         const next = { ...prev, [currentId]: merged };
         saveAll(next);
         return next;

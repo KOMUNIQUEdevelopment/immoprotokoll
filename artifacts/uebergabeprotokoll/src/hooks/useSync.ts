@@ -63,12 +63,8 @@ export function useSync({ onReceive, sendRef }: UseSyncOptions) {
   useEffect(() => {
     sendRef.current = (data: ProtocolData) => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-      const stripped = {
-        ...data,
-        rooms: data.rooms.map((r) => ({ ...r, photos: [] })),
-      };
       try {
-        wsRef.current.send(JSON.stringify(stripped));
+        wsRef.current.send(JSON.stringify(data));
       } catch {}
     };
   }, [sendRef]);

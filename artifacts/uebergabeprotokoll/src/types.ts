@@ -66,6 +66,7 @@ export interface ProtocolData {
   meterReadings: MeterReading[];
   appliances: ApplianceEntry[];
   allgemeinerZustandKueche: string;
+  kitchenPhotos: RoomPhoto[];
   rooms: RoomData[];
   signaturOrt: string;
   signaturDatum: string;
@@ -85,15 +86,16 @@ export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
   { id: "og-schlafzimmer", name: "Schlafzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "og-kinderzimmer", name: "Kinderzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "og-wohnzimmer", name: "Wohnzimmer", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "og-bad", name: "Bad / WC", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "og-terrasse", name: "Terrasse", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "og-bad", name: "Bad", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "og-wc", name: "WC", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "og-balkon", name: "Balkon", floor: "OG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   // DG
   { id: "dg-zimmer1", name: "Zimmer 1", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-zimmer2", name: "Zimmer 2", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-kueche", name: "Küche", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-bad", name: "Bad", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "dg-wc", name: "WC", floor: "DG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  // UG / Keller – Hobbyraum zuletzt
+  // UG / Keller
   { id: "keller-technik", name: "Keller / Technik", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   {
     id: "ug-kohlekeller-aufzug",
@@ -126,7 +128,9 @@ export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
   // Außen
   { id: "aussen-garage", name: "Garage", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   { id: "aussen-terrasse-eg", name: "Terrasse EG", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "aussen-terrasse-garage", name: "Terrasse oben", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-freisitz", name: "Freisitz / Garten", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-gartenhaus", name: "Gartenhaus", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-terrasse-garage", name: "Dachterrasse", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
 ];
 
 export const DEFAULT_APPLIANCES: ApplianceEntry[] = [
@@ -157,6 +161,7 @@ export function createDefaultProtocol(): ProtocolData {
     meterReadings: DEFAULT_METER_READINGS,
     appliances: DEFAULT_APPLIANCES,
     allgemeinerZustandKueche: "",
+    kitchenPhotos: [],
     rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
     signaturOrt: "",
     signaturDatum: "28.03.2026",
@@ -164,6 +169,17 @@ export function createDefaultProtocol(): ProtocolData {
     lastSaved: null,
   };
 }
+
+const ROOM_RENAMES: Record<string, string> = {
+  "og-bad": "Bad",
+  "og-terrasse": "Balkon",
+  "og-balkon": "Balkon",
+  "aussen-terrasse-garage": "Dachterrasse",
+};
+
+const RENAMED_ID_MAP: Record<string, string> = {
+  "og-terrasse": "og-balkon",
+};
 
 export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
   const def = createDefaultProtocol();
@@ -180,13 +196,23 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     const sigs = (data.signatures as Array<{ id: string; signatureDataUrl: string | null }> | undefined) || [];
     data.personSignatures = sigs.map(s => ({ personId: s.id, signatureDataUrl: s.signatureDataUrl }));
   }
+  if (!data.kitchenPhotos) data.kitchenPhotos = [];
+
   const REMOVED_ROOM_IDS = new Set(["garage-stellplatz", "terrasse-garten"]);
-  let rooms = (data.rooms as RoomData[]).filter(r => !REMOVED_ROOM_IDS.has(r.id));
+  let rooms = ((data.rooms as RoomData[]) || []).filter(r => !REMOVED_ROOM_IDS.has(r.id));
+
+  rooms = rooms.map(r => {
+    const newId = RENAMED_ID_MAP[r.id] ?? r.id;
+    const newName = ROOM_RENAMES[r.id] ?? r.name;
+    return { ...r, id: newId, name: newName };
+  });
+
   const existingRoomIds = new Set(rooms.map(r => r.id));
   const missingRooms = DEFAULT_ROOMS.filter(r => !existingRoomIds.has(r.id)).map(r => ({ ...r, photos: [] }));
   if (missingRooms.length > 0) {
     rooms.push(...missingRooms);
   }
+
   const defaultOrder = DEFAULT_ROOMS.map(r => r.id);
   rooms.sort((a, b) => {
     const ai = defaultOrder.indexOf(a.id);
@@ -196,6 +222,7 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     if (bi === -1) return -1;
     return ai - bi;
   });
+
   data.rooms = rooms;
   return { ...def, ...(data as Partial<ProtocolData>) } as ProtocolData;
 }
