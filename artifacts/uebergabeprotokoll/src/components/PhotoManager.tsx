@@ -83,6 +83,38 @@ interface PhotoManagerProps {
   onChange: (photos: RoomPhoto[]) => void;
 }
 
+const MAX_DIM = 1920;
+const JPEG_QUALITY = 0.82;
+
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width >= height) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("No canvas context")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -95,31 +127,21 @@ export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files) return;
-      const newPhotos: RoomPhoto[] = [];
-      const readers: Promise<void>[] = [];
+      const validFiles = Array.from(files).filter(f => f.type.startsWith("image/"));
+      if (validFiles.length === 0) return;
 
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) continue;
-        const reader = new FileReader();
-        const p = new Promise<void>((resolve) => {
-          reader.onload = (e) => {
-            if (e.target?.result) {
-              newPhotos.push({
-                id: crypto.randomUUID(),
-                dataUrl: e.target.result as string,
-                timestamp: new Date().toISOString(),
-              });
-            }
-            resolve();
-          };
-        });
-        reader.readAsDataURL(file);
-        readers.push(p);
-      }
-
-      Promise.all(readers).then(() => {
+      Promise.all(
+        validFiles.map(async (file) => {
+          const dataUrl = await compressImage(file);
+          return {
+            id: crypto.randomUUID(),
+            dataUrl,
+            timestamp: new Date().toISOString(),
+          } satisfies RoomPhoto;
+        })
+      ).then((newPhotos) => {
         onChange([...photos, ...newPhotos]);
-      });
+      }).catch(console.error);
     },
     [photos, onChange]
   );
@@ -167,7 +189,7 @@ export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
           capture="environment"
           multiple
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
         />
         <input
           ref={fileInputRef}
@@ -175,7 +197,7 @@ export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
           accept="image/*"
           multiple
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
         />
       </div>
 
