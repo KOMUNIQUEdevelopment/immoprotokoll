@@ -126,8 +126,8 @@ export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
   { id: "ug-hobbyraum", name: "Hobbyraum", floor: "UG", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
   // Außen
   { id: "aussen-garage", name: "Garage", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "aussen-terrasse-eg", name: "Terrasse (EG)", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
-  { id: "aussen-terrasse-garage", name: "Terrasse (Garage)", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-terrasse-eg", name: "Terrasse EG", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
+  { id: "aussen-terrasse-garage", name: "Terrasse oben", floor: "Außen", bodenZustand: "", waendeDecken: "", fensterTueren: "", elektrik: "OK", heizung: "OK", maengelSchaeden: "", notizen: "" },
 ];
 
 export const DEFAULT_APPLIANCES: ApplianceEntry[] = [
