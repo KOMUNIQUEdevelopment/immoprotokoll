@@ -39,17 +39,19 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
     y += 7;
   };
 
+  const labelW = 52;
   const field = (label: string, value: string) => {
-    checkPage(7);
+    const lines = doc.splitTextToSize(value || "—", contentW - labelW);
+    const needed = Math.max(6, lines.length * 5) + 2;
+    checkPage(needed);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(80, 80, 80);
     doc.text(label + ":", margin, y);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(20, 20, 20);
-    const lines = doc.splitTextToSize(value || "—", contentW - 40);
-    doc.text(lines, margin + 50, y);
-    y += Math.max(6, lines.length * 5);
+    doc.text(lines, margin + labelW, y);
+    y += needed;
   };
 
   // Title banner
@@ -144,31 +146,32 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
         doc.text(`Fotos (${room.photos.length}):`, margin, y);
-        y += 5;
+        y += 6;
 
         const photoW = (contentW - 6) / 3;
         const photoH = photoW * 0.75;
+        const rowH = photoH + 10; // photo + caption gap
 
         for (let i = 0; i < room.photos.length; i++) {
           const col = i % 3;
-          if (col === 0 && i > 0) {
-            y += photoH + 8;
-            checkPage(photoH + 10);
+          if (col === 0) {
+            if (i > 0) y += rowH;
+            checkPage(rowH + 6);
           }
           const photoX = margin + col * (photoW + 3);
           const photo = room.photos[i];
           try {
-            doc.addImage(photo.dataUrl, "JPEG", photoX, y, photoW, photoH);
+            const fmt = photo.dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+            doc.addImage(photo.dataUrl, fmt, photoX, y, photoW, photoH);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
             doc.setTextColor(100, 100, 100);
             const ts = new Date(photo.timestamp).toLocaleString("de-DE");
-            doc.text(ts, photoX, y + photoH + 3, { maxWidth: photoW });
+            doc.text(ts, photoX, y + photoH + 3.5, { maxWidth: photoW });
           } catch {}
         }
-
-        const rows = Math.ceil(room.photos.length / 3);
-        y += rows * (photoH + 8) + 4;
+        // advance past the last row
+        y += rowH + 4;
       }
 
       y += 4;
