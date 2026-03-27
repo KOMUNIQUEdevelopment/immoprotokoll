@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { ProtocolData, Person, PersonSignature, getPersonRole } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
 import { Input } from "@/components/ui/input";
@@ -29,11 +29,9 @@ interface PersonSignatureBlockProps {
   onSignatureChange: (dataUrl: string | null) => void;
   onNameChange: (name: string) => void;
   onRemove?: () => void;
-  onAdd: () => void;
-  isLast: boolean;
 }
 
-function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChange, onNameChange, onRemove, onAdd, isLast }: PersonSignatureBlockProps) {
+function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChange, onNameChange, onRemove }: PersonSignatureBlockProps) {
   const role = getPersonRole(person, side);
 
   return (
@@ -79,14 +77,6 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
     updateProtocol(p => ({
       ...p,
       [side]: (p[side] as Person[]).map(person => person.id === id ? { ...person, name } : person),
-    }));
-  };
-
-  const addPerson = (side: "uebergeber" | "uebernehmer") => {
-    const newPerson: Person = { id: crypto.randomUUID(), name: "", gender: "m" };
-    updateProtocol(p => ({
-      ...p,
-      [side]: [...(p[side] as Person[]), newPerson],
     }));
   };
 
@@ -139,24 +129,14 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
 
       {/* Vermieter Signatures */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            Übergeber (Vermieter)
-            {allVermieterSigned && protocol.uebergeber.length > 0 && (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
-            )}
-          </h3>
-          <button
-            type="button"
-            onClick={() => addPerson("uebergeber")}
-            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-          >
-            <Plus size={12} />
-            Person hinzufügen
-          </button>
-        </div>
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          Übergeber (Vermieter)
+          {allVermieterSigned && protocol.uebergeber.length > 0 && (
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+          )}
+        </h3>
 
-        {protocol.uebergeber.map((person, i) => (
+        {protocol.uebergeber.map((person) => (
           <PersonSignatureBlock
             key={person.id}
             person={person}
@@ -165,32 +145,20 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebergeber", person.id, name)}
             onRemove={protocol.uebergeber.length > 1 ? () => removePerson("uebergeber", person.id) : undefined}
-            onAdd={() => addPerson("uebergeber")}
-            isLast={i === protocol.uebergeber.length - 1}
           />
         ))}
       </div>
 
       {/* Mieter Signatures */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            Übernehmer (Mieter)
-            {allMieterSigned && protocol.uebernehmer.length > 0 && (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
-            )}
-          </h3>
-          <button
-            type="button"
-            onClick={() => addPerson("uebernehmer")}
-            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-          >
-            <Plus size={12} />
-            Person hinzufügen
-          </button>
-        </div>
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          Übernehmer (Mieter)
+          {allMieterSigned && protocol.uebernehmer.length > 0 && (
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+          )}
+        </h3>
 
-        {protocol.uebernehmer.map((person, i) => (
+        {protocol.uebernehmer.map((person) => (
           <PersonSignatureBlock
             key={person.id}
             person={person}
@@ -199,8 +167,6 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebernehmer", person.id, name)}
             onRemove={protocol.uebernehmer.length > 1 ? () => removePerson("uebernehmer", person.id) : undefined}
-            onAdd={() => addPerson("uebernehmer")}
-            isLast={i === protocol.uebernehmer.length - 1}
           />
         ))}
       </div>
