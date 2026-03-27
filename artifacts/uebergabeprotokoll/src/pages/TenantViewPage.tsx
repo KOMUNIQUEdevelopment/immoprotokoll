@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ProtocolData, RoomData, getPersonRole } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
+import { exportToPDF, exportPhotosAsZip } from "../pdfExport";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
   ClipboardList,
   MapPin,
@@ -19,6 +21,8 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  FileDown,
+  ImageDown,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -204,6 +208,7 @@ type LoadState = "loading" | "loaded" | "not-found" | "error";
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
+  const { toast } = useToast();
   const [protocol, setProtocol] = useState<ProtocolData | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">(
@@ -213,6 +218,8 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const [pendingSig, setPendingSig] = useState<Record<string, string | null>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [justSigned, setJustSigned] = useState<Record<string, boolean>>({});
+  const [isExporting, setIsExporting] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -306,6 +313,39 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
 
   const getSignature = (personId: string) =>
     protocol?.personSignatures.find((s) => s.personId === personId)?.signatureDataUrl ?? null;
+
+  const handleExportPdf = async () => {
+    if (!protocol) return;
+    setIsExporting(true);
+    try {
+      await exportToPDF(protocol);
+      toast({ title: "PDF erstellt", description: "Das Protokoll wurde erfolgreich exportiert." });
+    } catch {
+      toast({ title: "Export fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportZip = async () => {
+    if (!protocol) return;
+    const totalPhotos =
+      (protocol.kitchenPhotos?.length ?? 0) +
+      protocol.rooms.reduce((s, r) => s + r.photos.length, 0);
+    if (totalPhotos === 0) {
+      toast({ title: "Keine Fotos", description: "Es sind noch keine Fotos vorhanden." });
+      return;
+    }
+    setIsZipping(true);
+    try {
+      await exportPhotosAsZip(protocol);
+      toast({ title: "ZIP erstellt", description: `${totalPhotos} Foto${totalPhotos !== 1 ? "s" : ""} exportiert.` });
+    } catch {
+      toast({ title: "Export fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+    } finally {
+      setIsZipping(false);
+    }
+  };
 
   // ── Loading / error states ──────────────────────────────────────────────────
 
@@ -424,6 +464,41 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
             automatisch aktualisiert wenn der Vermieter Änderungen vornimmt. Am Ende können
             Sie Ihre Unterschrift leisten.
           </p>
+        </div>
+      </div>
+
+      {/* ── Export toolbar ───────────────────────────────────────────────────── */}
+      <div className="border-b border-border bg-card/60">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground mr-1 shrink-0">Exportieren:</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {isExporting ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <FileDown size={13} />
+            )}
+            PDF herunterladen
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportZip}
+            disabled={isZipping}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {isZipping ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <ImageDown size={13} />
+            )}
+            Fotos als ZIP
+          </Button>
         </div>
       </div>
 
