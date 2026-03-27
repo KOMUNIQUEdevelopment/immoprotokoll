@@ -22,6 +22,8 @@ import {
   RefreshCw,
   ArrowLeft,
   FolderArchive,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +52,7 @@ function AppContent() {
     backToList,
     deleteProtocol,
     updateProtocol,
+    toggleSync,
     receiveInit,
     receiveRemote,
     receiveDelete,
@@ -150,6 +153,7 @@ function AppContent() {
           onOpen={handleOpen}
           onCreate={handleCreate}
           onDelete={deleteProtocol}
+          onToggleSync={toggleSync}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
       </>
@@ -183,11 +187,34 @@ function AppContent() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Sync status */}
+              {/* Sync toggle */}
+              {currentProtocol && (
+                <button
+                  type="button"
+                  onClick={() => toggleSync(currentProtocol.id)}
+                  title={currentProtocol.syncEnabled ? "Sync aktiv – auf allen Geräten sichtbar. Klicken zum Deaktivieren." : "Sync deaktiviert – nur lokal. Klicken zum Aktivieren."}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium transition-colors ${
+                    currentProtocol.syncEnabled
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {currentProtocol.syncEnabled ? (
+                    <Cloud size={13} />
+                  ) : (
+                    <CloudOff size={13} />
+                  )}
+                  <span className="hidden sm:inline">
+                    {currentProtocol.syncEnabled ? "Sync" : "Sync"}
+                  </span>
+                </button>
+              )}
+
+              {/* Connection status */}
               <span
                 title={
                   syncStatus === "connected"
-                    ? "Echtzeit-Sync aktiv"
+                    ? "Verbunden"
                     : syncStatus === "connecting"
                     ? "Verbinde..."
                     : "Offline"

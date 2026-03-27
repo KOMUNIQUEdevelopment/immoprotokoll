@@ -72,6 +72,7 @@ export interface ProtocolData {
   signaturDatum: string;
   personSignatures: PersonSignature[];
   lastSaved: string | null;
+  syncEnabled: boolean;
 }
 
 export const DEFAULT_ROOMS: Omit<RoomData, "photos">[] = [
@@ -167,6 +168,7 @@ export function createDefaultProtocol(): ProtocolData {
     signaturDatum: "28.03.2026",
     personSignatures: [],
     lastSaved: null,
+    syncEnabled: false,
   };
 }
 

@@ -60,46 +60,41 @@ export function useProtocolsStore() {
 
   const receiveInit = useCallback((remoteProtocols: Record<string, ProtocolData>) => {
     setProtocols(prev => {
-      const migrated = Object.fromEntries(
-        Object.entries(remoteProtocols).map(([id, p]) => [id, migrateProtocol(p as Record<string, unknown>)])
+      const synced = Object.fromEntries(
+        Object.entries(remoteProtocols).map(([id, p]) => [
+          id,
+          { ...migrateProtocol(p as Record<string, unknown>), syncEnabled: true },
+        ])
       );
 
-      const serverIsEmpty = Object.keys(migrated).length === 0;
-
-      if (serverIsEmpty && Object.keys(prev).length > 0) {
-        setTimeout(() => {
-          Object.values(prev).forEach(p => {
-            wsSendRef.current?.({ type: "update", protocol: p });
-          });
-        }, 100);
-        return prev;
-      }
-
-      if (serverIsEmpty) {
-        return prev;
-      }
-
-      const merged: Record<string, ProtocolData> = { ...migrated };
-
-      Object.entries(prev).forEach(([id, localP]) => {
-        if (!merged[id]) {
-          merged[id] = localP;
+      if (Object.keys(synced).length === 0) {
+        const localSynced = Object.values(prev).filter(p => p.syncEnabled);
+        if (localSynced.length > 0) {
           setTimeout(() => {
-            wsSendRef.current?.({ type: "update", protocol: localP });
-          }, 100);
+            localSynced.forEach(p => {
+              wsSendRef.current?.({ type: "update", protocol: p });
+            });
+          }, 200);
+        }
+        return prev;
+      }
+
+      const merged: Record<string, ProtocolData> = { ...prev };
+
+      Object.entries(synced).forEach(([id, remoteP]) => {
+        const localP = prev[id];
+        if (!localP) {
+          merged[id] = remoteP;
         } else {
-          const remoteP = merged[id];
           const rooms = remoteP.rooms.map(remoteRoom => {
             const prevRoom = localP.rooms.find(r => r.id === remoteRoom.id);
-            const photos = remoteRoom.photos?.length
-              ? remoteRoom.photos
-              : (prevRoom?.photos ?? []);
+            const photos = remoteRoom.photos?.length ? remoteRoom.photos : (prevRoom?.photos ?? []);
             return { ...remoteRoom, photos };
           });
           const kitchenPhotos = remoteP.kitchenPhotos?.length
             ? remoteP.kitchenPhotos
             : (localP.kitchenPhotos ?? []);
-          merged[id] = { ...remoteP, rooms, kitchenPhotos };
+          merged[id] = { ...remoteP, rooms, kitchenPhotos, syncEnabled: true };
         }
       });
 
@@ -119,7 +114,7 @@ export function useProtocolsStore() {
       const kitchenPhotos = remote.kitchenPhotos?.length
         ? remote.kitchenPhotos
         : (existing?.kitchenPhotos ?? []);
-      const merged = { ...remote, rooms, kitchenPhotos };
+      const merged = { ...remote, rooms, kitchenPhotos, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
       persistAll(next);
       return next;
@@ -137,6 +132,23 @@ export function useProtocolsStore() {
     setCurrentId(prev => (prev === id ? null : prev));
   }, []);
 
+  const toggleSync = useCallback((id: string) => {
+    setProtocols(prev => {
+      if (!prev[id]) return prev;
+      const current = prev[id];
+      const enabling = !current.syncEnabled;
+      const updated = { ...current, syncEnabled: enabling };
+      const next = { ...prev, [id]: updated };
+      persistAll(next);
+      if (enabling) {
+        setTimeout(() => wsSendRef.current?.({ type: "update", protocol: updated }), 0);
+      } else {
+        setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
+      }
+      return next;
+    });
+  }, []);
+
   const createNew = useCallback(() => {
     const p = createDefaultProtocol();
     setProtocols(prev => {
@@ -145,9 +157,6 @@ export function useProtocolsStore() {
       return next;
     });
     setCurrentId(p.id);
-    setTimeout(() => {
-      wsSendRef.current?.({ type: "update", protocol: p });
-    }, 0);
     return p.id;
   }, []);
 
@@ -165,13 +174,16 @@ export function useProtocolsStore() {
 
   const deleteProtocol = useCallback((id: string) => {
     setProtocols(prev => {
+      const wasSync = prev[id]?.syncEnabled;
       const next = { ...prev };
       delete next[id];
       persistAll(next);
+      if (wasSync) {
+        setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
+      }
       return next;
     });
     setCurrentId(prev => (prev === id ? null : prev));
-    wsSendRef.current?.({ type: "delete", id });
   }, []);
 
   const manualSave = useCallback(() => {
@@ -182,7 +194,9 @@ export function useProtocolsStore() {
       const updated = { ...prev[currentId], lastSaved: new Date().toISOString() };
       const next = { ...prev, [currentId]: updated };
       persistAll(next);
-      wsSendRef.current?.({ type: "update", protocol: updated });
+      if (updated.syncEnabled) {
+        wsSendRef.current?.({ type: "update", protocol: updated });
+      }
       return next;
     });
     setLastSaved(new Date());
@@ -199,7 +213,9 @@ export function useProtocolsStore() {
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
         autoSaveTimer.current = setTimeout(() => {
           saveAll(next);
-          wsSendRef.current?.({ type: "update", protocol: updated });
+          if (updated.syncEnabled) {
+            wsSendRef.current?.({ type: "update", protocol: updated });
+          }
         }, 1500);
         return next;
       });
@@ -217,6 +233,7 @@ export function useProtocolsStore() {
     backToList,
     deleteProtocol,
     updateProtocol,
+    toggleSync,
     receiveInit,
     receiveRemote,
     receiveDelete,

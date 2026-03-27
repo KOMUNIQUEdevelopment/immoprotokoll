@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ProtocolData } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -10,6 +10,7 @@ interface ProtocolListPageProps {
   onOpen: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onToggleSync: (id: string) => void;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -99,6 +100,7 @@ export default function ProtocolListPage({
   onOpen,
   onCreate,
   onDelete,
+  onToggleSync,
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
@@ -173,7 +175,15 @@ export default function ProtocolListPage({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm leading-snug truncate">{title}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm leading-snug truncate">{title}</p>
+                    {p.syncEnabled && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5 shrink-0">
+                        <Cloud size={9} />
+                        Sync
+                      </span>
+                    )}
+                  </div>
                   {subtitle && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
                   )}
@@ -183,6 +193,28 @@ export default function ProtocolListPage({
                 </div>
 
                 <div className="flex gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onToggleSync(p.id)}
+                    title={p.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren – auf allen Geräten sichtbar"}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                      p.syncEnabled
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {p.syncEnabled ? (
+                      <>
+                        <Cloud size={13} />
+                        <span className="hidden sm:inline">Sync</span>
+                      </>
+                    ) : (
+                      <>
+                        <CloudOff size={13} />
+                        <span className="hidden sm:inline">Sync</span>
+                      </>
+                    )}
+                  </button>
                   <Button
                     variant="outline"
                     size="sm"
