@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData, getPersonRole } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -20,6 +20,7 @@ interface ProtocolListPageProps {
   onDelete: (id: string) => void;
   onToggleSync: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  onLogout?: () => void;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -455,6 +456,7 @@ export default function ProtocolListPage({
   onDelete,
   onToggleSync,
   onRename,
+  onLogout,
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -514,6 +516,16 @@ export default function ProtocolListPage({
             </div>
             <div className="flex items-center gap-2">
               <InstallButton />
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  title="Abmelden"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <LogOut size={15} />
+                </button>
+              )}
               <Button size="sm" onClick={onCreate} className="gap-1.5">
                 <Plus size={15} />
                 Neu

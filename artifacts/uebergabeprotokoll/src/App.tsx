@@ -7,6 +7,7 @@ import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import ProtocolListPage from "./pages/ProtocolListPage";
 import TenantViewPage from "./pages/TenantViewPage";
+import LoginPage from "./pages/LoginPage";
 import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
@@ -25,6 +26,7 @@ import {
   FolderArchive,
   Cloud,
   CloudOff,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -42,7 +44,7 @@ function formatRelative(date: Date | null): string {
 
 type EditorTab = "protokoll" | "unterschriften";
 
-function AppContent() {
+function AppContent({ onLogout }: { onLogout: () => void }) {
   const {
     protocols,
     currentProtocol,
@@ -157,6 +159,7 @@ function AppContent() {
           onDelete={deleteProtocol}
           onToggleSync={toggleSync}
           onRename={renameProtocol}
+          onLogout={onLogout}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
       </>
@@ -238,6 +241,15 @@ function AppContent() {
               )}
 
               <InstallButton />
+
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Abmelden"
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors hidden sm:flex"
+              >
+                <LogOut size={15} />
+              </button>
 
               <Button
                 variant="outline"
@@ -374,6 +386,18 @@ export default function App() {
   const hash = window.location.hash;
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
 
+  const [authed, setAuthed] = useState<boolean>(
+    () => localStorage.getItem("uebergabe_auth") === "1"
+  );
+
+  const handleLogin = () => setAuthed(true);
+
+  const handleLogout = () => {
+    localStorage.removeItem("uebergabe_auth");
+    setAuthed(false);
+  };
+
+  // Tenant view: always accessible without login
   if (viewMatch) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -383,9 +407,19 @@ export default function App() {
     );
   }
 
+  // Main app: requires login
+  if (!authed) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <LoginPage onLogin={handleLogin} />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <AppContent onLogout={handleLogout} />
       <Toaster />
     </QueryClientProvider>
   );
