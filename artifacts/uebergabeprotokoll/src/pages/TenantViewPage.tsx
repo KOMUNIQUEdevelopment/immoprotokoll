@@ -401,9 +401,12 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const floors = ["EG", "OG", "DG", "UG", "Außen"];
+  const landlords = protocol.uebergeber.filter((p) => p.name);
   const tenants = protocol.uebernehmer.filter((p) => p.name);
   const allTenantsSigned =
     tenants.length > 0 && tenants.every((p) => !!getSignature(p.id));
+  const allLandlordsSigned =
+    landlords.length > 0 && landlords.every((p) => !!getSignature(p.id));
 
   const meterIcons: Record<string, React.ReactNode> = {
     Strom: <Zap size={13} />,
@@ -687,101 +690,174 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
 
           {/* 6 ── Unterschriften ───────────────────────────────────────────── */}
           <div className="mb-4 border-2 border-primary/20 rounded-xl overflow-hidden">
-            <div className="bg-primary/5 px-4 py-3 border-b border-primary/20 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <PenLine size={16} className="text-primary" />
-                  <h2 className="font-bold text-sm text-primary">Ihre Unterschrift</h2>
-                  {allTenantsSigned && (
-                    <CheckCircle2 size={15} className="text-green-500" />
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Durch Ihre Unterschrift bestätigen Sie die Kenntnisnahme des Protokolls
-                  einschließlich aller Zusatzvereinbarungen.
-                </p>
+            <div className="bg-primary/5 px-4 py-3 border-b border-primary/20">
+              <div className="flex items-center gap-2">
+                <PenLine size={16} className="text-primary" />
+                <h2 className="font-bold text-sm text-primary">Unterschriften</h2>
+                {allTenantsSigned && allLandlordsSigned && (
+                  <CheckCircle2 size={15} className="text-green-500" />
+                )}
               </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Durch Ihre Unterschrift bestätigen Sie die Kenntnisnahme des Protokolls
+                einschließlich aller Zusatzvereinbarungen.
+              </p>
             </div>
 
-            <div className="px-4 py-4 space-y-5">
-              {tenants.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic text-center py-4">
-                  Keine Mieter im Protokoll eingetragen.
-                </p>
-              ) : (
-                tenants.map((person) => {
-                  const existingSig = getSignature(person.id);
-                  const pending = pendingSig[person.id];
-                  const isSubmitting = submitting[person.id] ?? false;
-                  const hasJustSigned = justSigned[person.id] ?? false;
+            <div className="px-4 py-4 space-y-6">
 
-                  return (
-                    <div key={person.id} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
-                          Mieter
-                        </span>
-                        <span className="font-semibold text-sm">{person.name}</span>
-                        {existingSig && (
-                          <CheckCircle2 size={14} className="text-green-500 ml-auto" />
+              {/* ── Vermieter (read-only) ──────────────────────────────────── */}
+              {landlords.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    Übergeber (Vermieter)
+                    {allLandlordsSigned && (
+                      <CheckCircle2 size={12} className="text-green-500" />
+                    )}
+                  </p>
+                  {landlords.map((person) => {
+                    const sig = getSignature(person.id);
+                    return (
+                      <div key={person.id} className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                            {getPersonRole(person, "uebergeber")}
+                          </span>
+                          <span className="font-semibold text-sm">{person.name}</span>
+                          {sig && (
+                            <CheckCircle2 size={14} className="text-green-500 ml-auto shrink-0" />
+                          )}
+                        </div>
+                        {sig ? (
+                          <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-1.5">
+                            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Unterschrieben
+                            </p>
+                            <img
+                              src={sig}
+                              alt={`Unterschrift ${person.name}`}
+                              className="max-h-20 border border-green-200 rounded bg-white"
+                            />
+                          </div>
+                        ) : (
+                          <div className="border border-border rounded-lg px-3 py-2.5 bg-muted/30 text-xs text-muted-foreground italic">
+                            Noch nicht unterschrieben
+                          </div>
                         )}
                       </div>
-
-                      {existingSig ? (
-                        <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-2">
-                          <p className="text-xs text-green-700 font-medium flex items-center gap-1">
-                            <CheckCircle2 size={12} />
-                            {hasJustSigned
-                              ? "Unterschrift erfolgreich gespeichert!"
-                              : "Bereits unterschrieben"}
-                          </p>
-                          <img
-                            src={existingSig}
-                            alt="Unterschrift"
-                            className="max-h-20 border border-green-200 rounded bg-white"
-                          />
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <SignatureCanvasComponent
-                            value={pending ?? null}
-                            onChange={(dataUrl) =>
-                              setPendingSig((s) => ({ ...s, [person.id]: dataUrl }))
-                            }
-                            label="Hier unterschreiben"
-                          />
-                          <Button
-                            onClick={() => handleSign(person.id)}
-                            disabled={!pending || isSubmitting}
-                            className="w-full gap-2"
-                            size="sm"
-                          >
-                            {isSubmitting ? (
-                              <>
-                                <Loader2 size={13} className="animate-spin" />
-                                Wird gespeichert…
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 size={13} />
-                                Unterschrift bestätigen & synchronisieren
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
 
-              {allTenantsSigned && (
+              {/* Divider between landlord and tenant sections */}
+              {landlords.length > 0 && tenants.length > 0 && (
+                <div className="border-t border-border" />
+              )}
+
+              {/* ── Mieter (interaktiv) ────────────────────────────────────── */}
+              <div className="space-y-3">
+                {tenants.length > 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    Übernehmer (Mieter)
+                    {allTenantsSigned && (
+                      <CheckCircle2 size={12} className="text-green-500" />
+                    )}
+                  </p>
+                )}
+
+                {tenants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic text-center py-4">
+                    Keine Mieter im Protokoll eingetragen.
+                  </p>
+                ) : (
+                  tenants.map((person) => {
+                    const existingSig = getSignature(person.id);
+                    const pending = pendingSig[person.id];
+                    const isSubmitting = submitting[person.id] ?? false;
+                    const hasJustSigned = justSigned[person.id] ?? false;
+
+                    return (
+                      <div key={person.id} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                            {getPersonRole(person, "uebernehmer")}
+                          </span>
+                          <span className="font-semibold text-sm">{person.name}</span>
+                          {existingSig && (
+                            <CheckCircle2 size={14} className="text-green-500 ml-auto" />
+                          )}
+                        </div>
+
+                        {existingSig ? (
+                          <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-2">
+                            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              {hasJustSigned
+                                ? "Unterschrift erfolgreich gespeichert!"
+                                : "Bereits unterschrieben"}
+                            </p>
+                            <img
+                              src={existingSig}
+                              alt="Unterschrift"
+                              className="max-h-20 border border-green-200 rounded bg-white"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <SignatureCanvasComponent
+                              value={pending ?? null}
+                              onChange={(dataUrl) =>
+                                setPendingSig((s) => ({ ...s, [person.id]: dataUrl }))
+                              }
+                              label="Hier unterschreiben"
+                            />
+                            <Button
+                              onClick={() => handleSign(person.id)}
+                              disabled={!pending || isSubmitting}
+                              className="w-full gap-2"
+                              size="sm"
+                            >
+                              {isSubmitting ? (
+                                <>
+                                  <Loader2 size={13} className="animate-spin" />
+                                  Wird gespeichert…
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={13} />
+                                  Unterschrift bestätigen & synchronisieren
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* All-signed banner */}
+              {allTenantsSigned && allLandlordsSigned && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                   <CheckCircle2 size={20} className="text-green-500 mx-auto mb-1" />
                   <p className="text-sm font-semibold text-green-700">
-                    Alle Mieter haben unterschrieben
+                    Alle Beteiligten haben unterschrieben
                   </p>
                   <p className="text-xs text-green-600 mt-0.5">
+                    Das Protokoll ist vollständig unterzeichnet.
+                  </p>
+                </div>
+              )}
+              {allTenantsSigned && !allLandlordsSigned && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <CheckCircle2 size={20} className="text-blue-500 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-blue-700">
+                    Ihre Unterschrift wurde gespeichert
+                  </p>
+                  <p className="text-xs text-blue-600 mt-0.5">
                     Die Unterschriften wurden automatisch synchronisiert.
                   </p>
                 </div>
