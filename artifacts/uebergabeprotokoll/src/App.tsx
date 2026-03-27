@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
-import { useProtocolStore } from "./store";
+import { useProtocolsStore } from "./store";
 import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
+import ProtocolListPage from "./pages/ProtocolListPage";
 import { exportToPDF } from "./pdfExport";
 import { usePwaInstall } from "./hooks/usePwaInstall";
 import { useSwUpdate } from "./hooks/useSwUpdate";
@@ -20,6 +21,7 @@ import {
   WifiOff,
   X,
   RefreshCw,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,12 +37,27 @@ function formatRelative(date: Date | null): string {
   return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
-type Tab = "protokoll" | "unterschriften";
+type EditorTab = "protokoll" | "unterschriften";
 
 function AppContent() {
-  const { protocol, updateProtocol, receiveRemote, manualSave, isSaving, lastSaved, wsSendRef } =
-    useProtocolStore();
-  const [activeTab, setActiveTab] = useState<Tab>("protokoll");
+  const {
+    protocols,
+    currentProtocol,
+    currentId,
+    isEditing,
+    createNew,
+    switchTo,
+    backToList,
+    deleteProtocol,
+    updateProtocol,
+    receiveRemote,
+    manualSave,
+    isSaving,
+    lastSaved,
+    wsSendRef,
+  } = useProtocolsStore();
+
+  const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
@@ -48,17 +65,24 @@ function AppContent() {
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
   const { status: syncStatus } = useSync({ onReceive: receiveRemote, sendRef: wsSendRef });
 
-  const headerTitle =
-    [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Übergabeprotokoll";
+  const headerTitle = currentProtocol
+    ? [currentProtocol.mietobjekt, currentProtocol.adresse].filter(Boolean).join(", ") ||
+      "Übergabeprotokoll"
+    : null;
 
   const handleExport = async () => {
+    if (!currentProtocol) return;
     setIsExporting(true);
     try {
-      await exportToPDF(protocol);
+      await exportToPDF(currentProtocol);
       toast({ title: "PDF erstellt", description: "Das Protokoll wurde erfolgreich exportiert." });
     } catch (e) {
       console.error(e);
-      toast({ title: "Export fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+      toast({
+        title: "Export fehlgeschlagen",
+        description: "Bitte erneut versuchen.",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -69,25 +93,69 @@ function AppContent() {
     toast({ title: "Gespeichert", description: "Das Protokoll wurde gespeichert." });
   };
 
+  const handleCreate = () => {
+    createNew();
+    setActiveTab("protokoll");
+  };
+
+  const handleOpen = (id: string) => {
+    switchTo(id);
+    setActiveTab("protokoll");
+  };
+
   const allSigned =
-    protocol.uebergeber.length > 0 &&
-    protocol.uebernehmer.length > 0 &&
-    [...protocol.uebergeber, ...protocol.uebernehmer].every((p) =>
-      protocol.personSignatures.some((s) => s.personId === p.id && s.signatureDataUrl !== null)
+    currentProtocol &&
+    currentProtocol.uebergeber.length > 0 &&
+    currentProtocol.uebernehmer.length > 0 &&
+    [...currentProtocol.uebergeber, ...currentProtocol.uebernehmer].every(p =>
+      currentProtocol.personSignatures.some(
+        s => s.personId === p.id && s.signatureDataUrl !== null
+      )
     );
 
+  // ── List view ────────────────────────────────────────────────────────────────
+  if (!isEditing) {
+    return (
+      <>
+        <ProtocolListPage
+          protocols={protocols}
+          onOpen={handleOpen}
+          onCreate={handleCreate}
+          onDelete={deleteProtocol}
+        />
+        <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+      </>
+    );
+  }
+
+  // ── Editor view ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-40 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h1 className="font-bold text-sm leading-tight">Übergabeprotokoll</h1>
-              <p className="text-xs text-muted-foreground truncate">{headerTitle}</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={backToList}
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                title="Zur Übersicht"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="font-bold text-sm leading-tight truncate">
+                  {currentProtocol?.mietobjekt || "Übergabeprotokoll"}
+                </h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {currentProtocol?.adresse || ""}
+                </p>
+              </div>
             </div>
+
             <div className="flex items-center gap-2 shrink-0">
-              {/* Sync status indicator */}
+              {/* Sync status */}
               <span
                 title={
                   syncStatus === "connected"
@@ -133,7 +201,12 @@ function AppContent() {
                 <span className="hidden sm:inline">{isSaving ? "OK" : "Speichern"}</span>
               </Button>
 
-              <Button size="sm" onClick={handleExport} disabled={isExporting} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="gap-1.5"
+              >
                 <FileDown size={14} />
                 PDF
               </Button>
@@ -177,11 +250,11 @@ function AppContent() {
 
       {/* Content */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4">
-        {activeTab === "protokoll" && (
-          <ProtocolPage protocol={protocol} updateProtocol={updateProtocol} />
+        {currentProtocol && activeTab === "protokoll" && (
+          <ProtocolPage protocol={currentProtocol} updateProtocol={updateProtocol} />
         )}
-        {activeTab === "unterschriften" && (
-          <SignaturePage protocol={protocol} updateProtocol={updateProtocol} />
+        {currentProtocol && activeTab === "unterschriften" && (
+          <SignaturePage protocol={currentProtocol} updateProtocol={updateProtocol} />
         )}
       </main>
 
@@ -194,34 +267,40 @@ function AppContent() {
         </div>
       )}
 
-      {/* SW Update popup */}
-      {needsUpdate && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0 sm:right-4">
-          <div className="flex items-center gap-3 bg-card border border-border rounded-2xl shadow-xl px-4 py-3 min-w-[280px]">
-            <button
-              type="button"
-              onClick={dismissUpdate}
-              className="p-1 rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors shrink-0"
-              title="Schließen"
-            >
-              <X size={12} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Update verfügbar</p>
-              <p className="text-xs text-muted-foreground">Eine neue Version ist bereit.</p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={applyUpdate}
-              className="shrink-0 gap-1.5 font-semibold"
-            >
-              <RefreshCw size={13} />
-              Aktualisieren
-            </Button>
-          </div>
+      <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+    </div>
+  );
+}
+
+function SwUpdatePopup({
+  needsUpdate,
+  applyUpdate,
+  dismiss,
+}: {
+  needsUpdate: boolean;
+  applyUpdate: () => void;
+  dismiss: () => void;
+}) {
+  if (!needsUpdate) return null;
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0 sm:right-4">
+      <div className="flex items-center gap-3 bg-card border border-border rounded-2xl shadow-xl px-4 py-3 min-w-[280px]">
+        <button
+          type="button"
+          onClick={dismiss}
+          className="p-1 rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors shrink-0"
+        >
+          <X size={12} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold">Update verfügbar</p>
+          <p className="text-xs text-muted-foreground">Eine neue Version ist bereit.</p>
         </div>
-      )}
+        <Button size="sm" variant="outline" onClick={applyUpdate} className="shrink-0 gap-1.5 font-semibold">
+          <RefreshCw size={13} />
+          Aktualisieren
+        </Button>
+      </div>
     </div>
   );
 }
