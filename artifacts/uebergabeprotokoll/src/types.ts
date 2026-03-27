@@ -24,6 +24,12 @@ export interface RoomData {
   waschmaschinenNotizen?: string;
 }
 
+export interface ZusatzvereinbarungEntry {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface ApplianceEntry {
   name: string;
   zustand: string;
