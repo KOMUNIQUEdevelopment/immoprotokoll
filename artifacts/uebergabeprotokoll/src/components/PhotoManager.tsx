@@ -23,9 +23,10 @@ import { Button } from "@/components/ui/button";
 interface SortablePhotoProps {
   photo: RoomPhoto;
   onDelete: (id: string) => void;
+  roomName?: string;
 }
 
-function SortablePhoto({ photo, onDelete }: SortablePhotoProps) {
+function SortablePhoto({ photo, onDelete, roomName }: SortablePhotoProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: photo.id,
   });
@@ -73,7 +74,10 @@ function SortablePhoto({ photo, onDelete }: SortablePhotoProps) {
           <Trash2 size={16} />
         </button>
       </div>
-      <div className="px-2 py-1 text-xs text-muted-foreground truncate">{ts}</div>
+      <div className="px-2 py-1 text-xs text-muted-foreground truncate leading-tight">
+        {roomName && <span className="font-medium text-foreground/70">{roomName} · </span>}
+        {ts}
+      </div>
     </div>
   );
 }
@@ -81,6 +85,7 @@ function SortablePhoto({ photo, onDelete }: SortablePhotoProps) {
 interface PhotoManagerProps {
   photos: RoomPhoto[];
   onChange: (photos: RoomPhoto[]) => void;
+  roomName?: string;
 }
 
 const MAX_DIM = 1920;
@@ -115,7 +120,7 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
+export default function PhotoManager({ photos, onChange, roomName }: PhotoManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,7 +215,7 @@ export default function PhotoManager({ photos, onChange }: PhotoManagerProps) {
           <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {photos.map((photo) => (
-                <SortablePhoto key={photo.id} photo={photo} onDelete={deletePhoto} />
+                <SortablePhoto key={photo.id} photo={photo} onDelete={deletePhoto} roomName={roomName} />
               ))}
             </div>
           </SortableContext>

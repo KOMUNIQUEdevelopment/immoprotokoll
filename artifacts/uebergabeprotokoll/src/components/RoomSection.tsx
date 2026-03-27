@@ -200,6 +200,7 @@ export default function RoomSection({ room, onChange }: RoomSectionProps) {
             <PhotoManager
               photos={room.photos}
               onChange={(photos) => update("photos", photos)}
+              roomName={room.name}
             />
           </div>
         </div>

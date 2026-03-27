@@ -187,6 +187,7 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
             <PhotoManager
               photos={protocol.kitchenPhotos ?? []}
               onChange={(photos) => setField("kitchenPhotos", photos)}
+              roomName="Küche"
             />
           </div>
         </div>

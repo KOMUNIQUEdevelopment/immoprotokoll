@@ -302,30 +302,43 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
   const folder = zip.folder("Fotos");
   if (!folder) return;
 
-  const addPhotos = (photos: RoomPhoto[], prefix: string) => {
-    photos.forEach((photo, idx) => {
-      const ts = new Date(photo.timestamp)
-        .toLocaleString("de-DE", {
-          year: "numeric", month: "2-digit", day: "2-digit",
-          hour: "2-digit", minute: "2-digit",
-        })
-        .replace(/[,:\s\/]/g, "-")
-        .replace(/-+/g, "-");
+  const usedNames = new Map<string, number>();
+
+  const addPhotos = (photos: RoomPhoto[], roomName: string) => {
+    const safeRoom = roomName
+      .replace(/[\/\\:\*\?"<>\|]/g, "")
+      .replace(/\s+/g, "_");
+
+    photos.forEach((photo) => {
+      const d = new Date(photo.timestamp);
+      const ts = [
+        String(d.getFullYear()),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+      ].join("-") + "_" + [
+        String(d.getHours()).padStart(2, "0"),
+        String(d.getMinutes()).padStart(2, "0"),
+        String(d.getSeconds()).padStart(2, "0"),
+      ].join("-");
+
       const ext = photo.dataUrl.startsWith("data:image/png") ? "png" : "jpg";
-      const filename = `${prefix}_${String(idx + 1).padStart(2, "0")}_${ts}.${ext}`;
+      const baseName = `${safeRoom}_${ts}`;
+      const count = usedNames.get(baseName) ?? 0;
+      usedNames.set(baseName, count + 1);
+      const filename = count === 0 ? `${baseName}.${ext}` : `${baseName}_${count + 1}.${ext}`;
+
       const base64 = photo.dataUrl.split(",")[1];
       if (base64) folder.file(filename, base64, { base64: true });
     });
   };
 
   if (protocol.kitchenPhotos?.length) {
-    addPhotos(protocol.kitchenPhotos, "Kueche");
+    addPhotos(protocol.kitchenPhotos, "Küche");
   }
 
   for (const room of protocol.rooms) {
     if (room.photos.length > 0) {
-      const safeName = room.name.replace(/[\/\\:\*\?"<>\|]/g, "_").replace(/\s+/g, "_");
-      addPhotos(room.photos, `${room.floor}_${safeName}`);
+      addPhotos(room.photos, room.name);
     }
   }
 
