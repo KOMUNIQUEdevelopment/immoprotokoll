@@ -1,9 +1,38 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ProtocolData, createDefaultProtocol, migrateProtocol } from "./types";
 import { SyncMessage } from "./hooks/useSync";
+import {
+  savePhotosToDb,
+  loadAllPhotosFromDb,
+  deletePhotosFromDb,
+  collectPhotoEntries,
+} from "./photoDb";
 
 const PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
 const LEGACY_KEY = "uebergabeprotokoll_data";
+
+// Strip photo dataUrls so localStorage only holds tiny metadata
+function stripPhotoDataUrls(
+  protocols: Record<string, ProtocolData>
+): Record<string, ProtocolData> {
+  return Object.fromEntries(
+    Object.entries(protocols).map(([id, p]) => [
+      id,
+      {
+        ...p,
+        kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
+        rooms: p.rooms.map((r) => ({
+          ...r,
+          photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
+        })),
+        personSignatures: (p.personSignatures ?? []).map((s) => ({
+          ...s,
+          signatureDataUrl: "",
+        })),
+      },
+    ])
+  );
+}
 
 function loadLocalProtocols(): Record<string, ProtocolData> {
   try {
@@ -33,13 +62,54 @@ function loadLocalProtocols(): Record<string, ProtocolData> {
 }
 
 function persistAll(protocols: Record<string, ProtocolData>): boolean {
+  // 1. Save photo blobs to IndexedDB (fire-and-forget, large data)
+  const photoEntries = collectPhotoEntries(protocols);
+  if (photoEntries.length > 0) {
+    savePhotosToDb(photoEntries).catch((e) =>
+      console.error("IndexedDB photo save failed", e)
+    );
+  }
+
+  // 2. Save stripped metadata to localStorage (small, sync)
   try {
-    localStorage.setItem(PROTOCOLS_KEY, JSON.stringify(protocols));
+    localStorage.setItem(PROTOCOLS_KEY, JSON.stringify(stripPhotoDataUrls(protocols)));
     return true;
   } catch (e) {
-    console.error("Save failed", e);
+    console.error("localStorage save failed (quota exceeded?)", e);
     return false;
   }
+}
+
+// Re-hydrate stripped protocols with photo dataUrls from IndexedDB
+function hydratePhotos(
+  protocols: Record<string, ProtocolData>,
+  photoMap: Record<string, string>
+): Record<string, ProtocolData> {
+  if (Object.keys(photoMap).length === 0) return protocols;
+  return Object.fromEntries(
+    Object.entries(protocols).map(([id, p]) => [
+      id,
+      {
+        ...p,
+        kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({
+          ...ph,
+          dataUrl: photoMap[ph.id] ?? ph.dataUrl,
+        })),
+        rooms: p.rooms.map((r) => ({
+          ...r,
+          photos: r.photos.map((ph) => ({
+            ...ph,
+            dataUrl: photoMap[ph.id] ?? ph.dataUrl,
+          })),
+        })),
+        personSignatures: (p.personSignatures ?? []).map((s) => ({
+          ...s,
+          signatureDataUrl:
+            photoMap[`sig_${s.personId}`] ?? s.signatureDataUrl,
+        })),
+      },
+    ])
+  );
 }
 
 export function useProtocolsStore() {
@@ -51,6 +121,34 @@ export function useProtocolsStore() {
   const wsSendRef = useRef<((msg: SyncMessage) => void) | null>(null);
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
+
+  // On mount: load photos from IndexedDB and hydrate the protocols.
+  // This also handles migration: if existing localStorage data still has
+  // photos (dataUrl non-empty), they get persisted to IndexedDB on the
+  // next save so localStorage shrinks below quota limits.
+  useEffect(() => {
+    loadAllPhotosFromDb().then((photoMap) => {
+      setProtocols((prev) => {
+        const hydrated = hydratePhotos(prev, photoMap);
+        // If existing localStorage data had embedded photos (pre-migration),
+        // immediately persist them to IndexedDB and strip from localStorage.
+        const hasEmbedded = Object.values(prev).some(
+          (p) =>
+            (p.kitchenPhotos ?? []).some((ph) => ph.dataUrl) ||
+            p.rooms.some((r) => r.photos.some((ph) => ph.dataUrl)) ||
+            (p.personSignatures ?? []).some((s) => s.signatureDataUrl)
+        );
+        if (hasEmbedded) {
+          // Fire-and-forget: migrate embedded photos to IndexedDB
+          persistAll(prev);
+        }
+        return hydrated;
+      });
+    }).catch((err) => {
+      console.warn("Photo hydration from IndexedDB failed:", err);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveAll = useCallback((all: Record<string, ProtocolData>) => {
     const ok = persistAll(all);
@@ -223,12 +321,26 @@ export function useProtocolsStore() {
 
   const deleteProtocol = useCallback((id: string) => {
     setProtocols(prev => {
-      const wasSync = prev[id]?.syncEnabled;
+      const target = prev[id];
+      const wasSync = target?.syncEnabled;
       const next = { ...prev };
       delete next[id];
       persistAll(next);
       if (wasSync) {
         setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
+      }
+      // Clean up this protocol's photos from IndexedDB
+      if (target) {
+        const photoIds: string[] = [
+          ...(target.kitchenPhotos ?? []).map((ph) => ph.id),
+          ...target.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
+          ...(target.personSignatures ?? []).map((s) => `sig_${s.personId}`),
+        ];
+        if (photoIds.length > 0) {
+          deletePhotosFromDb(photoIds).catch((e) =>
+            console.warn("Failed to delete photos from IndexedDB", e)
+          );
+        }
       }
       return next;
     });
