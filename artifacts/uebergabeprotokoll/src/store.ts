@@ -11,26 +11,28 @@ import {
 const PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
 const LEGACY_KEY = "uebergabeprotokoll_data";
 
+// Strip photo dataUrls from a single protocol (used for WS sync)
+function stripSingleProtocol(p: ProtocolData): ProtocolData {
+  return {
+    ...p,
+    kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
+    rooms: p.rooms.map((r) => ({
+      ...r,
+      photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
+    })),
+    personSignatures: (p.personSignatures ?? []).map((s) => ({
+      ...s,
+      signatureDataUrl: "",
+    })),
+  };
+}
+
 // Strip photo dataUrls so localStorage only holds tiny metadata
 function stripPhotoDataUrls(
   protocols: Record<string, ProtocolData>
 ): Record<string, ProtocolData> {
   return Object.fromEntries(
-    Object.entries(protocols).map(([id, p]) => [
-      id,
-      {
-        ...p,
-        kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
-        rooms: p.rooms.map((r) => ({
-          ...r,
-          photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
-        })),
-        personSignatures: (p.personSignatures ?? []).map((s) => ({
-          ...s,
-          signatureDataUrl: "",
-        })),
-      },
-    ])
+    Object.entries(protocols).map(([id, p]) => [id, stripSingleProtocol(p)])
   );
 }
 
@@ -169,8 +171,9 @@ export function useProtocolsStore() {
         const localSynced = Object.values(prev).filter(p => p.syncEnabled);
         if (localSynced.length > 0) {
           setTimeout(() => {
+            // Always strip photos before sending over WS
             localSynced.forEach(p => {
-              wsSendRef.current?.({ type: "update", protocol: p });
+              wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(p) });
             });
           }, 200);
         }
@@ -184,14 +187,15 @@ export function useProtocolsStore() {
         if (!localP) {
           merged[id] = remoteP;
         } else {
+          // Photos are local-only (IndexedDB) — always keep local copy
           const rooms = remoteP.rooms.map(remoteRoom => {
             const prevRoom = localP.rooms.find(r => r.id === remoteRoom.id);
-            const photos = remoteRoom.photos?.length ? remoteRoom.photos : (prevRoom?.photos ?? []);
+            const photos = prevRoom?.photos?.length ? prevRoom.photos : (remoteRoom.photos ?? []);
             return { ...remoteRoom, photos };
           });
-          const kitchenPhotos = remoteP.kitchenPhotos?.length
-            ? remoteP.kitchenPhotos
-            : (localP.kitchenPhotos ?? []);
+          const kitchenPhotos = localP.kitchenPhotos?.length
+            ? localP.kitchenPhotos
+            : (remoteP.kitchenPhotos ?? []);
           merged[id] = { ...remoteP, rooms, kitchenPhotos, syncEnabled: true };
         }
       });
@@ -204,14 +208,15 @@ export function useProtocolsStore() {
   const receiveRemote = useCallback((remote: ProtocolData) => {
     setProtocols(prev => {
       const existing = prev[remote.id];
+      // Photos are local-only — always keep local copy, never trust remote
       const rooms = remote.rooms.map(remoteRoom => {
         const prevRoom = existing?.rooms.find(r => r.id === remoteRoom.id);
-        const photos = remoteRoom.photos?.length ? remoteRoom.photos : (prevRoom?.photos ?? []);
+        const photos = prevRoom?.photos?.length ? prevRoom.photos : (remoteRoom.photos ?? []);
         return { ...remoteRoom, photos };
       });
-      const kitchenPhotos = remote.kitchenPhotos?.length
-        ? remote.kitchenPhotos
-        : (existing?.kitchenPhotos ?? []);
+      const kitchenPhotos = existing?.kitchenPhotos?.length
+        ? existing.kitchenPhotos
+        : (remote.kitchenPhotos ?? []);
       const merged = { ...remote, rooms, kitchenPhotos, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
       persistAll(next);
@@ -239,7 +244,7 @@ export function useProtocolsStore() {
       const next = { ...prev, [id]: updated };
       persistAll(next);
       if (enabling) {
-        setTimeout(() => wsSendRef.current?.({ type: "update", protocol: updated }), 0);
+        setTimeout(() => wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) }), 0);
       } else {
         setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
       }
@@ -256,7 +261,7 @@ export function useProtocolsStore() {
       const next = { ...prev, [id]: updated };
       persistAll(next);
       if (updated.syncEnabled) {
-        wsSendRef.current?.({ type: "update", protocol: updated });
+        wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
       }
       return next;
     });
@@ -356,7 +361,7 @@ export function useProtocolsStore() {
       const next = { ...prev, [currentId]: updated };
       persistAll(next);
       if (updated.syncEnabled) {
-        wsSendRef.current?.({ type: "update", protocol: updated });
+        wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
       }
       return next;
     });
@@ -375,7 +380,7 @@ export function useProtocolsStore() {
         autoSaveTimer.current = setTimeout(() => {
           saveAll(next);
           if (updated.syncEnabled) {
-            wsSendRef.current?.({ type: "update", protocol: updated });
+            wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
           }
         }, 1500);
         return next;

@@ -91,8 +91,8 @@ interface PhotoManagerProps {
   floorLabel?: string;
 }
 
-const MAX_DIM = 1920;
-const JPEG_QUALITY = 0.82;
+const MAX_DIM = 1280;
+const JPEG_QUALITY = 0.78;
 
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
