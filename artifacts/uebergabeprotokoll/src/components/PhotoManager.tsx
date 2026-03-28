@@ -124,24 +124,46 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-// Extract the original capture date from EXIF metadata.
-// Falls back to null if not available (e.g. screenshots, PNG files, no EXIF).
-async function getExifTimestamp(file: File): Promise<string | null> {
-  try {
-    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate", "DateTime"] });
-    if (!exif) return null;
-    const raw: unknown = exif.DateTimeOriginal ?? exif.CreateDate ?? exif.DateTime;
-    if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString();
-    if (typeof raw === "string") {
-      // EXIF dates often come as "YYYY:MM:DD HH:MM:SS"
-      const normalized = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
-      const d = new Date(normalized);
-      if (!isNaN(d.getTime())) return d.toISOString();
-    }
-    return null;
-  } catch {
-    return null;
+// Attempt to parse a date value returned by exifr (Date object or EXIF string).
+function parseExifDate(raw: unknown): string | null {
+  if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString();
+  if (typeof raw === "string" && raw.trim()) {
+    // EXIF dates often come as "YYYY:MM:DD HH:MM:SS"
+    const normalized = raw.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
+    const d = new Date(normalized);
+    if (!isNaN(d.getTime())) return d.toISOString();
   }
+  return null;
+}
+
+// Determine the best timestamp for a photo file.
+// Priority:
+//   1. EXIF DateTimeOriginal  – actual camera shutter moment
+//   2. EXIF CreateDate        – digitisation / creation date
+//   3. file.lastModified      – file-system date (usually = capture date for unedited photos)
+//   4. current time           – fallback of last resort (upload moment)
+async function getPhotoTimestamp(file: File): Promise<string> {
+  try {
+    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"] });
+    if (exif) {
+      const fromOriginal = parseExifDate(exif.DateTimeOriginal);
+      if (fromOriginal) return fromOriginal;
+      const fromCreate = parseExifDate(exif.CreateDate);
+      if (fromCreate) return fromCreate;
+    }
+  } catch {
+    // EXIF parsing failed – proceed to fallbacks
+  }
+
+  // file.lastModified is a Unix timestamp in milliseconds; for photos freshly taken
+  // or imported straight from a camera, this typically equals the capture time.
+  if (file.lastModified) {
+    const fromFile = new Date(file.lastModified);
+    if (!isNaN(fromFile.getTime())) return fromFile.toISOString();
+  }
+
+  // Last resort: moment of upload
+  return new Date().toISOString();
 }
 
 export default function PhotoManager({ photos, onChange, roomName, floorLabel }: PhotoManagerProps) {
@@ -161,17 +183,11 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
 
       Promise.all(
         validFiles.map(async (file) => {
-          // Run compression and EXIF extraction in parallel
-          const [dataUrl, exifTs] = await Promise.all([
+          const [dataUrl, timestamp] = await Promise.all([
             compressImage(file),
-            getExifTimestamp(file),
+            getPhotoTimestamp(file),
           ]);
-          return {
-            id: crypto.randomUUID(),
-            dataUrl,
-            // Use EXIF capture date if available, otherwise upload timestamp
-            timestamp: exifTs ?? new Date().toISOString(),
-          } satisfies RoomPhoto;
+          return { id: crypto.randomUUID(), dataUrl, timestamp } satisfies RoomPhoto;
         })
       ).then((newPhotos) => {
         onChange([...photos, ...newPhotos]);
