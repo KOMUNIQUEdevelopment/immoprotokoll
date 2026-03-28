@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Camera, ImagePlus, Trash2, GripVertical } from "lucide-react";
 import { RoomPhoto } from "../types";
 import { Button } from "@/components/ui/button";
+import exifr from "exifr";
 
 interface SortablePhotoProps {
   photo: RoomPhoto;
@@ -123,6 +124,26 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
+// Extract the original capture date from EXIF metadata.
+// Falls back to null if not available (e.g. screenshots, PNG files, no EXIF).
+async function getExifTimestamp(file: File): Promise<string | null> {
+  try {
+    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate", "DateTime"] });
+    if (!exif) return null;
+    const raw: unknown = exif.DateTimeOriginal ?? exif.CreateDate ?? exif.DateTime;
+    if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString();
+    if (typeof raw === "string") {
+      // EXIF dates often come as "YYYY:MM:DD HH:MM:SS"
+      const normalized = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
+      const d = new Date(normalized);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PhotoManager({ photos, onChange, roomName, floorLabel }: PhotoManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -140,11 +161,16 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
 
       Promise.all(
         validFiles.map(async (file) => {
-          const dataUrl = await compressImage(file);
+          // Run compression and EXIF extraction in parallel
+          const [dataUrl, exifTs] = await Promise.all([
+            compressImage(file),
+            getExifTimestamp(file),
+          ]);
           return {
             id: crypto.randomUUID(),
             dataUrl,
-            timestamp: new Date().toISOString(),
+            // Use EXIF capture date if available, otherwise upload timestamp
+            timestamp: exifTs ?? new Date().toISOString(),
           } satisfies RoomPhoto;
         })
       ).then((newPhotos) => {
