@@ -146,7 +146,7 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
 
   // Kitchen photos
   if (protocol.kitchenPhotos?.length) {
-    addPhotosBlock(doc, protocol.kitchenPhotos, "Küche", "", margin, contentW, usableH, () => y, (v) => { y = v; });
+    await addPhotosBlock(doc, protocol.kitchenPhotos, "Küche", "", margin, contentW, usableH, () => y, (v) => { y = v; });
   }
 
   // ── Rooms by floor ────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
 
       if (room.photos.length > 0) {
         const roomFloorLabel = FLOOR_LABEL[room.floor] ?? FLOOR_LABEL["Außen"] ?? room.floor;
-        addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; });
+        await addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; });
       }
 
       y += 3;
@@ -329,9 +329,42 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
   doc.save(fileName);
 }
 
+// ─── photo rotation helper ────────────────────────────────────────────────────
+
+/**
+ * If the photo is portrait (height > width), rotate it 90° clockwise so it
+ * becomes landscape. This prevents squishing in the fixed landscape PDF cells.
+ * Returns the original dataUrl unchanged for landscape/square images.
+ */
+function ensureLandscape(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth >= img.naturalHeight) {
+        // Already landscape or square — no change needed
+        resolve(dataUrl);
+        return;
+      }
+      // Portrait → rotate 90° CW to landscape
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalHeight;   // new width = old height
+      canvas.height = img.naturalWidth;   // new height = old width
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 // ─── photo block helper ───────────────────────────────────────────────────────
 
-function addPhotosBlock(
+async function addPhotosBlock(
   doc: jsPDF,
   photos: RoomPhoto[],
   roomName: string,
@@ -357,8 +390,10 @@ function addPhotosBlock(
 
     const photo = photos[i];
     try {
-      const fmt = photo.dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-      doc.addImage(photo.dataUrl, fmt, margin, y, photoW, photoH);
+      // Rotate portrait photos to landscape so they fill the cell correctly
+      const landDataUrl = await ensureLandscape(photo.dataUrl);
+      const fmt = landDataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+      doc.addImage(landDataUrl, fmt, margin, y, photoW, photoH);
     } catch {
       // skip broken images
     }
