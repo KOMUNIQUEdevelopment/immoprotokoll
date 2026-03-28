@@ -75,6 +75,49 @@ export async function deletePhotosFromDb(ids: string[]): Promise<void> {
   }
 }
 
+// ─── Server-Sync (cross-device) ───────────────────────────────────────────────
+
+function getApiBase(): string {
+  // API is proxied under the same host
+  return `${window.location.protocol}//${window.location.host}/api`;
+}
+
+const UPLOAD_BATCH = 3; // photos per HTTP request
+
+export async function uploadPhotosToServer(
+  entries: { id: string; dataUrl: string }[]
+): Promise<void> {
+  const valid = entries.filter((e) => e.id && e.dataUrl);
+  if (valid.length === 0) return;
+  for (let i = 0; i < valid.length; i += UPLOAD_BATCH) {
+    const batch = valid.slice(i, i + UPLOAD_BATCH);
+    try {
+      await fetch(`${getApiBase()}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: batch }),
+      });
+    } catch (e) {
+      console.warn("Photo server upload failed (offline?)", e);
+    }
+  }
+}
+
+export async function fetchMissingPhotosFromServer(
+  ids: string[]
+): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  try {
+    const url = `${getApiBase()}/photos?ids=${ids.join(",")}`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = await res.json() as { photos?: Record<string, string> };
+    return data.photos ?? {};
+  } catch {
+    return {};
+  }
+}
+
 export function collectPhotoEntries(
   protocols: Record<string, import("./types").ProtocolData>
 ): { id: string; dataUrl: string }[] {

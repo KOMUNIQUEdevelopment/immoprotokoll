@@ -1,5 +1,6 @@
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import express from "express";
 import app from "./app";
 import { logger } from "./lib/logger";
 
@@ -21,6 +22,9 @@ const wss = new WebSocketServer({ noServer: true });
 const MAX_PAYLOAD = 50 * 1024 * 1024;
 
 const serverProtocols: Record<string, unknown> = {};
+
+// In-memory photo store for cross-device sync (id → dataUrl)
+const serverPhotos: Map<string, string> = new Map();
 
 server.on("upgrade", (request, socket, head) => {
   if (request.url === "/api/sync") {
@@ -132,6 +136,37 @@ app.post("/api/protocol/:id/sign", (req, res) => {
 
   logger.info({ id, personId }, "Tenant signature saved and broadcast");
   res.json({ ok: true });
+});
+
+// ── REST: Fotos hochladen (cross-device sync) ─────────────────────────────────
+// Eigenes JSON-Limit von 50 MB für Foto-Payloads
+app.post("/api/photos", express.json({ limit: "50mb" }), (req, res) => {
+  const photos = (req.body as { photos?: { id: string; dataUrl: string }[] }).photos;
+  if (!Array.isArray(photos)) {
+    res.status(400).json({ error: "photos array erforderlich" });
+    return;
+  }
+  let stored = 0;
+  for (const p of photos) {
+    if (typeof p.id === "string" && typeof p.dataUrl === "string" && p.dataUrl) {
+      serverPhotos.set(p.id, p.dataUrl);
+      stored++;
+    }
+  }
+  logger.info({ stored, total: serverPhotos.size }, "Photos stored");
+  res.json({ ok: true, stored });
+});
+
+// ── REST: Fotos abrufen ───────────────────────────────────────────────────────
+app.get("/api/photos", (req, res) => {
+  const raw = (req.query.ids as string) || "";
+  const ids = raw.split(",").map(s => s.trim()).filter(Boolean);
+  const result: Record<string, string> = {};
+  for (const id of ids) {
+    const dataUrl = serverPhotos.get(id);
+    if (dataUrl) result[id] = dataUrl;
+  }
+  res.json({ photos: result });
 });
 
 server.listen(port, (err?: Error) => {

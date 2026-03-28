@@ -6,6 +6,8 @@ import {
   loadAllPhotosFromDb,
   deletePhotosFromDb,
   collectPhotoEntries,
+  uploadPhotosToServer,
+  fetchMissingPhotosFromServer,
 } from "./photoDb";
 
 const PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
@@ -70,6 +72,10 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
     savePhotosToDb(photoEntries).catch((e) =>
       console.error("IndexedDB photo save failed", e)
     );
+    // Also upload to server so other devices can fetch them
+    uploadPhotosToServer(photoEntries).catch((e) =>
+      console.warn("Server photo upload failed", e)
+    );
   }
 
   // 2. Save stripped metadata to localStorage (small, sync)
@@ -124,30 +130,54 @@ export function useProtocolsStore() {
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
 
-  // On mount: load photos from IndexedDB and hydrate the protocols.
-  // This also handles migration: if existing localStorage data still has
-  // photos (dataUrl non-empty), they get persisted to IndexedDB on the
-  // next save so localStorage shrinks below quota limits.
+  // On mount: load photos from IndexedDB, hydrate protocols.
+  // Then fetch any photos missing locally from the server (cross-device sync).
   useEffect(() => {
-    loadAllPhotosFromDb().then((photoMap) => {
+    loadAllPhotosFromDb().then(async (photoMap) => {
+      // First pass: hydrate from local IndexedDB
       setProtocols((prev) => {
         const hydrated = hydratePhotos(prev, photoMap);
-        // If existing localStorage data had embedded photos (pre-migration),
-        // immediately persist them to IndexedDB and strip from localStorage.
+        // Migrate pre-IndexedDB embedded photos if still present
         const hasEmbedded = Object.values(prev).some(
           (p) =>
             (p.kitchenPhotos ?? []).some((ph) => ph.dataUrl) ||
             p.rooms.some((r) => r.photos.some((ph) => ph.dataUrl)) ||
             (p.personSignatures ?? []).some((s) => s.signatureDataUrl)
         );
-        if (hasEmbedded) {
-          // Fire-and-forget: migrate embedded photos to IndexedDB
-          persistAll(prev);
-        }
+        if (hasEmbedded) persistAll(prev);
         return hydrated;
       });
+
+      // Second pass: collect photo IDs that are still missing locally
+      // (empty dataUrl after IndexedDB hydration → not on this device yet)
+      const currentProtocols = await new Promise<Record<string, ProtocolData>>(
+        (resolve) => setProtocols((p) => { resolve(p); return p; })
+      );
+      const missingIds: string[] = [];
+      for (const p of Object.values(currentProtocols)) {
+        for (const ph of p.kitchenPhotos ?? []) {
+          if (!ph.dataUrl && !photoMap[ph.id]) missingIds.push(ph.id);
+        }
+        for (const r of p.rooms) {
+          for (const ph of r.photos) {
+            if (!ph.dataUrl && !photoMap[ph.id]) missingIds.push(ph.id);
+          }
+        }
+      }
+
+      if (missingIds.length > 0) {
+        const serverMap = await fetchMissingPhotosFromServer(missingIds);
+        if (Object.keys(serverMap).length > 0) {
+          // Save fetched photos to local IndexedDB for offline access
+          savePhotosToDb(
+            Object.entries(serverMap).map(([id, dataUrl]) => ({ id, dataUrl }))
+          ).catch(console.warn);
+          // Apply to state
+          setProtocols((prev) => hydratePhotos(prev, serverMap));
+        }
+      }
     }).catch((err) => {
-      console.warn("Photo hydration from IndexedDB failed:", err);
+      console.warn("Photo hydration failed:", err);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
