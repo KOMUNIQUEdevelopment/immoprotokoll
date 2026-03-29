@@ -23,11 +23,35 @@ function stripSingleProtocol(p: ProtocolData): ProtocolData {
       ...r,
       photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
     })),
+    // Use null (not "") so the receiving side can distinguish "stripped but
+    // actually signed" from "genuinely unsigned".  The actual dataUrl lives
+    // in IndexedDB / the server photo store.
     personSignatures: (p.personSignatures ?? []).map((s) => ({
       ...s,
-      signatureDataUrl: "",
+      signatureDataUrl: null,
     })),
   };
+}
+
+// Merge two personSignature arrays: prefer non-null values over null ones.
+// "local" wins when remote is stripped/null; remote wins when it has the
+// actual signature (e.g. from the sign endpoint broadcast).
+function mergeSignatures(
+  local: ProtocolData["personSignatures"],
+  remote: ProtocolData["personSignatures"]
+): ProtocolData["personSignatures"] {
+  const result = (remote ?? []).map((rs) => {
+    if (rs.signatureDataUrl) return rs; // remote has the real sig → use it
+    const ls = (local ?? []).find((s) => s.personId === rs.personId);
+    return ls?.signatureDataUrl ? { ...rs, signatureDataUrl: ls.signatureDataUrl } : rs;
+  });
+  // Carry over any local sigs for persons not listed in remote
+  for (const ls of local ?? []) {
+    if (ls.signatureDataUrl && !result.some((s) => s.personId === ls.personId)) {
+      result.push(ls);
+    }
+  }
+  return result;
 }
 
 // Strip photo dataUrls so localStorage only holds tiny metadata
@@ -67,7 +91,7 @@ function loadLocalProtocols(): Record<string, ProtocolData> {
 }
 
 function persistAll(protocols: Record<string, ProtocolData>): boolean {
-  // 1. Save photo blobs to IndexedDB (fire-and-forget, large data)
+  // 1a. Save photo blobs + signatures to IndexedDB (fire-and-forget, large data)
   const photoEntries = collectPhotoEntries(protocols);
   if (photoEntries.length > 0) {
     savePhotosToDb(photoEntries).catch((e) =>
@@ -77,6 +101,21 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
     uploadPhotosToServer(photoEntries).catch((e) =>
       console.warn("Server photo upload failed", e)
     );
+  }
+
+  // 1b. Delete stale signatures from IndexedDB for persons whose signature is
+  //     currently null (explicitly cleared, or never signed).  Without this,
+  //     a cleared signature would be restored from IndexedDB on the next load.
+  const nullSigIds: string[] = [];
+  for (const p of Object.values(protocols)) {
+    for (const s of p.personSignatures ?? []) {
+      if (s.personId && !s.signatureDataUrl) {
+        nullSigIds.push(`sig_${s.personId}`);
+      }
+    }
+  }
+  if (nullSigIds.length > 0) {
+    deletePhotosFromDb(nullSigIds).catch(() => {});
   }
 
   // 2. Save stripped metadata to localStorage (small, sync)
@@ -261,7 +300,10 @@ export function useProtocolsStore() {
           };
           const meterPhotos = mergeFlatPhotos(localP.meterPhotos, remoteP.meterPhotos);
           const kitchenPhotos = mergeFlatPhotos(localP.kitchenPhotos, remoteP.kitchenPhotos);
-          merged[id] = { ...remoteP, rooms, meterPhotos, kitchenPhotos, syncEnabled: true };
+          // Merge signatures: preserve local non-null values that the remote
+          // doesn't have (remote signatures are always stripped to null on WS).
+          const personSignatures = mergeSignatures(localP.personSignatures, remoteP.personSignatures);
+          merged[id] = { ...remoteP, rooms, meterPhotos, kitchenPhotos, personSignatures, syncEnabled: true };
         }
       });
 
@@ -301,7 +343,9 @@ export function useProtocolsStore() {
       };
       const meterPhotos = mergeFlatPhotos2(existing?.meterPhotos ?? [], remote.meterPhotos ?? []);
       const kitchenPhotos = mergeFlatPhotos2(existing?.kitchenPhotos ?? [], remote.kitchenPhotos ?? []);
-      const merged = { ...remote, rooms, meterPhotos, kitchenPhotos, syncEnabled: true };
+      // Merge signatures: prefer local non-null over remote null/stripped
+      const personSignatures = mergeSignatures(existing?.personSignatures, remote.personSignatures);
+      const merged = { ...remote, rooms, meterPhotos, kitchenPhotos, personSignatures, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
       missingIds = collectMissingPhotoIds({ [remote.id]: merged });
       persistAll(next);

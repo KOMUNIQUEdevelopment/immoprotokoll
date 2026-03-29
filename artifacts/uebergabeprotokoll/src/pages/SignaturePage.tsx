@@ -11,7 +11,10 @@ interface SignaturePageProps {
 }
 
 function getSignatureFor(signatures: PersonSignature[], personId: string): string | null {
-  return signatures.find(s => s.personId === personId)?.signatureDataUrl ?? null;
+  const val = signatures.find(s => s.personId === personId)?.signatureDataUrl;
+  // Treat empty string the same as null (stripped protocol sent "" instead of null
+  // in older versions; callers rely on a truthy/falsy distinction).
+  return val || null;
 }
 
 function upsertSignature(signatures: PersonSignature[], personId: string, dataUrl: string | null): PersonSignature[] {
@@ -95,8 +98,8 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
     }));
   };
 
-  const allVermieterSigned = protocol.uebergeber.every(p => getSignatureFor(protocol.personSignatures, p.id) !== null);
-  const allMieterSigned = protocol.uebernehmer.every(p => getSignatureFor(protocol.personSignatures, p.id) !== null);
+  const allVermieterSigned = protocol.uebergeber.every(p => !!getSignatureFor(protocol.personSignatures, p.id));
+  const allMieterSigned = protocol.uebernehmer.every(p => !!getSignatureFor(protocol.personSignatures, p.id));
 
   return (
     <div className="space-y-6">

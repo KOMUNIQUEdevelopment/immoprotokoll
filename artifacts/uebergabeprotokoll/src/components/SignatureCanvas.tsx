@@ -8,6 +8,18 @@ interface SignatureCanvasProps {
   label?: string;
 }
 
+// Returns true when every pixel is fully transparent (alpha ≤ 20).
+// Used to auto-reject blank PNGs written by the old DPR-bug code path.
+function isCanvasBlank(canvas: HTMLCanvasElement): boolean {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 20) return false; // found a non-transparent pixel
+  }
+  return true;
+}
+
 export default function SignatureCanvasComponent({
   value,
   onChange,
@@ -18,6 +30,11 @@ export default function SignatureCanvasComponent({
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const [isEmpty, setIsEmpty] = React.useState(!value);
+
+  // Always-fresh reference to onChange so async image-load callbacks never
+  // call a stale closure.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
 
   // Whether the user has drawn on this canvas instance themselves.
   // External value changes (WS sync) are only applied when this is false.
@@ -64,7 +81,20 @@ export default function SignatureCanvasComponent({
 
     if (restoreDataUrl) {
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, width, height);
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, width, height);
+        // Auto-detect and reject visually blank PNGs (written by the old
+        // DPR-bug code path where strokes landed outside the canvas).
+        if (isCanvasBlank(canvas)) {
+          const dpr2 = window.devicePixelRatio || 1;
+          ctx.clearRect(0, 0, canvas.width / dpr2, canvas.height / dpr2);
+          setIsEmpty(true);
+          appliedValue.current = null;
+          onChangeRef.current(null); // propagate clear to parent state
+        } else {
+          setIsEmpty(false); // confirmed non-blank — show "Unterschrift gespeichert"
+        }
+      };
       img.src = restoreDataUrl;
     }
   }, []);
@@ -79,7 +109,8 @@ export default function SignatureCanvasComponent({
     if (width > 0) {
       initCanvas(value);
       appliedValue.current = value ?? null;
-      if (value) setIsEmpty(false);
+      // setIsEmpty is handled inside initCanvas's img.onload for non-null values.
+      // For null/empty we keep the initial useState(!value) = true.
       return;
     }
 
@@ -91,7 +122,6 @@ export default function SignatureCanvasComponent({
           observer.disconnect();
           initCanvas(value);
           appliedValue.current = value ?? null;
-          if (value) setIsEmpty(false);
           return;
         }
       }
@@ -126,8 +156,8 @@ export default function SignatureCanvasComponent({
 
     // Re-initialise with the new value so the canvas is sized correctly for
     // the current container dimensions and the image fills it properly.
+    // setIsEmpty(true/false) is handled inside initCanvas's img.onload.
     initCanvas(value);
-    setIsEmpty(false);
   }, [value, initCanvas]);
 
   // ── Pointer helpers ───────────────────────────────────────────────────────────
