@@ -59,7 +59,8 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
         alt={`Foto ${ts}`}
         className="w-full aspect-[4/3] object-cover"
       />
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+      {/* Drag handle + overlay controls – visible on hover (desktop) */}
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <button
           {...listeners}
           {...attributes}
@@ -68,14 +69,15 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
         >
           <GripVertical size={16} />
         </button>
-        <button
-          onClick={() => onDelete(photo.id)}
-          className="p-1.5 bg-red-500/80 rounded-md text-white hover:bg-red-600"
-          title="Löschen"
-        >
-          <Trash2 size={16} />
-        </button>
       </div>
+      {/* Delete button – always visible so it works on touch/mobile */}
+      <button
+        onClick={() => onDelete(photo.id)}
+        className="absolute top-1.5 right-1.5 p-1 bg-red-500/80 rounded-md text-white hover:bg-red-600 active:bg-red-700 shadow"
+        title="Löschen"
+      >
+        <Trash2 size={14} />
+      </button>
       <div className="px-2 py-1 text-xs text-muted-foreground truncate leading-tight">
         {floorLabel && <span className="text-foreground/50">{floorLabel} · </span>}
         {roomName && <span className="font-medium text-foreground/70">{roomName} · </span>}
