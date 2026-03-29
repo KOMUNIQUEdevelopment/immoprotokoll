@@ -88,6 +88,22 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
   }
 }
 
+// Collect photo IDs that have no dataUrl (need to be fetched from somewhere)
+function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string[] {
+  const ids: string[] = [];
+  for (const p of Object.values(protocols)) {
+    for (const ph of p.kitchenPhotos ?? []) {
+      if (!ph.dataUrl) ids.push(ph.id);
+    }
+    for (const r of p.rooms) {
+      for (const ph of r.photos) {
+        if (!ph.dataUrl) ids.push(ph.id);
+      }
+    }
+  }
+  return ids;
+}
+
 // Re-hydrate stripped protocols with photo dataUrls from IndexedDB
 function hydratePhotos(
   protocols: Record<string, ProtocolData>,
@@ -130,14 +146,30 @@ export function useProtocolsStore() {
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
 
-  // On mount: load photos from IndexedDB, hydrate protocols.
-  // Then fetch any photos missing locally from the server (cross-device sync).
+  // Fetch photos that are missing locally from the server and apply them to state.
+  // Called both on mount (after IndexedDB hydration) and after every WS sync event.
+  const fetchAndApplyServerPhotos = useCallback(async (missingIds: string[]) => {
+    if (missingIds.length === 0) return;
+    try {
+      const serverMap = await fetchMissingPhotosFromServer(missingIds);
+      if (Object.keys(serverMap).length === 0) return;
+      // Cache fetched photos in local IndexedDB for offline use
+      savePhotosToDb(
+        Object.entries(serverMap).map(([id, dataUrl]) => ({ id, dataUrl }))
+      ).catch(console.warn);
+      setProtocols((prev) => hydratePhotos(prev, serverMap));
+    } catch (e) {
+      console.warn("Server photo fetch failed", e);
+    }
+  }, []);
+
+  // On mount: load photos from local IndexedDB and hydrate state.
   useEffect(() => {
     loadAllPhotosFromDb().then(async (photoMap) => {
-      // First pass: hydrate from local IndexedDB
+      let missingIds: string[] = [];
       setProtocols((prev) => {
         const hydrated = hydratePhotos(prev, photoMap);
-        // Migrate pre-IndexedDB embedded photos if still present
+        // Migrate legacy embedded photos to IndexedDB if still present
         const hasEmbedded = Object.values(prev).some(
           (p) =>
             (p.kitchenPhotos ?? []).some((ph) => ph.dataUrl) ||
@@ -145,39 +177,15 @@ export function useProtocolsStore() {
             (p.personSignatures ?? []).some((s) => s.signatureDataUrl)
         );
         if (hasEmbedded) persistAll(prev);
+        // After IndexedDB hydration, still-missing IDs must come from server
+        missingIds = collectMissingPhotoIds(hydrated);
         return hydrated;
       });
-
-      // Second pass: collect photo IDs that are still missing locally
-      // (empty dataUrl after IndexedDB hydration → not on this device yet)
-      const currentProtocols = await new Promise<Record<string, ProtocolData>>(
-        (resolve) => setProtocols((p) => { resolve(p); return p; })
-      );
-      const missingIds: string[] = [];
-      for (const p of Object.values(currentProtocols)) {
-        for (const ph of p.kitchenPhotos ?? []) {
-          if (!ph.dataUrl && !photoMap[ph.id]) missingIds.push(ph.id);
-        }
-        for (const r of p.rooms) {
-          for (const ph of r.photos) {
-            if (!ph.dataUrl && !photoMap[ph.id]) missingIds.push(ph.id);
-          }
-        }
-      }
-
-      if (missingIds.length > 0) {
-        const serverMap = await fetchMissingPhotosFromServer(missingIds);
-        if (Object.keys(serverMap).length > 0) {
-          // Save fetched photos to local IndexedDB for offline access
-          savePhotosToDb(
-            Object.entries(serverMap).map(([id, dataUrl]) => ({ id, dataUrl }))
-          ).catch(console.warn);
-          // Apply to state
-          setProtocols((prev) => hydratePhotos(prev, serverMap));
-        }
-      }
+      // Fetch from server after state update (WS init may not have fired yet;
+      // receiveInit will also call this when it does fire)
+      await fetchAndApplyServerPhotos(missingIds);
     }).catch((err) => {
-      console.warn("Photo hydration failed:", err);
+      console.warn("Photo hydration from IndexedDB failed:", err);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -189,6 +197,7 @@ export function useProtocolsStore() {
   }, []);
 
   const receiveInit = useCallback((remoteProtocols: Record<string, ProtocolData>) => {
+    let missingIds: string[] = [];
     setProtocols(prev => {
       const synced = Object.fromEntries(
         Object.entries(remoteProtocols).map(([id, p]) => [
@@ -201,7 +210,6 @@ export function useProtocolsStore() {
         const localSynced = Object.values(prev).filter(p => p.syncEnabled);
         if (localSynced.length > 0) {
           setTimeout(() => {
-            // Always strip photos before sending over WS
             localSynced.forEach(p => {
               wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(p) });
             });
@@ -215,44 +223,86 @@ export function useProtocolsStore() {
       Object.entries(synced).forEach(([id, remoteP]) => {
         const localP = prev[id];
         if (!localP) {
+          // New protocol on this device — use remote stubs (photo IDs, no dataUrls)
           merged[id] = remoteP;
         } else {
-          // Photos are local-only (IndexedDB) — always keep local copy
+          // Prefer local photos (already hydrated from IndexedDB);
+          // fall back to remote stubs so the IDs are preserved for server fetch
           const rooms = remoteP.rooms.map(remoteRoom => {
             const prevRoom = localP.rooms.find(r => r.id === remoteRoom.id);
-            const photos = prevRoom?.photos?.length ? prevRoom.photos : (remoteRoom.photos ?? []);
-            return { ...remoteRoom, photos };
+            // Use local photos if they have data; otherwise keep remote stubs (IDs intact)
+            const photos = (prevRoom?.photos ?? []).map(localPh => {
+              if (localPh.dataUrl) return localPh;
+              const remotePh = (remoteRoom.photos ?? []).find(rp => rp.id === localPh.id);
+              return remotePh ?? localPh;
+            });
+            // If remote room has new photos not yet in local, add their stubs too
+            const localIds = new Set((prevRoom?.photos ?? []).map(p => p.id));
+            const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
+            return { ...remoteRoom, photos: [...photos, ...newRemote] };
           });
-          const kitchenPhotos = localP.kitchenPhotos?.length
-            ? localP.kitchenPhotos
-            : (remoteP.kitchenPhotos ?? []);
+          const kitchenPhotos = (() => {
+            const local = localP.kitchenPhotos ?? [];
+            const remote = remoteP.kitchenPhotos ?? [];
+            const merged2 = local.map(localPh => {
+              if (localPh.dataUrl) return localPh;
+              return remote.find(rp => rp.id === localPh.id) ?? localPh;
+            });
+            const localIds = new Set(local.map(p => p.id));
+            const newRemote = remote.filter(rp => !localIds.has(rp.id));
+            return [...merged2, ...newRemote];
+          })();
           merged[id] = { ...remoteP, rooms, kitchenPhotos, syncEnabled: true };
         }
       });
 
+      // Collect IDs still missing dataUrls → need to fetch from server
+      missingIds = collectMissingPhotoIds(merged);
       persistAll(merged);
       return merged;
     });
-  }, []);
+    // Trigger server fetch AFTER state update (outside the updater to avoid side-effect issues)
+    if (missingIds.length > 0) {
+      setTimeout(() => fetchAndApplyServerPhotos(missingIds), 0);
+    }
+  }, [fetchAndApplyServerPhotos]);
 
   const receiveRemote = useCallback((remote: ProtocolData) => {
+    let missingIds: string[] = [];
     setProtocols(prev => {
       const existing = prev[remote.id];
-      // Photos are local-only — always keep local copy, never trust remote
+      // Prefer local photos (with dataUrls); keep remote stubs for IDs not yet local
       const rooms = remote.rooms.map(remoteRoom => {
         const prevRoom = existing?.rooms.find(r => r.id === remoteRoom.id);
-        const photos = prevRoom?.photos?.length ? prevRoom.photos : (remoteRoom.photos ?? []);
-        return { ...remoteRoom, photos };
+        const photos = (prevRoom?.photos ?? []).map(localPh => {
+          if (localPh.dataUrl) return localPh;
+          return (remoteRoom.photos ?? []).find(rp => rp.id === localPh.id) ?? localPh;
+        });
+        const localIds = new Set((prevRoom?.photos ?? []).map(p => p.id));
+        const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
+        return { ...remoteRoom, photos: [...photos, ...newRemote] };
       });
-      const kitchenPhotos = existing?.kitchenPhotos?.length
-        ? existing.kitchenPhotos
-        : (remote.kitchenPhotos ?? []);
+      const kitchenPhotos = (() => {
+        const local = existing?.kitchenPhotos ?? [];
+        const remoteKp = remote.kitchenPhotos ?? [];
+        const merged2 = local.map(localPh => {
+          if (localPh.dataUrl) return localPh;
+          return remoteKp.find(rp => rp.id === localPh.id) ?? localPh;
+        });
+        const localIds = new Set(local.map(p => p.id));
+        const newRemote = remoteKp.filter(rp => !localIds.has(rp.id));
+        return [...merged2, ...newRemote];
+      })();
       const merged = { ...remote, rooms, kitchenPhotos, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
+      missingIds = collectMissingPhotoIds({ [remote.id]: merged });
       persistAll(next);
       return next;
     });
-  }, []);
+    if (missingIds.length > 0) {
+      setTimeout(() => fetchAndApplyServerPhotos(missingIds), 0);
+    }
+  }, [fetchAndApplyServerPhotos]);
 
   const receiveDelete = useCallback((id: string) => {
     setProtocols(prev => {
