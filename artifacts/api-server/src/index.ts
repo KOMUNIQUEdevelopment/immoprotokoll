@@ -60,8 +60,35 @@ wss.on("connection", (ws) => {
     }
 
     if (msg.type === "update" && msg.protocol && msg.protocol.id) {
-      serverProtocols[msg.protocol.id] = msg.protocol;
-      logger.info({ id: msg.protocol.id, total: Object.keys(serverProtocols).length }, "Protocol updated");
+      const incoming = msg.protocol as {
+        id: string;
+        personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
+      };
+      const existing = serverProtocols[incoming.id] as typeof incoming | undefined;
+
+      // Preserve non-empty signatures already on the server:
+      // desktop always strips signatures before sending WS updates.
+      if (existing?.personSignatures?.length && incoming.personSignatures) {
+        incoming.personSignatures = incoming.personSignatures.map((sig) => {
+          if (sig.signatureDataUrl) return sig; // incoming already has one
+          const kept = existing.personSignatures!.find(
+            (s) => s.personId === sig.personId && s.signatureDataUrl
+          );
+          return kept ? { ...sig, signatureDataUrl: kept.signatureDataUrl } : sig;
+        });
+        // Also carry over signatures for persons not yet in the incoming list
+        for (const es of existing.personSignatures) {
+          if (
+            es.signatureDataUrl &&
+            !incoming.personSignatures.some((s) => s.personId === es.personId)
+          ) {
+            incoming.personSignatures.push(es);
+          }
+        }
+      }
+
+      serverProtocols[incoming.id] = incoming;
+      logger.info({ id: incoming.id, total: Object.keys(serverProtocols).length }, "Protocol updated");
     } else if (msg.type === "delete" && msg.id) {
       delete serverProtocols[msg.id];
       logger.info({ id: msg.id, total: Object.keys(serverProtocols).length }, "Protocol deleted");
@@ -126,6 +153,9 @@ app.post("/api/protocol/:id/sign", (req, res) => {
   }
   protocol.personSignatures = sigs;
   serverProtocols[id] = protocol;
+
+  // Also persist signatures in the photo store so they survive protocol re-pushes
+  serverPhotos.set(`sig_${personId}`, signatureDataUrl);
 
   const payload = JSON.stringify({ type: "update", protocol });
   wss.clients.forEach((client) => {

@@ -223,11 +223,89 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track photo IDs already fetched to avoid re-fetching on every WS update
+  const fetchedPhotoIds = useRef<Set<string>>(new Set());
 
-  const updateProtocol = useCallback((updated: ProtocolData) => {
-    setProtocol(updated);
-    setLoadState("loaded");
+  // ── Helpers: collect photo IDs with missing dataUrl ────────────────────────
+
+  const collectMissingIds = useCallback((p: ProtocolData): string[] => {
+    const ids: string[] = [];
+    for (const ph of p.meterPhotos ?? []) if (ph.id && !ph.dataUrl) ids.push(ph.id);
+    for (const ph of p.kitchenPhotos ?? []) if (ph.id && !ph.dataUrl) ids.push(ph.id);
+    for (const r of p.rooms) for (const ph of r.photos) if (ph.id && !ph.dataUrl) ids.push(ph.id);
+    // Also fetch signatures that are missing (stored under sig_${personId} on server)
+    for (const sig of p.personSignatures ?? [])
+      if (sig.personId && !sig.signatureDataUrl) ids.push(`sig_${sig.personId}`);
+    return ids.filter((id) => !fetchedPhotoIds.current.has(id));
   }, []);
+
+  const applyPhotoMap = useCallback(
+    (p: ProtocolData, map: Record<string, string>): ProtocolData => ({
+      ...p,
+      meterPhotos: (p.meterPhotos ?? []).map((ph) => ({
+        ...ph,
+        dataUrl: map[ph.id] ?? ph.dataUrl,
+      })),
+      kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({
+        ...ph,
+        dataUrl: map[ph.id] ?? ph.dataUrl,
+      })),
+      rooms: p.rooms.map((r) => ({
+        ...r,
+        photos: r.photos.map((ph) => ({ ...ph, dataUrl: map[ph.id] ?? ph.dataUrl })),
+      })),
+    }),
+    []
+  );
+
+  /** Fetches missing photos from the server and sets protocol state. */
+  const hydrateAndSet = useCallback(
+    async (incoming: ProtocolData) => {
+      const missingIds = collectMissingIds(incoming);
+      let serverMap: Record<string, string> = {};
+
+      if (missingIds.length > 0) {
+        try {
+          const url = `/api/photos?ids=${missingIds.join(",")}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = (await res.json()) as { photos?: Record<string, string> };
+            serverMap = data.photos ?? {};
+            for (const id of missingIds) fetchedPhotoIds.current.add(id);
+          }
+        } catch {
+          // silently ignore – photos will just be blank
+        }
+      }
+
+      setProtocol((prev) => {
+        // Build final photo map: server fetch results + already-loaded local photos
+        const localPhotoMap: Record<string, string> = {};
+        if (prev) {
+          for (const ph of prev.meterPhotos ?? []) if (ph.dataUrl) localPhotoMap[ph.id] = ph.dataUrl;
+          for (const ph of prev.kitchenPhotos ?? []) if (ph.dataUrl) localPhotoMap[ph.id] = ph.dataUrl;
+          for (const r of prev.rooms) for (const ph of r.photos) if (ph.dataUrl) localPhotoMap[ph.id] = ph.dataUrl;
+        }
+        const combinedMap = { ...localPhotoMap, ...serverMap };
+        const withPhotos = applyPhotoMap(incoming, combinedMap);
+
+        // Merge signatures: priority order:
+        // 1. remote has it (incoming protocol from server had the full sig)
+        // 2. server photo store had it (fetched via sig_${personId} key)
+        // 3. local state already has it (not overwritten by stripped WS update)
+        const mergedSigs = (withPhotos.personSignatures ?? []).map((sig) => {
+          if (sig.signatureDataUrl) return sig;
+          const fromMap = combinedMap[`sig_${sig.personId}`];
+          if (fromMap) return { ...sig, signatureDataUrl: fromMap };
+          const local = prev?.personSignatures.find((s) => s.personId === sig.personId);
+          return local?.signatureDataUrl ? { ...sig, signatureDataUrl: local.signatureDataUrl } : sig;
+        });
+        return { ...withPhotos, personSignatures: mergedSigs };
+      });
+      setLoadState("loaded");
+    },
+    [collectMissingIds, applyPhotoMap]
+  );
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -243,9 +321,9 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
       try {
         const msg = JSON.parse(event.data as string);
         if (msg.type === "init" && msg.protocols?.[protocolId]) {
-          updateProtocol(msg.protocols[protocolId] as ProtocolData);
+          void hydrateAndSet(msg.protocols[protocolId] as ProtocolData);
         } else if (msg.type === "update" && msg.protocol?.id === protocolId) {
-          updateProtocol(msg.protocol as ProtocolData);
+          void hydrateAndSet(msg.protocol as ProtocolData);
         }
       } catch {}
     };
@@ -257,7 +335,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
     };
 
     ws.onerror = () => ws.close();
-  }, [protocolId, updateProtocol]);
+  }, [protocolId, hydrateAndSet]);
 
   useEffect(() => {
     fetch(`/api/protocol/${protocolId}`)
@@ -266,14 +344,11 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
         if (!res.ok) throw new Error("error");
         return res.json();
       })
-      .then((data) => {
-        setProtocol(data.protocol as ProtocolData);
-        setLoadState("loaded");
-      })
+      .then((data) => void hydrateAndSet(data.protocol as ProtocolData))
       .catch((err: Error & { code?: string }) => {
         setLoadState(err.code === "not-found" ? "not-found" : "error");
       });
-  }, [protocolId]);
+  }, [protocolId, hydrateAndSet]);
 
   useEffect(() => {
     connect();
