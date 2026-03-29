@@ -69,7 +69,6 @@ function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChang
       <SignatureCanvasComponent
         value={signatureDataUrl}
         onChange={onSignatureChange}
-        label="Hier unterschreiben"
       />
     </div>
   );

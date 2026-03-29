@@ -358,28 +358,30 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
     };
   }, [connect]);
 
-  const handleSign = async (personId: string) => {
-    const sig = pendingSig[personId];
-    if (!sig) return;
+  const handleSign = async (personId: string, dataUrl: string) => {
     setSubmitting((s) => ({ ...s, [personId]: true }));
+    // Optimistic: show pending sig immediately so canvas enters confirmed mode
+    setPendingSig((s) => ({ ...s, [personId]: dataUrl }));
     try {
       const res = await fetch(`/api/protocol/${protocolId}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personId, signatureDataUrl: sig }),
+        body: JSON.stringify({ personId, signatureDataUrl: dataUrl }),
       });
       if (!res.ok) throw new Error("Fehler");
       setProtocol((prev) => {
         if (!prev) return prev;
         const sigs = [...prev.personSignatures];
         const idx = sigs.findIndex((s) => s.personId === personId);
-        if (idx >= 0) sigs[idx] = { ...sigs[idx], signatureDataUrl: sig };
-        else sigs.push({ personId, signatureDataUrl: sig });
+        if (idx >= 0) sigs[idx] = { ...sigs[idx], signatureDataUrl: dataUrl };
+        else sigs.push({ personId, signatureDataUrl: dataUrl });
         return { ...prev, personSignatures: sigs };
       });
       setJustSigned((s) => ({ ...s, [personId]: true }));
       setPendingSig((s) => ({ ...s, [personId]: null }));
     } catch {
+      // Rollback optimistic state so user can retry
+      setPendingSig((s) => ({ ...s, [personId]: null }));
       alert("Fehler beim Speichern. Bitte erneut versuchen.");
     } finally {
       setSubmitting((s) => ({ ...s, [personId]: false }));
@@ -899,34 +901,18 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                               className="max-h-20 border border-green-200 rounded bg-white"
                             />
                           </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <SignatureCanvasComponent
-                              value={pending ?? null}
-                              onChange={(dataUrl) =>
-                                setPendingSig((s) => ({ ...s, [person.id]: dataUrl }))
-                              }
-                              label="Hier unterschreiben"
-                            />
-                            <Button
-                              onClick={() => handleSign(person.id)}
-                              disabled={!pending || isSubmitting}
-                              className="w-full gap-2"
-                              size="sm"
-                            >
-                              {isSubmitting ? (
-                                <>
-                                  <Loader2 size={13} className="animate-spin" />
-                                  Wird gespeichert…
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 size={13} />
-                                  Unterschrift bestätigen & synchronisieren
-                                </>
-                              )}
-                            </Button>
+                        ) : isSubmitting ? (
+                          <div className="border border-border rounded-xl p-6 flex flex-col items-center gap-2 bg-muted/40">
+                            <Loader2 size={20} className="animate-spin text-primary" />
+                            <p className="text-xs text-muted-foreground">Wird synchronisiert…</p>
                           </div>
+                        ) : (
+                          <SignatureCanvasComponent
+                            value={pending ?? null}
+                            onChange={(dataUrl) => {
+                              if (dataUrl) void handleSign(person.id, dataUrl);
+                            }}
+                          />
                         )}
                       </div>
                     );
