@@ -610,140 +610,128 @@ export default function ProtocolListPage({
             return (
               <div
                 key={p.id}
-                className="bg-card border border-border rounded-xl p-4 flex items-start gap-3 hover:border-primary/40 transition-colors"
+                className="bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-sm transition-all"
               >
-                <div className="p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
-                  <ClipboardList size={16} className="text-primary" />
+                {/* ── Info section ── */}
+                <div className="px-4 pt-4 pb-3 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
+                    <ClipboardList size={16} className="text-primary" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {renamingId === p.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          ref={renameInputRef}
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") commitRename();
+                            if (e.key === "Escape") cancelRename();
+                          }}
+                          onBlur={commitRename}
+                          className="h-7 text-sm font-semibold py-0 px-2"
+                        />
+                        <button
+                          type="button"
+                          onMouseDown={e => { e.preventDefault(); commitRename(); }}
+                          className="p-1 rounded text-emerald-600 hover:bg-emerald-50 shrink-0"
+                          title="Speichern"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onMouseDown={e => { e.preventDefault(); cancelRename(); }}
+                          className="p-1 rounded text-muted-foreground hover:bg-muted shrink-0"
+                          title="Abbrechen"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group/title">
+                        <p className="font-semibold text-sm leading-snug truncate">{title}</p>
+                        <button
+                          type="button"
+                          onClick={() => startRename(p)}
+                          className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
+                          title="Bezeichnung ändern"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      </div>
+                    )}
+                    {subtitle && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground/50 mt-0.5">
+                      Zuletzt: {formatDate(p.lastSaved)}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  {renamingId === p.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        ref={renameInputRef}
-                        value={renameValue}
-                        onChange={e => setRenameValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") commitRename();
-                          if (e.key === "Escape") cancelRename();
-                        }}
-                        onBlur={commitRename}
-                        className="h-7 text-sm font-semibold py-0 px-2"
-                      />
-                      <button
-                        type="button"
-                        onMouseDown={e => { e.preventDefault(); commitRename(); }}
-                        className="p-1 rounded text-emerald-600 hover:bg-emerald-50 shrink-0"
-                        title="Speichern"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onMouseDown={e => { e.preventDefault(); cancelRename(); }}
-                        className="p-1 rounded text-muted-foreground hover:bg-muted shrink-0"
-                        title="Abbrechen"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 group/title">
-                      <p className="font-semibold text-sm leading-snug truncate">{title}</p>
-                      {p.syncEnabled && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5 shrink-0">
-                          <Cloud size={9} />
-                          Sync
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => startRename(p)}
-                        className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
-                        title="Bezeichnung ändern"
-                      >
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )}
-                  {subtitle && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    Zuletzt gespeichert: {formatDate(p.lastSaved)}
-                  </p>
-                </div>
-
-                <div className="flex gap-1.5 shrink-0">
+                {/* ── Action strip ── */}
+                <div className="border-t border-border/60 bg-muted/20 px-3 py-2 flex items-center gap-0.5">
+                  {/* Secondary icon-only actions */}
                   <button
                     type="button"
                     onClick={() => onToggleSync(p.id)}
-                    title={p.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren – auf allen Geräten sichtbar"}
-                    className={`flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                    title={p.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
+                    className={`p-2 rounded-lg transition-colors ${
                       p.syncEnabled
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    {p.syncEnabled ? (
-                      <>
-                        <Cloud size={13} />
-                        <span className="hidden sm:inline">Sync</span>
-                      </>
-                    ) : (
-                      <>
-                        <CloudOff size={13} />
-                        <span className="hidden sm:inline">Sync</span>
-                      </>
-                    )}
+                    {p.syncEnabled ? <Cloud size={15} /> : <CloudOff size={15} />}
                   </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={() => setPreviewId(p.id)}
-                    className="gap-1"
                     title="Vorschau"
+                    className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
-                    <Eye size={13} />
-                    <span className="hidden sm:inline">Vorschau</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    <Eye size={15} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShareId(p.id)}
-                    className="gap-1"
-                    title="Mieter-Link erstellen"
+                    title="Mieter-Link teilen"
+                    className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
-                    <Link size={13} />
-                    <span className="hidden sm:inline">Teilen</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    <Link size={15} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onDuplicate(p.id)}
-                    className="gap-1"
                     title="Protokoll duplizieren"
+                    className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
-                    <Copy size={13} />
-                    <span className="hidden sm:inline">Duplizieren</span>
-                  </Button>
+                    <Copy size={15} />
+                  </button>
+
+                  <div className="flex-1" />
+
+                  {/* Primary action */}
                   <Button
-                    variant="outline"
                     size="sm"
                     onClick={() => onOpen(p.id)}
-                    className="gap-1"
+                    className="gap-1.5 h-8 px-3 text-xs"
                   >
-                    <Pencil size={13} />
-                    <span className="hidden sm:inline">Bearbeiten</span>
+                    <Pencil size={12} />
+                    Bearbeiten
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+
+                  {/* Delete (far right, visually separated) */}
+                  <button
+                    type="button"
                     onClick={() => setDeleteTarget(p.id)}
-                    className="gap-1 text-destructive hover:text-destructive hover:border-destructive/50"
+                    title="In Papierkorb verschieben"
+                    className="ml-1 p-2 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
-                    <Trash2 size={13} />
-                  </Button>
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             );
