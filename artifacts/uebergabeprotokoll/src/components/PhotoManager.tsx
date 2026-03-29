@@ -124,12 +124,20 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-// Attempt to parse a date value returned by exifr (Date object or EXIF string).
+// Parse a raw EXIF date value (Date object or EXIF string "YYYY:MM:DD HH:MM:SS").
+// EXIF timestamps have NO timezone info → treat them as local device time by
+// constructing an explicit local-time string (no trailing "Z").
 function parseExifDate(raw: unknown): string | null {
-  if (raw instanceof Date && !isNaN(raw.getTime())) return raw.toISOString();
+  if (raw instanceof Date && !isNaN(raw.getTime())) {
+    // exifr already built a Date – use it directly (it applied local-time rules)
+    return raw.toISOString();
+  }
   if (typeof raw === "string" && raw.trim()) {
-    // EXIF dates often come as "YYYY:MM:DD HH:MM:SS"
-    const normalized = raw.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
+    // "YYYY:MM:DD HH:MM:SS" → "YYYY-MM-DDTHH:MM:SS" (no Z = local time in JS)
+    const normalized = raw.trim().replace(
+      /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}:\d{2}:\d{2})$/,
+      "$1-$2-$3T$4"
+    );
     const d = new Date(normalized);
     if (!isNaN(d.getTime())) return d.toISOString();
   }
@@ -139,27 +147,53 @@ function parseExifDate(raw: unknown): string | null {
 // Determine the best timestamp for a photo file.
 // Priority:
 //   1. EXIF DateTimeOriginal  – actual camera shutter moment
-//   2. EXIF CreateDate        – digitisation / creation date
-//   3. file.lastModified      – file-system date (usually = capture date for unedited photos)
-//   4. current time           – fallback of last resort (upload moment)
+//   2. EXIF CreateDate        – digitisation / creation date (also in XMP)
+//   3. Any other recognisable EXIF/XMP date field
+//   4. file.lastModified      – file-system date (only useful for freshly taken photos)
+//   5. current time           – absolute last resort (upload moment)
 async function getPhotoTimestamp(file: File): Promise<string> {
   try {
-    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"] });
-    if (exif) {
-      const fromOriginal = parseExifDate(exif.DateTimeOriginal);
-      if (fromOriginal) return fromOriginal;
-      const fromCreate = parseExifDate(exif.CreateDate);
-      if (fromCreate) return fromCreate;
+    // Parse broadly: all EXIF segments + XMP (used by Google Photos / Drive)
+    // translateValues:false keeps raw strings so we can normalise ourselves
+    const tags = await exifr.parse(file, {
+      tiff: true,
+      xmp: true,
+      iptc: false,
+      icc: false,
+      jfif: false,
+      translateValues: false,
+      reviveValues: true, // still convert date strings to Date objects where possible
+    }) as Record<string, unknown> | null | undefined;
+
+    if (tags) {
+      // Ordered list of fields to try, from most to least authoritative
+      const candidates = [
+        tags["DateTimeOriginal"],
+        tags["dateTimeOriginal"],
+        tags["CreateDate"],
+        tags["createDate"],
+        tags["DateCreated"],     // IPTC / XMP
+        tags["dateCreated"],
+        tags["MetadataDate"],    // XMP
+        tags["ModifyDate"],
+      ];
+      for (const raw of candidates) {
+        const ts = parseExifDate(raw);
+        if (ts) return ts;
+      }
     }
   } catch {
     // EXIF parsing failed – proceed to fallbacks
   }
 
-  // file.lastModified is a Unix timestamp in milliseconds; for photos freshly taken
-  // or imported straight from a camera, this typically equals the capture time.
+  // file.lastModified is reliable ONLY if it predates "now" by a meaningful margin
+  // (i.e. the file existed before the upload session started, not a just-downloaded copy).
   if (file.lastModified) {
     const fromFile = new Date(file.lastModified);
-    if (!isNaN(fromFile.getTime())) return fromFile.toISOString();
+    // Accept if the file was last modified more than 60 seconds before upload began
+    if (!isNaN(fromFile.getTime()) && Date.now() - fromFile.getTime() > 60_000) {
+      return fromFile.toISOString();
+    }
   }
 
   // Last resort: moment of upload
