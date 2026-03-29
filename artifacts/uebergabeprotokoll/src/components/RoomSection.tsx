@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { RoomData, Condition } from "../types";
 import PhotoManager from "./PhotoManager";
 import AutoGrowTextarea from "./AutoGrowTextarea";
@@ -9,6 +9,7 @@ interface RoomSectionProps {
   room: RoomData;
   onChange: (updated: RoomData) => void;
   floorLabel?: string;
+  onDelete?: () => void;
 }
 
 const CONDITIONS: Condition[] = ["sehr gut", "gut", "Mängel"];
@@ -46,7 +47,7 @@ function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c:
   );
 }
 
-export default function RoomSection({ room, onChange, floorLabel }: RoomSectionProps) {
+export default function RoomSection({ room, onChange, floorLabel, onDelete }: RoomSectionProps) {
   const [open, setOpen] = useState(false);
 
   const update = (field: keyof RoomData, value: unknown) => {
@@ -58,33 +59,46 @@ export default function RoomSection({ room, onChange, floorLabel }: RoomSectionP
 
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-sm">{room.name}</span>
-          {hasContent && (
-            <span className="inline-block w-2 h-2 rounded-full bg-primary" title="Ausgefüllt" />
-          )}
-          {room.bodenZustand && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              room.bodenZustand === "sehr gut"
-                ? "bg-green-100 text-green-700"
-                : room.bodenZustand === "gut"
-                ? "bg-yellow-100 text-yellow-700"
-                : "bg-red-100 text-red-700"
-            }`}>
-              {room.bodenZustand}
-            </span>
-          )}
-          {room.photos.length > 0 && (
-            <span className="text-xs text-muted-foreground">{room.photos.length} Foto{room.photos.length > 1 ? "s" : ""}</span>
-          )}
-        </div>
-        {open ? <ChevronUp size={18} className="text-muted-foreground shrink-0" /> : <ChevronDown size={18} className="text-muted-foreground shrink-0" />}
-      </button>
+      {/* Header: expand area + optional delete button */}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="flex-1 flex items-center justify-between px-4 py-3 text-left hover:bg-accent/30 transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-semibold text-sm truncate">{room.name}</span>
+            {hasContent && (
+              <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" title="Ausgefüllt" />
+            )}
+            {room.bodenZustand && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                room.bodenZustand === "sehr gut"
+                  ? "bg-green-100 text-green-700"
+                  : room.bodenZustand === "gut"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-red-100 text-red-700"
+              }`}>
+                {room.bodenZustand}
+              </span>
+            )}
+            {room.photos.length > 0 && (
+              <span className="text-xs text-muted-foreground shrink-0">{room.photos.length} Foto{room.photos.length > 1 ? "s" : ""}</span>
+            )}
+          </div>
+          {open ? <ChevronUp size={18} className="text-muted-foreground shrink-0 ml-2" /> : <ChevronDown size={18} className="text-muted-foreground shrink-0 ml-2" />}
+        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            title="Raum löschen"
+            className="px-3 border-l border-border text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5 transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">

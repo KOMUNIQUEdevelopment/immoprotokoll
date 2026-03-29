@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData, RoomData, ZusatzvereinbarungEntry } from "../types";
 import { getFloorLabel } from "../pdfExport";
 import RoomSection from "../components/RoomSection";
@@ -6,7 +6,8 @@ import PersonList from "../components/PersonList";
 import AutoGrowTextarea from "../components/AutoGrowTextarea";
 import PhotoManager from "../components/PhotoManager";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, Plus, X, Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, Plus, X, Pencil, Trash2, Check } from "lucide-react";
 
 interface ProtocolPageProps {
   protocol: ProtocolData;
@@ -61,6 +62,51 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
       ...p,
       rooms: p.rooms.map(r => r.id === roomId ? updated : r),
     }));
+  };
+
+  // ── Room management ─────────────────────────────────────────────────────────
+
+  const [addingFloor, setAddingFloor] = useState<string | null>(null);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [deleteRoomTarget, setDeleteRoomTarget] = useState<{ id: string; name: string } | null>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (addingFloor && addInputRef.current) {
+      addInputRef.current.focus();
+    }
+  }, [addingFloor]);
+
+  const startAddRoom = (floor: string) => {
+    setAddingFloor(floor);
+    setNewRoomName("");
+  };
+
+  const confirmAddRoom = () => {
+    const name = newRoomName.trim();
+    if (!name || !addingFloor) return;
+    const newRoom: RoomData = {
+      id: crypto.randomUUID(),
+      name,
+      floor: addingFloor,
+      bodenZustand: "",
+      waendeDecken: "",
+      fensterTueren: "",
+      elektrik: "",
+      heizung: "",
+      maengelSchaeden: "",
+      notizen: "",
+      photos: [],
+    };
+    updateProtocol(p => ({ ...p, rooms: [...p.rooms, newRoom] }));
+    setAddingFloor(null);
+    setNewRoomName("");
+  };
+
+  const confirmDeleteRoom = () => {
+    if (!deleteRoomTarget) return;
+    updateProtocol(p => ({ ...p, rooms: p.rooms.filter(r => r.id !== deleteRoomTarget.id) }));
+    setDeleteRoomTarget(null);
   };
 
   return (
@@ -207,7 +253,6 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
       {/* Rooms by floor */}
       {floors.map(floor => {
         const rooms = protocol.rooms.filter(r => r.floor === floor);
-        if (rooms.length === 0) return null;
         return (
           <CollapsibleSection key={floor} title={floorLabels[floor] || floor}>
             <div className="px-1 space-y-2">
@@ -217,12 +262,96 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                   room={room}
                   onChange={(updated) => updateRoom(room.id, updated)}
                   floorLabel={getFloorLabel(floor)}
+                  onDelete={() => setDeleteRoomTarget({ id: room.id, name: room.name })}
                 />
               ))}
+
+              {/* Add room inline form or button */}
+              {addingFloor === floor ? (
+                <div className="flex items-center gap-2 pt-1">
+                  <Input
+                    ref={addInputRef}
+                    value={newRoomName}
+                    onChange={e => setNewRoomName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") confirmAddRoom();
+                      if (e.key === "Escape") setAddingFloor(null);
+                    }}
+                    placeholder="Raumbezeichnung…"
+                    className="h-8 text-sm flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!newRoomName.trim()}
+                    onClick={confirmAddRoom}
+                    className="gap-1 h-8 px-3 text-xs"
+                  >
+                    <Check size={13} />
+                    Hinzufügen
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setAddingFloor(null)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startAddRoom(floor)}
+                  className="w-full flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg px-3 py-2.5 border border-dashed border-border/70 transition-colors mt-1"
+                >
+                  <Plus size={13} />
+                  Raum hinzufügen
+                </button>
+              )}
             </div>
           </CollapsibleSection>
         );
       })}
+
+      {/* Delete room confirmation dialog */}
+      {deleteRoomTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setDeleteRoomTarget(null)}
+        >
+          <div
+            className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-in fade-in zoom-in-95"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-muted shrink-0">
+                <Trash2 size={18} className="text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-semibold text-base">Raum löschen?</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  <span className="font-medium text-foreground">„{deleteRoomTarget.name}"</span>
+                  {" "}und alle zugehörigen Daten (inkl. Fotos) werden aus diesem Protokoll entfernt.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setDeleteRoomTarget(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={confirmDeleteRoom}
+                autoFocus
+                className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                <Trash2 size={14} />
+                Löschen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zusatzvereinbarung */}
       <ZusatzvereinbarungSection
