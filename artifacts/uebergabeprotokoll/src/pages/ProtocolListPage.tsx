@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData, getPersonRole } from "../types";
-import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink, LogOut } from "lucide-react";
+import { TrashedEntry } from "../store";
+import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink, LogOut, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -15,9 +16,13 @@ const FLOOR_LABEL: Record<string, string> = {
 
 interface ProtocolListPageProps {
   protocols: Record<string, ProtocolData>;
+  trashedProtocols: Record<string, TrashedEntry>;
   onOpen: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onRestore: (id: string) => void;
+  onPermanentlyDelete: (id: string) => void;
+  onEmptyTrash: () => void;
   onDuplicate: (id: string) => void;
   onToggleSync: (id: string) => void;
   onRename: (id: string, name: string) => void;
@@ -382,7 +387,7 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
   );
 }
 
-// ── Delete Dialog ─────────────────────────────────────────────────────────────
+// ── Move to Trash Dialog ──────────────────────────────────────────────────────
 
 interface DeleteDialogProps {
   protocol: ProtocolData;
@@ -391,22 +396,23 @@ interface DeleteDialogProps {
 }
 
 function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
-  const [input, setInput] = useState("");
-  const confirmed = input.trim().toLowerCase() === "löschen";
   const label = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Dieses Protokoll";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onCancel}>
+      <div
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-full bg-destructive/10 shrink-0">
-            <AlertTriangle size={18} className="text-destructive" />
+          <div className="p-2 rounded-full bg-muted shrink-0">
+            <Trash2 size={18} className="text-muted-foreground" />
           </div>
-          <div>
-            <h2 className="font-semibold text-base">Protokoll löschen?</h2>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-base">In Papierkorb verschieben?</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              <span className="font-medium text-foreground">{label}</span> wird dauerhaft gelöscht.
-              Diese Aktion kann nicht rückgängig gemacht werden.
+              <span className="font-medium text-foreground truncate block">{label}</span>
+              wird in den Papierkorb verschoben und kann dort wiederhergestellt werden.
             </p>
           </div>
           <button
@@ -418,31 +424,60 @@ function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
           </button>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Gib <span className="text-destructive font-bold">löschen</span> ein um zu bestätigen
-          </label>
-          <Input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="löschen"
-            autoFocus
-            onKeyDown={e => e.key === "Enter" && confirmed && onConfirm()}
-            className={`${confirmed ? "border-destructive ring-1 ring-destructive" : ""}`}
-          />
-        </div>
-
         <div className="flex gap-2 justify-end">
           <Button variant="outline" size="sm" onClick={onCancel}>
             Abbrechen
           </Button>
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
-            disabled={!confirmed}
+            className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
             onClick={onConfirm}
+            autoFocus
           >
-            <Trash2 size={14} className="mr-1.5" />
+            <Trash2 size={14} />
+            In Papierkorb
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Permanent Delete Dialog (from trash) ──────────────────────────────────────
+
+interface PermanentDeleteDialogProps {
+  label: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function PermanentDeleteDialog({ label, onConfirm, onCancel }: PermanentDeleteDialogProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onCancel}>
+      <div
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-full bg-destructive/10 shrink-0">
+            <AlertTriangle size={18} className="text-destructive" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-base">Endgültig löschen?</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="font-medium text-foreground truncate block">{label}</span>
+              wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+          </div>
+          <button type="button" onClick={onCancel} className="p-1 rounded-md text-muted-foreground hover:bg-muted shrink-0 ml-auto">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={onCancel}>Abbrechen</Button>
+          <Button variant="destructive" size="sm" onClick={onConfirm} autoFocus className="gap-1.5">
+            <Trash2 size={14} />
             Endgültig löschen
           </Button>
         </div>
@@ -453,20 +488,32 @@ function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
 
 export default function ProtocolListPage({
   protocols,
+  trashedProtocols,
   onOpen,
   onCreate,
   onDelete,
+  onRestore,
+  onPermanentlyDelete,
+  onEmptyTrash,
   onDuplicate,
   onToggleSync,
   onRename,
   onLogout,
 }: ProtocolListPageProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [permDeleteTarget, setPermDeleteTarget] = useState<string | null>(null);
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [shareId, setShareId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const trashEntries = Object.entries(trashedProtocols).sort(
+    (a, b) => new Date(b[1].deletedAt).getTime() - new Date(a[1].deletedAt).getTime()
+  );
+  const trashCount = trashEntries.length;
 
   useEffect(() => {
     if (renamingId && renameInputRef.current) {
@@ -702,6 +749,88 @@ export default function ProtocolListPage({
             );
           })
         )}
+
+      {/* ── Papierkorb section ────────────────────────────────────── */}
+      {trashCount > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setTrashOpen(o => !o)}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-sm text-muted-foreground"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <Trash2 size={14} />
+              Papierkorb
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted-foreground/20 text-[11px] font-bold">
+                {trashCount}
+              </span>
+            </span>
+            {trashOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {trashOpen && (
+            <div className="mt-2 space-y-2">
+              {/* Empty trash button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEmptyTrashConfirm(true)}
+                  className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
+                >
+                  <Trash2 size={12} />
+                  Papierkorb leeren
+                </Button>
+              </div>
+
+              {trashEntries.map(([id, entry]) => {
+                const title = entry.protocol.mietobjekt || "Unbenanntes Protokoll";
+                const subtitle = [entry.protocol.adresse, entry.protocol.datum].filter(Boolean).join(" · ");
+                return (
+                  <div
+                    key={id}
+                    className="bg-card border border-border/60 rounded-xl p-3 flex items-start gap-3 opacity-70 hover:opacity-100 transition-opacity"
+                  >
+                    <div className="p-1.5 rounded-lg bg-muted shrink-0 mt-0.5">
+                      <Trash2 size={14} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm leading-snug truncate">{title}</p>
+                      {subtitle && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        Gelöscht: {formatDate(entry.deletedAt)}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onRestore(id)}
+                        className="gap-1 text-xs"
+                        title="Wiederherstellen"
+                      >
+                        <RotateCcw size={12} />
+                        <span className="hidden sm:inline">Wiederherstellen</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPermDeleteTarget(id)}
+                        className="p-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Endgültig löschen"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       </main>
 
       {/* Share link modal */}
@@ -721,12 +850,44 @@ export default function ProtocolListPage({
         />
       )}
 
-      {/* Delete confirmation dialog */}
+      {/* Move to trash dialog */}
       {deleteTarget && protocols[deleteTarget] && (
         <DeleteDialog
           protocol={protocols[deleteTarget]}
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Permanent delete dialog (single item from trash) */}
+      {permDeleteTarget && trashedProtocols[permDeleteTarget] && (
+        <PermanentDeleteDialog
+          label={
+            [
+              trashedProtocols[permDeleteTarget].protocol.mietobjekt,
+              trashedProtocols[permDeleteTarget].protocol.adresse,
+            ]
+              .filter(Boolean)
+              .join(", ") || "Dieses Protokoll"
+          }
+          onConfirm={() => {
+            onPermanentlyDelete(permDeleteTarget);
+            setPermDeleteTarget(null);
+          }}
+          onCancel={() => setPermDeleteTarget(null)}
+        />
+      )}
+
+      {/* Empty trash confirm dialog */}
+      {emptyTrashConfirm && (
+        <PermanentDeleteDialog
+          label={`alle ${trashCount} Protokoll${trashCount !== 1 ? "e" : ""} im Papierkorb`}
+          onConfirm={() => {
+            onEmptyTrash();
+            setEmptyTrashConfirm(false);
+            setTrashOpen(false);
+          }}
+          onCancel={() => setEmptyTrashConfirm(false)}
         />
       )}
     </div>

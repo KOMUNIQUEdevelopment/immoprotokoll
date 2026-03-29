@@ -47,6 +47,7 @@ type EditorTab = "protokoll" | "unterschriften";
 function AppContent({ onLogout }: { onLogout: () => void }) {
   const {
     protocols,
+    trashedProtocols,
     currentProtocol,
     currentId,
     isEditing,
@@ -55,6 +56,9 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     switchTo,
     backToList,
     deleteProtocol,
+    restoreFromTrash,
+    permanentlyDelete,
+    emptyTrash,
     renameProtocol,
     updateProtocol,
     toggleSync,
@@ -156,9 +160,13 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <>
         <ProtocolListPage
           protocols={protocols}
+          trashedProtocols={trashedProtocols}
           onOpen={handleOpen}
           onCreate={handleCreate}
           onDelete={deleteProtocol}
+          onRestore={restoreFromTrash}
+          onPermanentlyDelete={permanentlyDelete}
+          onEmptyTrash={emptyTrash}
           onDuplicate={duplicateProtocol}
           onToggleSync={toggleSync}
           onRename={renameProtocol}

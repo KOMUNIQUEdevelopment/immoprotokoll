@@ -12,6 +12,12 @@ import {
 
 const PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
 const LEGACY_KEY = "uebergabeprotokoll_data";
+const TRASH_KEY = "uebergabeprotokoll_trash";
+
+export interface TrashedEntry {
+  protocol: ProtocolData;
+  deletedAt: string; // ISO timestamp
+}
 
 // Strip photo dataUrls from a single protocol (used for WS sync)
 function stripSingleProtocol(p: ProtocolData): ProtocolData {
@@ -88,6 +94,24 @@ function loadLocalProtocols(): Record<string, ProtocolData> {
   } catch {}
 
   return {};
+}
+
+function loadLocalTrash(): Record<string, TrashedEntry> {
+  try {
+    const saved = localStorage.getItem(TRASH_KEY);
+    if (saved) return JSON.parse(saved) as Record<string, TrashedEntry>;
+  } catch (e) {
+    console.warn("Failed to load trash from localStorage", e);
+  }
+  return {};
+}
+
+function persistTrash(trash: Record<string, TrashedEntry>): void {
+  try {
+    localStorage.setItem(TRASH_KEY, JSON.stringify(trash));
+  } catch (e) {
+    console.error("localStorage trash save failed", e);
+  }
 }
 
 function persistAll(protocols: Record<string, ProtocolData>): boolean {
@@ -185,6 +209,7 @@ function hydratePhotos(
 
 export function useProtocolsStore() {
   const [protocols, setProtocols] = useState<Record<string, ProtocolData>>(loadLocalProtocols);
+  const [trashedProtocols, setTrashedProtocols] = useState<Record<string, TrashedEntry>>(loadLocalTrash);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -461,22 +486,58 @@ export function useProtocolsStore() {
   }, []);
 
   const deleteProtocol = useCallback((id: string) => {
+    // Move to trash instead of permanent deletion.
+    // Photos in IndexedDB are preserved so the protocol can be restored.
     setProtocols(prev => {
       const target = prev[id];
-      const wasSync = target?.syncEnabled;
+      if (!target) return prev;
+      const wasSync = target.syncEnabled;
+      // Add to trash
+      setTrashedProtocols(t => {
+        const next = { ...t, [id]: { protocol: target, deletedAt: new Date().toISOString() } };
+        persistTrash(next);
+        return next;
+      });
       const next = { ...prev };
       delete next[id];
       persistAll(next);
       if (wasSync) {
+        // Remove from server so other devices don't see it anymore
         setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
       }
-      // Clean up this protocol's photos from IndexedDB
-      if (target) {
+      return next;
+    });
+    setCurrentId(prev => (prev === id ? null : prev));
+  }, []);
+
+  const restoreFromTrash = useCallback((id: string) => {
+    setTrashedProtocols(prev => {
+      const entry = prev[id];
+      if (!entry) return prev;
+      // Put the protocol back into active list (sync disabled to avoid surprises)
+      const restored = { ...entry.protocol, syncEnabled: false };
+      setProtocols(p => {
+        const next = { ...p, [id]: restored };
+        persistAll(next);
+        return next;
+      });
+      const next = { ...prev };
+      delete next[id];
+      persistTrash(next);
+      return next;
+    });
+  }, []);
+
+  const permanentlyDelete = useCallback((id: string) => {
+    setTrashedProtocols(prev => {
+      const entry = prev[id];
+      if (entry) {
+        // Clean up photos from IndexedDB
         const photoIds: string[] = [
-          ...(target.meterPhotos ?? []).map((ph) => ph.id),
-          ...(target.kitchenPhotos ?? []).map((ph) => ph.id),
-          ...target.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
-          ...(target.personSignatures ?? []).map((s) => `sig_${s.personId}`),
+          ...(entry.protocol.meterPhotos ?? []).map((ph) => ph.id),
+          ...(entry.protocol.kitchenPhotos ?? []).map((ph) => ph.id),
+          ...entry.protocol.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
+          ...(entry.protocol.personSignatures ?? []).map((s) => `sig_${s.personId}`),
         ];
         if (photoIds.length > 0) {
           deletePhotosFromDb(photoIds).catch((e) =>
@@ -484,9 +545,33 @@ export function useProtocolsStore() {
           );
         }
       }
+      const next = { ...prev };
+      delete next[id];
+      persistTrash(next);
       return next;
     });
-    setCurrentId(prev => (prev === id ? null : prev));
+  }, []);
+
+  const emptyTrash = useCallback(() => {
+    setTrashedProtocols(prev => {
+      // Clean up all photos from IndexedDB
+      const allPhotoIds: string[] = [];
+      for (const entry of Object.values(prev)) {
+        allPhotoIds.push(
+          ...(entry.protocol.meterPhotos ?? []).map((ph) => ph.id),
+          ...(entry.protocol.kitchenPhotos ?? []).map((ph) => ph.id),
+          ...entry.protocol.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
+          ...(entry.protocol.personSignatures ?? []).map((s) => `sig_${s.personId}`)
+        );
+      }
+      if (allPhotoIds.length > 0) {
+        deletePhotosFromDb(allPhotoIds).catch((e) =>
+          console.warn("Failed to delete photos from IndexedDB", e)
+        );
+      }
+      persistTrash({});
+      return {};
+    });
   }, []);
 
   const manualSave = useCallback(() => {
@@ -528,6 +613,7 @@ export function useProtocolsStore() {
 
   return {
     protocols,
+    trashedProtocols,
     currentProtocol,
     currentId,
     isEditing: currentId !== null,
@@ -536,6 +622,9 @@ export function useProtocolsStore() {
     switchTo,
     backToList,
     deleteProtocol,
+    restoreFromTrash,
+    permanentlyDelete,
+    emptyTrash,
     renameProtocol,
     updateProtocol,
     toggleSync,
