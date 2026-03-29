@@ -152,7 +152,9 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
   }
 }
 
-// Collect photo IDs that have no dataUrl (need to be fetched from somewhere)
+// Collect photo IDs that have no dataUrl (need to be fetched from somewhere).
+// Also includes signature IDs (sig_<personId>) so that signatures uploaded by
+// other devices via /api/photos are fetched and applied on this device too.
 function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string[] {
   const ids: string[] = [];
   for (const p of Object.values(protocols)) {
@@ -165,6 +167,14 @@ function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string
     for (const r of p.rooms) {
       for (const ph of r.photos) {
         if (!ph.dataUrl) ids.push(ph.id);
+      }
+    }
+    // Signatures are uploaded to the server photo store by every device that
+    // holds them (via persistAll → uploadPhotosToServer).  Collect any that
+    // are currently null so they get fetched from the server.
+    for (const sig of p.personSignatures ?? []) {
+      if (sig.personId && !sig.signatureDataUrl) {
+        ids.push(`sig_${sig.personId}`);
       }
     }
   }
