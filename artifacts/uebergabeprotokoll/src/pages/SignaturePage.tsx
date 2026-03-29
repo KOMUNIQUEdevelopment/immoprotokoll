@@ -96,6 +96,16 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
       ...p,
       personSignatures: upsertSignature(p.personSignatures, personId, dataUrl),
     }));
+
+    // Push non-null signatures to the server sign endpoint so all devices
+    // receive the actual dataUrl via WS broadcast (same path as TenantView).
+    if (dataUrl && protocol.syncEnabled && protocol.id) {
+      fetch(`/api/protocol/${protocol.id}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personId, signatureDataUrl: dataUrl }),
+      }).catch((e) => console.warn("Signature sync to server failed:", e));
+    }
   };
 
   const allVermieterSigned = protocol.uebergeber.every(p => !!getSignatureFor(protocol.personSignatures, p.id));

@@ -89,18 +89,29 @@ wss.on("connection", (ws) => {
 
       serverProtocols[incoming.id] = incoming;
       logger.info({ id: incoming.id, total: Object.keys(serverProtocols).length }, "Protocol updated");
+
+      // Broadcast the SERVER's preserved version (with actual signatures), not the
+      // original stripped client payload.  This ensures all other devices always
+      // receive the most up-to-date signature state.
+      const broadcastPayload = JSON.stringify({ type: "update", protocol: serverProtocols[incoming.id] });
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(broadcastPayload);
+        }
+      });
     } else if (msg.type === "delete" && msg.id) {
       delete serverProtocols[msg.id];
       logger.info({ id: msg.id, total: Object.keys(serverProtocols).length }, "Protocol deleted");
+
+      const deleteBroadcast = JSON.stringify({ type: "delete", id: msg.id });
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(deleteBroadcast);
+        }
+      });
     } else {
       return;
     }
-
-    wss.clients.forEach((client) => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-      }
-    });
   });
 
   ws.on("close", () => {

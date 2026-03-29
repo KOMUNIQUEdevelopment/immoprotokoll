@@ -386,8 +386,10 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
     }
   };
 
-  const getSignature = (personId: string) =>
-    protocol?.personSignatures.find((s) => s.personId === personId)?.signatureDataUrl ?? null;
+  const getSignature = (personId: string) => {
+    const val = protocol?.personSignatures.find((s) => s.personId === personId)?.signatureDataUrl;
+    return val || null; // treat empty string same as null
+  };
 
   const handleExportPdf = async () => {
     if (!protocol) return;
