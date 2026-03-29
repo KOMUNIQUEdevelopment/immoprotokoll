@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, useCallback } from "react";
+import React, { useRef, useLayoutEffect, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash2, Check } from "lucide-react";
 
@@ -19,15 +19,24 @@ export default function SignatureCanvasComponent({
   const last = useRef<{ x: number; y: number } | null>(null);
   const [isEmpty, setIsEmpty] = React.useState(!value);
 
-  // ── Canvas setup ────────────────────────────────────────────────────────────
+  // Whether the user has drawn on this canvas instance themselves.
+  // External value changes (WS sync) are only applied when this is false.
+  const drawnByUser = useRef(false);
+
+  // Last value that was painted onto the canvas so we can detect real changes.
+  const appliedValue = useRef<string | null>(null);
+
+  // ── Canvas setup ─────────────────────────────────────────────────────────────
 
   const getCtx = () => canvasRef.current?.getContext("2d") ?? null;
 
   /**
-   * Resize the canvas buffer to match the container's CSS size multiplied by
-   * the device pixel ratio.  Must be called once on mount (and after any
-   * layout shift) so that strokes are drawn at the right coordinates on
-   * high-DPR screens (Android / iOS retina).
+   * (Re-)initialise the canvas: resize the buffer to container × DPR, reset
+   * the context transform, configure stroke style, and optionally draw
+   * `restoreDataUrl` into the fresh canvas.
+   *
+   * Setting canvas.width resets every context state, so calling this a second
+   * time is safe – it starts with a clean slate.
    */
   const initCanvas = useCallback((restoreDataUrl?: string | null) => {
     const canvas = canvasRef.current;
@@ -38,23 +47,21 @@ export default function SignatureCanvasComponent({
     const { width, height } = container.getBoundingClientRect();
     if (!width || !height) return;
 
+    // Setting width/height resets the canvas buffer AND the context transform.
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
-    // CSS size stays at the physical pixel size so the element fills the container
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
 
     const ctx = getCtx();
     if (!ctx) return;
 
-    // Scale the context so every drawing command uses CSS-pixel coordinates
     ctx.scale(dpr, dpr);
     ctx.strokeStyle = "#1a1a2e";
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Restore previous drawing if supplied
     if (restoreDataUrl) {
       const img = new Image();
       img.onload = () => ctx.drawImage(img, 0, 0, width, height);
@@ -62,26 +69,28 @@ export default function SignatureCanvasComponent({
     }
   }, []);
 
+  // ── Mount: size the canvas (handles lazy layout inside collapsed sections) ──
+
   useLayoutEffect(() => {
-    // Try to init immediately; if the container has zero size (e.g. inside a
-    // collapsed section), fall back to a ResizeObserver that fires once the
-    // element becomes visible and has layout.
     const container = containerRef.current;
     if (!container) return;
 
     const { width } = container.getBoundingClientRect();
     if (width > 0) {
       initCanvas(value);
+      appliedValue.current = value ?? null;
       if (value) setIsEmpty(false);
       return;
     }
 
-    // Container not laid out yet – wait for first non-zero size
+    // Container has no layout yet (e.g. inside a collapsed CollapsibleSection).
+    // Wait until it becomes visible before initialising.
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.contentRect.width > 0) {
           observer.disconnect();
           initCanvas(value);
+          appliedValue.current = value ?? null;
           if (value) setIsEmpty(false);
           return;
         }
@@ -89,9 +98,39 @@ export default function SignatureCanvasComponent({
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []); // run once after first render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run only once on mount
 
-  // ── Pointer helpers ─────────────────────────────────────────────────────────
+  // ── Sync: update canvas when `value` prop changes after mount (WS sync) ─────
+
+  useEffect(() => {
+    // Ignore if the value hasn't actually changed since we last painted it.
+    if (value === appliedValue.current) return;
+
+    // Don't overwrite something the user drew themselves in this session.
+    if (drawnByUser.current) return;
+
+    appliedValue.current = value ?? null;
+
+    if (!value) {
+      // External clear (e.g. someone deleted the signature).
+      const canvas = canvasRef.current;
+      const ctx = getCtx();
+      if (canvas && ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+      }
+      setIsEmpty(true);
+      return;
+    }
+
+    // Re-initialise with the new value so the canvas is sized correctly for
+    // the current container dimensions and the image fills it properly.
+    initCanvas(value);
+    setIsEmpty(false);
+  }, [value, initCanvas]);
+
+  // ── Pointer helpers ───────────────────────────────────────────────────────────
 
   const getPos = (
     e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>
@@ -104,17 +143,14 @@ export default function SignatureCanvasComponent({
       const te = e as React.TouchEvent<HTMLCanvasElement>;
       const touch = te.touches[0] ?? te.changedTouches[0];
       if (!touch) return null;
-      return {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top,
-      };
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
     }
 
     const me = e as React.MouseEvent<HTMLCanvasElement>;
     return { x: me.clientX - rect.left, y: me.clientY - rect.top };
   };
 
-  // ── Draw handlers ───────────────────────────────────────────────────────────
+  // ── Draw handlers ─────────────────────────────────────────────────────────────
 
   const onStart = (
     e: React.TouchEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>
@@ -140,7 +176,6 @@ export default function SignatureCanvasComponent({
     if (!pos) return;
     const ctx = getCtx();
     if (!ctx) return;
-
     ctx.beginPath();
     ctx.moveTo(last.current?.x ?? pos.x, last.current?.y ?? pos.y);
     ctx.lineTo(pos.x, pos.y);
@@ -159,8 +194,9 @@ export default function SignatureCanvasComponent({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // toDataURL always captures the full canvas buffer at its native resolution
+    drawnByUser.current = true;
     const dataUrl = canvas.toDataURL("image/png");
+    appliedValue.current = dataUrl;
     setIsEmpty(false);
     onChange(dataUrl);
   };
@@ -169,10 +205,11 @@ export default function SignatureCanvasComponent({
     const canvas = canvasRef.current;
     const ctx = getCtx();
     if (canvas && ctx) {
-      // clearRect must cover the CSS-pixel area (context is scaled by DPR)
       const dpr = window.devicePixelRatio || 1;
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     }
+    drawnByUser.current = false; // allow external value changes again
+    appliedValue.current = null;
     setIsEmpty(true);
     onChange(null);
   };
