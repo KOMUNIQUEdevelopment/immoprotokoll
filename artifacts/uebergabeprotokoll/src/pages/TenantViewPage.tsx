@@ -330,6 +330,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const handleExportZip = async () => {
     if (!protocol) return;
     const totalPhotos =
+      (protocol.meterPhotos?.length ?? 0) +
       (protocol.kitchenPhotos?.length ?? 0) +
       protocol.rooms.reduce((s, r) => s + r.photos.length, 0);
     if (totalPhotos === 0) {
@@ -589,6 +590,23 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                   </div>
                 </div>
               ))}
+
+              {/* Meter photos */}
+              {(protocol.meterPhotos?.length ?? 0) > 0 && (
+                <div className="pt-1">
+                  <FieldLabel>Fotos Zählerstände</FieldLabel>
+                  <div className="grid grid-cols-3 gap-2">
+                    {protocol.meterPhotos!.map((ph) => (
+                      <img
+                        key={ph.id}
+                        src={ph.dataUrl}
+                        alt={ph.caption || "Zählerstand"}
+                        className="w-full aspect-square object-cover rounded-lg border border-border"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CollapsibleSection>
 

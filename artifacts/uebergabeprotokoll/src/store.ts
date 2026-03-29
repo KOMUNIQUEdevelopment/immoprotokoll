@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { ProtocolData, createDefaultProtocol, migrateProtocol } from "./types";
+import { ProtocolData, RoomPhoto, createDefaultProtocol, migrateProtocol } from "./types";
 import { SyncMessage } from "./hooks/useSync";
 import {
   savePhotosToDb,
@@ -17,6 +17,7 @@ const LEGACY_KEY = "uebergabeprotokoll_data";
 function stripSingleProtocol(p: ProtocolData): ProtocolData {
   return {
     ...p,
+    meterPhotos: (p.meterPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
     kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
     rooms: p.rooms.map((r) => ({
       ...r,
@@ -92,6 +93,9 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
 function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string[] {
   const ids: string[] = [];
   for (const p of Object.values(protocols)) {
+    for (const ph of p.meterPhotos ?? []) {
+      if (!ph.dataUrl) ids.push(ph.id);
+    }
     for (const ph of p.kitchenPhotos ?? []) {
       if (!ph.dataUrl) ids.push(ph.id);
     }
@@ -115,6 +119,10 @@ function hydratePhotos(
       id,
       {
         ...p,
+        meterPhotos: (p.meterPhotos ?? []).map((ph) => ({
+          ...ph,
+          dataUrl: photoMap[ph.id] ?? ph.dataUrl,
+        })),
         kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({
           ...ph,
           dataUrl: photoMap[ph.id] ?? ph.dataUrl,
@@ -241,18 +249,19 @@ export function useProtocolsStore() {
             const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
             return { ...remoteRoom, photos: [...photos, ...newRemote] };
           });
-          const kitchenPhotos = (() => {
-            const local = localP.kitchenPhotos ?? [];
-            const remote = remoteP.kitchenPhotos ?? [];
-            const merged2 = local.map(localPh => {
+          const mergeFlatPhotos = (local: typeof localP.kitchenPhotos, remote: typeof remoteP.kitchenPhotos) => {
+            const loc = local ?? [];
+            const rem = remote ?? [];
+            const merged2 = loc.map(localPh => {
               if (localPh.dataUrl) return localPh;
-              return remote.find(rp => rp.id === localPh.id) ?? localPh;
+              return rem.find(rp => rp.id === localPh.id) ?? localPh;
             });
-            const localIds = new Set(local.map(p => p.id));
-            const newRemote = remote.filter(rp => !localIds.has(rp.id));
-            return [...merged2, ...newRemote];
-          })();
-          merged[id] = { ...remoteP, rooms, kitchenPhotos, syncEnabled: true };
+            const localIds = new Set(loc.map(p => p.id));
+            return [...merged2, ...rem.filter(rp => !localIds.has(rp.id))];
+          };
+          const meterPhotos = mergeFlatPhotos(localP.meterPhotos, remoteP.meterPhotos);
+          const kitchenPhotos = mergeFlatPhotos(localP.kitchenPhotos, remoteP.kitchenPhotos);
+          merged[id] = { ...remoteP, rooms, meterPhotos, kitchenPhotos, syncEnabled: true };
         }
       });
 
@@ -282,18 +291,17 @@ export function useProtocolsStore() {
         const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
         return { ...remoteRoom, photos: [...photos, ...newRemote] };
       });
-      const kitchenPhotos = (() => {
-        const local = existing?.kitchenPhotos ?? [];
-        const remoteKp = remote.kitchenPhotos ?? [];
+      const mergeFlatPhotos2 = (local: RoomPhoto[], remoteArr: RoomPhoto[]) => {
         const merged2 = local.map(localPh => {
           if (localPh.dataUrl) return localPh;
-          return remoteKp.find(rp => rp.id === localPh.id) ?? localPh;
+          return remoteArr.find(rp => rp.id === localPh.id) ?? localPh;
         });
         const localIds = new Set(local.map(p => p.id));
-        const newRemote = remoteKp.filter(rp => !localIds.has(rp.id));
-        return [...merged2, ...newRemote];
-      })();
-      const merged = { ...remote, rooms, kitchenPhotos, syncEnabled: true };
+        return [...merged2, ...remoteArr.filter(rp => !localIds.has(rp.id))];
+      };
+      const meterPhotos = mergeFlatPhotos2(existing?.meterPhotos ?? [], remote.meterPhotos ?? []);
+      const kitchenPhotos = mergeFlatPhotos2(existing?.kitchenPhotos ?? [], remote.kitchenPhotos ?? []);
+      const merged = { ...remote, rooms, meterPhotos, kitchenPhotos, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
       missingIds = collectMissingPhotoIds({ [remote.id]: merged });
       persistAll(next);
@@ -375,6 +383,10 @@ export function useProtocolsStore() {
           id: crypto.randomUUID(),
           photos: r.photos.map(ph => ({ ...ph, id: crypto.randomUUID() })),
         })),
+        meterPhotos: (source.meterPhotos ?? []).map(ph => ({
+          ...ph,
+          id: crypto.randomUUID(),
+        })),
         kitchenPhotos: (source.kitchenPhotos ?? []).map(ph => ({
           ...ph,
           id: crypto.randomUUID(),
@@ -417,6 +429,7 @@ export function useProtocolsStore() {
       // Clean up this protocol's photos from IndexedDB
       if (target) {
         const photoIds: string[] = [
+          ...(target.meterPhotos ?? []).map((ph) => ph.id),
           ...(target.kitchenPhotos ?? []).map((ph) => ph.id),
           ...target.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
           ...(target.personSignatures ?? []).map((s) => `sig_${s.personId}`),

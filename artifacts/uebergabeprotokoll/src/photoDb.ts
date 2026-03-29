@@ -123,6 +123,9 @@ export function collectPhotoEntries(
 ): { id: string; dataUrl: string }[] {
   const entries: { id: string; dataUrl: string }[] = [];
   for (const p of Object.values(protocols)) {
+    for (const ph of p.meterPhotos ?? []) {
+      if (ph.dataUrl) entries.push({ id: ph.id, dataUrl: ph.dataUrl });
+    }
     for (const ph of p.kitchenPhotos ?? []) {
       if (ph.id && ph.dataUrl) entries.push({ id: ph.id, dataUrl: ph.dataUrl });
     }

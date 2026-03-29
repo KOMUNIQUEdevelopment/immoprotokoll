@@ -134,6 +134,11 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
   }
   y += 4;
 
+  // Meter photos
+  if (protocol.meterPhotos?.length) {
+    await addPhotosBlock(doc, protocol.meterPhotos, "Zählerstände", "", margin, contentW, usableH, () => y, (v) => { y = v; });
+  }
+
   // ── Kitchen ───────────────────────────────────────────────────────────────
   h1("Kueche - Geraete & Zustand");
   for (const app of protocol.appliances) {
@@ -457,6 +462,10 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
       if (base64) folder.file(filename, base64, { base64: true });
     });
   };
+
+  if (protocol.meterPhotos?.length) {
+    addPhotos(protocol.meterPhotos, "", "Zählerstände");
+  }
 
   if (protocol.kitchenPhotos?.length) {
     addPhotos(protocol.kitchenPhotos, "", "Küche");

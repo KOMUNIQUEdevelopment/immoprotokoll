@@ -59,6 +59,7 @@ function PreviewSection({ title, children }: { title: string; children: React.Re
 function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModalProps) {
   const floors = ["EG", "OG", "DG", "UG", "Außen"];
   const totalPhotos =
+    (protocol.meterPhotos?.length ?? 0) +
     (protocol.kitchenPhotos?.length ?? 0) +
     protocol.rooms.reduce((s, r) => s + r.photos.length, 0);
 

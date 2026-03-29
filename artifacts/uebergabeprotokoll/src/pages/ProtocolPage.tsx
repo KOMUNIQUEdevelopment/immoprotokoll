@@ -137,23 +137,33 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
 
       {/* Meter Readings */}
       <CollapsibleSection title="Zählerstände">
-        <div className="px-1 space-y-3">
-          {protocol.meterReadings.map((meter, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <label className="text-sm font-medium w-20 shrink-0">{meter.type}</label>
-              <Input
-                value={meter.stand}
-                onChange={(e) => {
-                  const updated = [...protocol.meterReadings];
-                  updated[i] = { ...meter, stand: e.target.value };
-                  setField("meterReadings", updated);
-                }}
-                placeholder={`Stand in ${meter.einheit}`}
-                className="text-sm"
-              />
-              <span className="text-sm text-muted-foreground shrink-0">{meter.einheit}</span>
-            </div>
-          ))}
+        <div className="px-1 space-y-4">
+          <div className="space-y-3">
+            {protocol.meterReadings.map((meter, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <label className="text-sm font-medium w-20 shrink-0">{meter.type}</label>
+                <Input
+                  value={meter.stand}
+                  onChange={(e) => {
+                    const updated = [...protocol.meterReadings];
+                    updated[i] = { ...meter, stand: e.target.value };
+                    setField("meterReadings", updated);
+                  }}
+                  placeholder={`Stand in ${meter.einheit}`}
+                  className="text-sm"
+                />
+                <span className="text-sm text-muted-foreground shrink-0">{meter.einheit}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p className="text-sm font-medium mb-2">Fotos Zählerstände</p>
+            <PhotoManager
+              photos={protocol.meterPhotos ?? []}
+              onChange={(photos) => setField("meterPhotos", photos)}
+              roomName="Zählerstände"
+            />
+          </div>
         </div>
       </CollapsibleSection>
 

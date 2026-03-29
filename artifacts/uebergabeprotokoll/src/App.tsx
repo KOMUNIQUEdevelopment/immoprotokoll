@@ -106,6 +106,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
   const handleZipExport = async () => {
     if (!currentProtocol) return;
     const totalPhotos =
+      (currentProtocol.meterPhotos?.length ?? 0) +
       (currentProtocol.kitchenPhotos?.length ?? 0) +
       currentProtocol.rooms.reduce((s, r) => s + r.photos.length, 0);
     if (totalPhotos === 0) {

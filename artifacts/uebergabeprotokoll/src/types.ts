@@ -70,6 +70,7 @@ export interface ProtocolData {
   schluessel: string;
   schluesselDetails: string;
   meterReadings: MeterReading[];
+  meterPhotos: RoomPhoto[];
   appliances: ApplianceEntry[];
   allgemeinerZustandKueche: string;
   kitchenPhotos: RoomPhoto[];
@@ -207,6 +208,7 @@ export function createDefaultProtocol(): ProtocolData {
     schluessel: "",
     schluesselDetails: "",
     meterReadings: DEFAULT_METER_READINGS,
+    meterPhotos: [],
     appliances: DEFAULT_APPLIANCES,
     allgemeinerZustandKueche: "",
     kitchenPhotos: [],
@@ -247,6 +249,7 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     const sigs = (data.signatures as Array<{ id: string; signatureDataUrl: string | null }> | undefined) || [];
     data.personSignatures = sigs.map(s => ({ personId: s.id, signatureDataUrl: s.signatureDataUrl }));
   }
+  if (!data.meterPhotos) data.meterPhotos = [];
   if (!data.kitchenPhotos) data.kitchenPhotos = [];
   if (!data.zusatzvereinbarungTitle) data.zusatzvereinbarungTitle = "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen";
   if (!data.zusatzvereinbarungen) data.zusatzvereinbarungen = DEFAULT_ZUSATZVEREINBARUNGEN.map(e => ({ ...e }));
