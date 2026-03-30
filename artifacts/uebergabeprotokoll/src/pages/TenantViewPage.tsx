@@ -75,8 +75,13 @@ function ReadField({ label, value, fullWidth = false }: { label: string; value: 
 const CONDITION_STYLE: Record<string, string> = {
   "sehr gut": "bg-black text-white border-black",
   gut: "bg-gray-600 text-white border-gray-600",
-  Mängel: "bg-gray-900 text-white border-gray-900",
+  "Mängel": "bg-gray-900 text-white border-gray-900",
 };
+
+function translateCondition(val: string, tr: Translations): string {
+  const cond = tr.editor.condition as Record<string, string>;
+  return cond[val] ?? val;
+}
 
 function RoomCard({ room, tr }: { room: RoomData; tr: Translations }) {
   const [open, setOpen] = useState(false);
@@ -94,7 +99,7 @@ function RoomCard({ room, tr }: { room: RoomData; tr: Translations }) {
           <span className="font-semibold text-sm truncate">{room.name}</span>
           {condition && (
             <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${CONDITION_STYLE[condition] ?? "bg-muted text-muted-foreground border-border"}`}>
-              {condition}
+              {translateCondition(condition, tr)}
             </span>
           )}
           {hasPhotos && (

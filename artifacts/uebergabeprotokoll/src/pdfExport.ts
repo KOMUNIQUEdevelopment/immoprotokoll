@@ -48,20 +48,23 @@ function buildFloorMap(floors: FloorDef[]): Record<string, FloorDef> {
 
 /**
  * Resolve a room.floor value to a human-readable label.
- * Priority: 1) floorMap (UUID floors from FloorEditor), 2) FLOOR_LABEL (legacy keys).
+ * Priority: 1) floorMap (UUID floors from FloorEditor), 2) trFloors translation (legacy keys).
  */
-function resolveFloorLabel(floorId: string, floorMap: Record<string, FloorDef>): string {
+function resolveFloorLabel(floorId: string, floorMap: Record<string, FloorDef>, trFloors: Record<string, string>): string {
   if (floorMap[floorId]) return floorMap[floorId].name;
-  return FLOOR_LABEL[floorId] ?? floorId;
+  // Handle legacy "Außen" → "Aussen" key alias
+  const key = floorId === "Außen" ? "Aussen" : floorId;
+  return trFloors[key] ?? FLOOR_LABEL[floorId] ?? floorId;
 }
 
 /**
  * Resolve a room.floor value to a filesystem-safe string.
- * Priority: 1) floorMap (UUID floors), 2) FLOOR_SAFE (legacy keys).
+ * Priority: 1) floorMap (UUID floors), 2) trFloorsSafe translation (legacy keys).
  */
-function resolveFloorSafe(floorId: string, floorMap: Record<string, FloorDef>): string {
+function resolveFloorSafe(floorId: string, floorMap: Record<string, FloorDef>, trFloorsSafe: Record<string, string>): string {
   if (floorMap[floorId]) return floorMap[floorId].name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-äöüÄÖÜ]/g, "");
-  return FLOOR_SAFE[floorId] ?? floorId.replace(/\s+/g, "_");
+  const key = floorId === "Außen" ? "Aussen" : floorId;
+  return trFloorsSafe[key] ?? FLOOR_SAFE[floorId] ?? floorId.replace(/\s+/g, "_");
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
@@ -270,7 +273,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
     if (rooms.length === 0) continue;
 
     addPage();
-    h1(`${pdf.roomProtocol} - ${safeText(resolveFloorLabel(floorId, floorMap))}`);
+    h1(`${pdf.roomProtocol} - ${safeText(resolveFloorLabel(floorId, floorMap, tr.floors as Record<string, string>))}`);
 
     for (const room of rooms) {
       checkPage(35);
@@ -279,8 +282,8 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
       field(pdf.floor, room.bodenZustand || "-");
       field(pdf.walls, room.waendeDecken || "-");
       field(pdf.windows, room.fensterTueren || "-");
-      field(pdf.electric, room.elektrik || "OK");
-      field(pdf.heating, room.heizung || "OK");
+      field(pdf.electric, room.elektrik || pdf.ok);
+      field(pdf.heating, room.heizung || pdf.ok);
       if (room.maengelSchaeden) field(pdf.defects, room.maengelSchaeden);
       if (room.notizen) field(pdf.notes, room.notizen);
 
@@ -295,7 +298,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
       }
 
       if (room.photos.length > 0) {
-        const roomFloorLabel = resolveFloorLabel(room.floor, floorMap);
+        const roomFloorLabel = resolveFloorLabel(room.floor, floorMap, tr.floors as Record<string, string>);
         await addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; }, pdf.locale);
       }
 
@@ -312,7 +315,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
   const zvEntries = protocol.zusatzvereinbarungen ?? [];
   if (zvEntries.length > 0) {
     addPage();
-    const zvTitle = protocol.zusatzvereinbarungTitle || "Zusatzvereinbarung";
+    const zvTitle = protocol.zusatzvereinbarungTitle || pdf.additionalClauses;
     h1(safeText(zvTitle));
 
     const renderMultiLine = (text: string) => {
@@ -427,7 +430,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
     doc.text(`${pdf.page} ${i} / ${totalPages}`, pageW - margin, pageH - 8, { align: "right" });
   }
 
-  const safeAddr = (protocol.adresse || "Objekt").replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
+  const safeAddr = (protocol.adresse || pdf.object).replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
   const safeDatum = protocol.datum.replace(/\./g, "-");
   const fileName = `${pdf.title}_${safeAddr}_${safeDatum}.pdf`;
 
@@ -590,11 +593,11 @@ export async function exportPhotosAsZip(protocol: ProtocolData, options?: Export
   const zipFloorMap = buildFloorMap(protocol.floors ?? []);
   for (const room of protocol.rooms) {
     if (room.photos.length > 0) {
-      addPhotos(room.photos, resolveFloorSafe(room.floor, zipFloorMap), room.name);
+      addPhotos(room.photos, resolveFloorSafe(room.floor, zipFloorMap, tr.floorsSafe as Record<string, string>), room.name);
     }
   }
 
-  const safeAddr = (protocol.adresse || "Objekt").replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
+  const safeAddr = (protocol.adresse || pdf.object).replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
   const safeDatum = protocol.datum.replace(/\./g, "-");
   const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);

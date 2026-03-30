@@ -125,12 +125,12 @@ export default function SignaturePage({ protocol, updateProtocol, language = "de
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-              Ort
+              {tr.pdf.signatureLocation}
             </label>
             <Input
               value={protocol.signaturOrt}
               onChange={(e) => updateProtocol(p => ({ ...p, signaturOrt: e.target.value }))}
-              placeholder="Stadt / Ort"
+              placeholder={tr.pdf.signatureLocationPlaceholder}
             />
           </div>
           <div>
