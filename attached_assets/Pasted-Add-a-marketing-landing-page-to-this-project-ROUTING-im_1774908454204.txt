@@ -1,0 +1,62 @@
+Add a marketing landing page to this project.
+
+ROUTING
+- immoprotokoll.com → landing page
+- app.immoprotokoll.com → existing app (login and all app routes)
+- www.immoprotokoll.com → redirect to immoprotokoll.com
+
+DESIGN
+Same design as the app: #ffffff / #000000, minimalist, professional.
+Fully mobile optimised - every section, layout and interaction 
+must work flawlessly on mobile devices.
+
+CONTENT
+Marketing page for two audiences: private landlords and real estate 
+agencies. Emphasise simplicity and flexibility.
+Include: features, a concrete use case / walkthrough, pricing, FAQ, 
+and a strong CTA to sign up.
+
+PRICING
+Four plans - monthly/annual toggle (20% discount on annual):
+- Free: CHF/EUR/USD 0 | 1 property, 1 protocol, branded exports
+- Privat: CHF/EUR/USD 9/mo | CHF/EUR/USD 86/yr | 
+  1 property, 30 protocols, unbranded exports
+- Agentur: CHF/EUR/USD 49/mo | CHF/EUR/USD 470/yr | 
+  50 properties, 30 protocols each, 20 users, unbranded exports
+- Custom: contact us → support@immoprotokoll.com
+Same numeric price in all three currencies, no conversion.
+
+LANGUAGES
+DE-CH and EN. Auto-detect via browser/region settings.
+German-speaking regions (DE, AT, CH) → DE-CH.
+All others → EN (fallback). Language toggle visible in navigation.
+DE-CH uses Swiss spelling: ss instead of ß, umlauts ä/ö/ü.
+
+ANALYTICS & COOKIES
+- Google Analytics is integrated via Google Tag Manager
+- Cookie banner is handled separately - 
+  integrate a placeholder/hook for an external cookie consent 
+  solution, do not implement a banner yourself
+
+LEGAL PAGES
+All in DE-CH and EN:
+- Datenschutz / Privacy Policy:
+  GDPR and Swiss nDSG compliant.
+  Hosting provider is based in the USA and provides a 
+  Data Processing Agreement (DPA) ensuring GDPR compliance 
+  via Standard Contractual Clauses. Do not name the provider.
+  Stripe is used for payment processing (DPA in place).
+  Google Analytics is used via Google Tag Manager for 
+  anonymous usage statistics.
+  Users can request deletion of their data at any time 
+  via support@immoprotokoll.com.
+- AGB / Terms: Swiss law, auto-renewal, cancel anytime.
+- Impressum / Imprint:
+  ImmoProtokoll ist ein Produkt von KOMUNIQUE by Philipp Roth
+  Blumenrainstrasse 29, 9050 Appenzell, Schweiz
+  support@immoprotokoll.com
+
+SEO & AEO
+Full on-page SEO for both language versions.
+Schema.org markup: SoftwareApplication, FAQPage, Organization.
+hreflang tags, sitemap.xml, robots.txt.

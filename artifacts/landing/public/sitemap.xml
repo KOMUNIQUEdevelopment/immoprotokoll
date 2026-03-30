@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://immoprotokoll.com/de</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/en</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/de/datenschutz</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/datenschutz" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/en/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/datenschutz" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/privacy" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/de/agb</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/agb" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/en/terms</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/agb" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/terms" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/de/impressum</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/imprint" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/impressum" />
+  </url>
+  <url>
+    <loc>https://immoprotokoll.com/en/imprint</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/impressum" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/imprint" />
+  </url>
+</urlset>
