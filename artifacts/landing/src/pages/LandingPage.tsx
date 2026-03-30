@@ -90,14 +90,14 @@ export default function LandingPage() {
             >
               <a 
                 href="https://app.immoprotokoll.com" 
-                className="bg-black text-white px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-xl hover:bg-black/80 transition-colors flex items-center justify-center gap-2 shadow-md"
+                className="bg-black text-white px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-lg hover:bg-black/80 transition-colors flex items-center justify-center gap-2 shadow-md"
               >
                 {t.hero.cta_primary}
                 <ArrowRight size={20} />
               </a>
               <a 
                 href="#features" 
-                className="bg-white text-black border-2 border-black px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-xl hover:bg-black/5 transition-colors shadow-sm"
+                className="bg-white text-black border-2 border-black px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-lg hover:bg-black/5 transition-colors shadow-sm"
               >
                 {t.hero.cta_secondary}
               </a>
@@ -114,13 +114,12 @@ export default function LandingPage() {
             variants={fadeUp}
             className="container mx-auto max-w-6xl"
           >
-            <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden relative shadow-2xl">
+            <div className="w-full rounded-lg overflow-hidden border border-black/8 shadow-xl bg-white">
               <img
-                src={`${import.meta.env.BASE_URL}hero-apartment.jpg`}
-                alt={lang === "de" ? "Moderne Wohnung bei der Übergabe" : "Modern apartment at handover"}
-                className="w-full h-full object-cover grayscale"
+                src={`${import.meta.env.BASE_URL}app-illustration.png`}
+                alt={lang === "de" ? "ImmoProtokoll App Vorschau" : "ImmoProtokoll app preview"}
+                className="w-full h-auto object-contain"
               />
-              <div className="absolute inset-0 bg-black/20" />
             </div>
           </motion.div>
         </section>
@@ -151,8 +150,8 @@ export default function LandingPage() {
               className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
               {[Camera, PenLine, FileDown, Share2, Monitor, Users].map((Icon, i) => (
-                <motion.div key={i} variants={fadeUp} className="bg-white/5 rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-5">
+                <motion.div key={i} variants={fadeUp} className="bg-white/5 rounded-lg p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                  <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center mb-5">
                     <Icon size={20} className="text-white" />
                   </div>
                   <h3 className="text-lg font-bold mb-2">{t.features.items[i].title}</h3>
@@ -263,7 +262,7 @@ export default function LandingPage() {
             </p>
             <a 
               href="https://app.immoprotokoll.com" 
-              className="inline-block bg-black text-white px-10 py-5 text-xl font-bold rounded-2xl hover:bg-black/80 transition-colors shadow-lg"
+              className="inline-block bg-black text-white px-10 py-5 text-xl font-bold rounded-lg hover:bg-black/80 transition-colors shadow-lg"
             >
               {t.hero.cta_primary}
             </a>
@@ -280,7 +279,7 @@ export default function LandingPage() {
 function FaqItem({ question, answer }: { question: string, answer: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-black/10 bg-white rounded-2xl overflow-hidden shadow-xs">
+    <div className="border border-black/10 bg-white rounded-lg overflow-hidden shadow-xs">
       <button 
         className="w-full px-6 py-5 flex items-center justify-between text-left font-bold text-lg hover:bg-black/5 transition-colors"
         onClick={() => setOpen(!open)}
