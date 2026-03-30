@@ -382,6 +382,11 @@ const deCH = {
     phone: "Telefon",
     email: "E-Mail",
     additionalClauses: "Zusatzvereinbarungen",
+    photosFolder: "Fotos",
+    photosMeters: "Zaehlerstaende",
+    photosKitchen: "Kueche",
+    zipReadme: "Diese Fotodokumentation wurde mit ImmoProtokoll erstellt.\nMehr Informationen: https://immoprotokoll.com\n\nUpgrade auf einen bezahlten Plan um diesen Hinweis zu entfernen.\n",
+    locale: "de-CH",
   },
   person: {
     addPerson: "Person hinzufügen",

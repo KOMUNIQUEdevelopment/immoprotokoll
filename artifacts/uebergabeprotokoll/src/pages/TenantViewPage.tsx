@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ProtocolData, RoomData, FloorDef, getPersonRole } from "../types";
+import { ProtocolData, RoomData, FloorDef } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
 import { exportToPDF, exportPhotosAsZip } from "../pdfExport";
 import { getTranslations, type SupportedLanguage } from "../i18n";
@@ -516,7 +516,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2">
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                          {getPersonRole(p, "uebergeber")}
+                          {tr.signature.landlordRole}
                         </span>
                         {p.name}
                       </span>
@@ -537,7 +537,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2">
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-black text-white">
-                          {getPersonRole(p, "uebernehmer")}
+                          {tr.signature.tenantRole}
                         </span>
                         {p.name}
                       </span>
@@ -679,7 +679,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                       <div key={person.id} className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-xs bg-black text-white px-1.5 py-0.5 rounded font-medium">
-                            {getPersonRole(person, "uebergeber")}
+                            {tr.signature.landlordRole}
                           </span>
                           <span className="font-semibold text-sm">{person.name}</span>
                           {sig && <CheckCircle2 size={14} className="text-black ml-auto shrink-0" />}
@@ -726,7 +726,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                       <div key={person.id} className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs bg-black text-white px-1.5 py-0.5 rounded font-medium">
-                            {getPersonRole(person, "uebernehmer")}
+                            {tr.signature.tenantRole}
                           </span>
                           <span className="font-semibold text-sm">{person.name}</span>
                           {existingSig && <CheckCircle2 size={14} className="text-black ml-auto" />}

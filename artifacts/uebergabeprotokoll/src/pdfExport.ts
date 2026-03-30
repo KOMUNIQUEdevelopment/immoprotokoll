@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import JSZip from "jszip";
-import { ProtocolData, RoomPhoto, FloorDef, getPersonRole } from "./types";
+import { ProtocolData, RoomPhoto, FloorDef } from "./types";
 import { getTranslations, type SupportedLanguage } from "./i18n";
 import type { Translations } from "./i18n/de-CH";
 
@@ -89,7 +89,7 @@ async function loadLogoDataUrl(): Promise<string | null> {
   }
 }
 
-function addWatermark(doc: jsPDF, pageCount: number, logoDataUrl: string | null) {
+function addWatermark(doc: jsPDF, pageCount: number, logoDataUrl: string | null, watermarkText: string) {
   const pageW = 210;
   const pageH = 297;
   const barH = 12;
@@ -111,7 +111,7 @@ function addWatermark(doc: jsPDF, pageCount: number, logoDataUrl: string | null)
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
     doc.text(
-      "Erstellt mit ImmoProtokoll · immoprotokoll.com · Free Plan",
+      watermarkText,
       pageW / 2 + 3,
       pageH - barH + 7.5,
       { align: "center" }
@@ -202,12 +202,12 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
   const vermieterNames =
     protocol.uebergeber
       .filter(p => p.name.trim())
-      .map(p => `${p.name} (${getPersonRole(p, "uebergeber")})`)
+      .map(p => `${p.name} (${pdf.landlordRole})`)
       .join(", ") || "-";
   const mieterNames =
     protocol.uebernehmer
       .filter(p => p.name.trim())
-      .map(p => `${p.name} (${getPersonRole(p, "uebernehmer")})`)
+      .map(p => `${p.name} (${pdf.tenantRole})`)
       .join(", ") || "-";
   field(pdf.handingOver, vermieterNames);
   field(pdf.takingOver, mieterNames);
@@ -225,7 +225,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   // Meter photos
   if (protocol.meterPhotos?.length) {
-    await addPhotosBlock(doc, protocol.meterPhotos, pdf.meters, "", margin, contentW, usableH, () => y, (v) => { y = v; });
+    await addPhotosBlock(doc, protocol.meterPhotos, pdf.meters, "", margin, contentW, usableH, () => y, (v) => { y = v; }, pdf.locale);
   }
 
   // ── Kitchen ───────────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   // Kitchen photos
   if (protocol.kitchenPhotos?.length) {
-    await addPhotosBlock(doc, protocol.kitchenPhotos, pdf.kitchen, "", margin, contentW, usableH, () => y, (v) => { y = v; });
+    await addPhotosBlock(doc, protocol.kitchenPhotos, pdf.kitchen, "", margin, contentW, usableH, () => y, (v) => { y = v; }, pdf.locale);
   }
 
   // ── Rooms by floor ────────────────────────────────────────────────────────
@@ -296,7 +296,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
       if (room.photos.length > 0) {
         const roomFloorLabel = resolveFloorLabel(room.floor, floorMap);
-        await addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; });
+        await addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; }, pdf.locale);
       }
 
       y += 3;
@@ -386,7 +386,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   for (const { person, side } of allPersons) {
     checkPage(65);
-    const role = getPersonRole(person, side);
+    const role = side === "uebergeber" ? pdf.landlordRole : pdf.tenantRole;
     const label = person.name ? `${person.name}, ${role}` : role;
 
     doc.setFont("helvetica", "bold");
@@ -434,7 +434,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
   // Add watermark to all pages for Free plan accounts
   if (options?.watermark) {
     const logoDataUrl = await loadLogoDataUrl();
-    addWatermark(doc, doc.getNumberOfPages(), logoDataUrl);
+    addWatermark(doc, doc.getNumberOfPages(), logoDataUrl, pdf.watermarkText);
   }
 
   doc.save(fileName);
@@ -485,6 +485,7 @@ async function addPhotosBlock(
   usableH: number,
   getY: () => number,
   setY: (v: number) => void,
+  locale: string,
 ) {
   let y = getY();
 
@@ -512,7 +513,7 @@ async function addPhotosBlock(
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-    const ts = new Date(photo.timestamp).toLocaleString("de-DE", {
+    const ts = new Date(photo.timestamp).toLocaleString(locale, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -533,18 +534,17 @@ async function addPhotosBlock(
 // ─── ZIP export (all photos) ──────────────────────────────────────────────────
 
 export async function exportPhotosAsZip(protocol: ProtocolData, options?: ExportOptions): Promise<void> {
+  const language = options?.language ?? "de-CH";
+  const tr = getTranslations(language) as Translations;
+  const pdf = tr.pdf;
+
   const zip = new JSZip();
-  const folder = zip.folder("Fotos");
+  const folder = zip.folder(pdf.photosFolder);
   if (!folder) return;
 
   // Free plan branding: add a README.txt at the root of the ZIP
   if (options?.watermark) {
-    zip.file(
-      "README.txt",
-      "Diese Fotodokumentation wurde mit ImmoProtokoll erstellt.\n" +
-      "Mehr Informationen: https://immoprotokoll.com\n\n" +
-      "Upgrade auf einen bezahlten Plan, um diesen Hinweis zu entfernen.\n"
-    );
+    zip.file("README.txt", pdf.zipReadme);
   }
 
   const usedNames = new Map<string, number>();
@@ -580,11 +580,11 @@ export async function exportPhotosAsZip(protocol: ProtocolData, options?: Export
   };
 
   if (protocol.meterPhotos?.length) {
-    addPhotos(protocol.meterPhotos, "", "Zählerstände");
+    addPhotos(protocol.meterPhotos, "", pdf.photosMeters);
   }
 
   if (protocol.kitchenPhotos?.length) {
-    addPhotos(protocol.kitchenPhotos, "", "Küche");
+    addPhotos(protocol.kitchenPhotos, "", pdf.photosKitchen);
   }
 
   const zipFloorMap = buildFloorMap(protocol.floors ?? []);
@@ -600,7 +600,7 @@ export async function exportPhotosAsZip(protocol: ProtocolData, options?: Export
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Fotos_${safeAddr}_${safeDatum}.zip`;
+  a.download = `${pdf.photosFolder}_${safeAddr}_${safeDatum}.zip`;
   a.click();
   URL.revokeObjectURL(url);
 }
