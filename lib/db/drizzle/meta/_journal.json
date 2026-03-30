@@ -43,6 +43,13 @@
       "when": 1774888934331,
       "tag": "0005_billing_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774893507806,
+      "tag": "0006_sudden_korvac",
+      "breakpoints": true
     }
   ]
 }

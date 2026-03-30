@@ -1,6 +1,6 @@
 import React from "react";
 import { Trash2 } from "lucide-react";
-import { ProtocolData, Person, PersonSignature, getPersonRole } from "../types";
+import { ProtocolData, Person, PersonSignature } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
 import { Input } from "@/components/ui/input";
 import { getTranslations, type SupportedLanguage } from "../i18n";
@@ -36,7 +36,7 @@ interface PersonSignatureBlockProps {
 }
 
 function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChange, onNameChange, onRemove, tr }: PersonSignatureBlockProps) {
-  const role = getPersonRole(person, side);
+  const role = side === "uebergeber" ? tr.signature.landlordRole : tr.signature.tenantRole;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">

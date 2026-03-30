@@ -1,0 +1,1 @@
+ALTER TABLE "properties" ADD COLUMN "language" text DEFAULT 'de-CH' NOT NULL;

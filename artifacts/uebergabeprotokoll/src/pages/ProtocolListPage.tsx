@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ProtocolData, getPersonRole } from "../types";
+import { ProtocolData } from "../types";
 import { TrashedEntry } from "../store";
+import { useTranslation } from "react-i18next";
 import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink, LogOut, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ function PreviewSection({ title, children }: { title: string; children: React.Re
 }
 
 function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModalProps) {
+  const { t } = useTranslation();
   const floors = ["EG", "OG", "DG", "UG", "Außen"];
   const totalPhotos =
     (protocol.meterPhotos?.length ?? 0) +
@@ -124,7 +126,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
               {protocol.uebergeber.filter(p => p.name).map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
                   <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
-                    {getPersonRole(p, "uebergeber")}
+                    {t("editor.landlordRole")}
                   </span>
                   <span className="truncate">{p.name}</span>
                 </div>
@@ -132,7 +134,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
               {protocol.uebernehmer.filter(p => p.name).map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
                   <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium shrink-0">
-                    {getPersonRole(p, "uebernehmer")}
+                    {t("editor.tenantRole")}
                   </span>
                   <span className="truncate">{p.name}</span>
                 </div>
@@ -277,6 +279,7 @@ interface ShareLinkModalProps {
 }
 
 function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const shareUrl = `${window.location.origin}${window.location.pathname.split("#")[0]}#/view/${protocol.id}`;
 
@@ -308,7 +311,7 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
             <Link size={18} className="text-primary" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-semibold text-base">Mieter-Link teilen</h2>
+            <h2 className="font-semibold text-base">{t("protocols.shareLink")}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
               {protocol.mietobjekt || "Protokoll"}
             </p>
@@ -326,15 +329,14 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
           <div className="flex items-start gap-2 bg-muted border border-border rounded-xl p-3">
             <AlertTriangle size={15} className="text-foreground shrink-0 mt-0.5" />
             <div className="text-xs text-foreground leading-snug">
-              <strong>Sync ist nicht aktiviert.</strong> Aktiviere erst Sync für dieses
-              Protokoll, damit der Link für die Mieterin funktioniert.
+              <strong>{t("protocols.syncNotActivated")}</strong> {t("protocols.syncNotActivatedHint")}
             </div>
           </div>
         )}
 
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Mieter-Link
+            {t("protocols.shareLinkLabel")}
           </p>
           <div className="flex gap-2">
             <div className="flex-1 bg-muted rounded-lg px-3 py-2 text-xs font-mono text-muted-foreground truncate border border-border">
@@ -500,6 +502,7 @@ export default function ProtocolListPage({
   const [permDeleteTarget, setPermDeleteTarget] = useState<string | null>(null);
   const [emptyTrashConfirm, setEmptyTrashConfirm] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
+  const { t } = useTranslation();
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [shareId, setShareId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -690,7 +693,7 @@ export default function ProtocolListPage({
                   <button
                     type="button"
                     onClick={() => setShareId(p.id)}
-                    title="Mieter-Link teilen"
+                    title={t("protocols.shareLink")}
                     className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
                     <Link size={15} />
