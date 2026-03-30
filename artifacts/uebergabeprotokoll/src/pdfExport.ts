@@ -11,19 +11,21 @@ function safeText(s: string): string {
 }
 
 const FLOOR_LABEL: Record<string, string> = {
-  EG: "Erdgeschoss (EG)",
-  OG: "Obergeschoss (OG)",
-  DG: "Dachgeschoss (DG)",
-  UG: "Untergeschoss (UG)",
-  "Außen": "Außenbereiche",
+  EG: "EG",
+  OG: "OG",
+  DG: "DG",
+  UG: "UG",
+  "Außen": "Aussen",
+  "Aussen": "Aussen",
 };
 
 const FLOOR_SAFE: Record<string, string> = {
-  EG: "Erdgeschoss_(EG)",
-  OG: "Obergeschoss_(OG)",
-  DG: "Dachgeschoss_(DG)",
-  UG: "Untergeschoss_(UG)",
-  "Außen": "Aussenbereiche",
+  EG: "EG",
+  OG: "OG",
+  DG: "DG",
+  UG: "UG",
+  "Außen": "Aussen",
+  "Aussen": "Aussen",
 };
 
 export function getFloorLabel(floor: string): string {

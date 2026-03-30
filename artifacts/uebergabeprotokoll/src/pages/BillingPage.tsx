@@ -134,7 +134,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
             <ArrowLeft size={16} />
           </button>
           <div>
-            <h1 className="font-semibold text-sm text-black">Abonnement & Abrechnung</h1>
+            <h1 className="font-semibold text-sm text-black">{t("billing.subscription")}</h1>
           </div>
         </div>
       </header>
@@ -145,9 +145,9 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
           <div className="flex items-start gap-3 bg-neutral-50 border border-neutral-200 rounded-xl p-4">
             <Lock size={16} className="text-neutral-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-black">Nur für Kontoinhaber</p>
+              <p className="text-sm font-medium text-black">{t("billing.ownerOnlyTitle")}</p>
               <p className="text-xs text-neutral-500 mt-0.5">
-                Nur der Kontoinhaber kann das Abonnement verwalten und ändern.
+                {t("billing.ownerOnlyDesc")}
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
               onClick={() => { setError(""); loadSubscription(); }}
               className="ml-auto text-xs text-neutral-500 hover:text-black gap-1 flex items-center"
             >
-              <RefreshCw size={12} /> Neu laden
+              <RefreshCw size={12} /> {t("billing.reload")}
             </button>
           </div>
         )}
@@ -181,7 +181,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
             <div className="rounded-2xl border border-neutral-200 p-6 mb-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-1">Aktueller Plan</p>
+                  <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-1">{t("billing.currentPlanLabel")}</p>
                   <p className="text-2xl font-bold text-black">{PLAN_LABELS[sub.plan]}</p>
                   {isPaid && sub.subscriptionStatus && (
                     <span className={`inline-flex items-center gap-1 text-xs mt-1 font-medium px-2 py-0.5 rounded-full ${
@@ -209,7 +209,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                   </div>
                   {sub.currentPeriodEnd && (
                     <div>
-                      <p className="text-neutral-400 mb-0.5">Nächste Verlängerung</p>
+                      <p className="text-neutral-400 mb-0.5">{t("billing.nextRenewal")}</p>
                       <p className="font-medium text-black">{formatDate(sub.currentPeriodEnd)}</p>
                     </div>
                   )}
@@ -219,7 +219,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
               {sub.plan === "free" && (
                 <div className="mt-4 pt-4 border-t border-neutral-100">
                   <p className="text-xs text-neutral-500">
-                    Sie nutzen den kostenlosen Plan. PDF-Exporte enthalten ein ImmoProtokoll-Wasserzeichen.
+                    {t("billing.freePlanNotice")}
                   </p>
                 </div>
               )}
@@ -228,13 +228,13 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
             {/* Usage summary */}
             {sub.usage && (
               <div className="rounded-2xl border border-neutral-200 p-6 mb-6">
-                <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-4">Nutzung</p>
+                <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-4">{t("billing.usage")}</p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Building2 size={14} className="text-neutral-400 shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-neutral-600">Liegenschaften</span>
+                        <span className="text-xs text-neutral-600">{t("billing.propertiesLabel")}</span>
                         <span className="text-xs font-medium text-black">
                           {sub.usage.properties}
                           {sub.usage.limits.properties !== null
@@ -256,7 +256,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                     <FileText size={14} className="text-neutral-400 shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-neutral-600">Protokolle (gesamt)</span>
+                        <span className="text-xs text-neutral-600">{t("billing.protocolsTotal")}</span>
                         <span className="text-xs font-medium text-black">
                           {sub.usage.protocols}
                           {sub.usage.limits.protocols !== null
@@ -285,7 +285,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                   className="w-full bg-black text-white hover:bg-neutral-800 gap-2"
                   onClick={onShowPricing}
                 >
-                  Jetzt upgraden
+                  {t("billing.upgradeNow")}
                 </Button>
               )}
 
@@ -303,7 +303,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
 
               {isPaid && (
                 <p className="text-xs text-neutral-400 text-center">
-                  Änderungen, Upgrades und Kündigungen werden über das Stripe-Kundenportal verwaltet.
+                  {t("billing.stripeNote")}
                 </p>
               )}
             </div>

@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
 
-const FLOOR_LABEL: Record<string, string> = {
-  EG: "Erdgeschoss (EG)",
-  OG: "Obergeschoss (OG)",
-  DG: "Dachgeschoss (DG)",
-  UG: "Untergeschoss (UG)",
-  "Außen": "Außenbereiche",
-};
 
 interface ProtocolListPageProps {
   protocols: Record<string, ProtocolData>;
@@ -93,7 +86,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="font-bold text-base leading-tight truncate">
-                {protocol.mietobjekt || "Protokoll"}
+                {protocol.mietobjekt || t("protocols.unnamed")}
               </h2>
               {protocol.adresse && (
                 <p className="text-primary-foreground/80 text-xs mt-0.5 flex items-center gap-1 truncate">
@@ -104,7 +97,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
               {protocol.datum && (
                 <p className="text-primary-foreground/80 text-xs mt-0.5 flex items-center gap-1">
                   <Calendar size={11} />
-                  Übergabe: {protocol.datum}
+                  {t("protocols.handoverLabel")}: {protocol.datum}
                 </p>
               )}
             </div>
@@ -121,7 +114,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Persons */}
-          <PreviewSection title="Beteiligte Personen">
+          <PreviewSection title={t("protocols.involvedPersons")}>
             <div className="space-y-2">
               {protocol.uebergeber.filter(p => p.name).map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
@@ -140,7 +133,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
                 </div>
               ))}
               {allPersons.filter(p => p.name).length === 0 && (
-                <p className="text-sm text-muted-foreground italic">Keine Personen eingetragen</p>
+                <p className="text-sm text-muted-foreground italic">{t("protocols.noPersonsNote")}</p>
               )}
             </div>
           </PreviewSection>
@@ -148,14 +141,14 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
           {/* Key & meter readings side by side */}
           <div className="grid grid-cols-2 gap-4">
             {protocol.schluessel && (
-              <PreviewSection title="Schlüssel">
+              <PreviewSection title={t("editor.keyHandover")}>
                 <div className="flex items-start gap-1.5 text-sm">
                   <Key size={13} className="text-muted-foreground mt-0.5 shrink-0" />
                   <span>{protocol.schluessel}</span>
                 </div>
               </PreviewSection>
             )}
-            <PreviewSection title="Zählerstände">
+            <PreviewSection title={t("editor.meterReadings")}>
               <div className="space-y-1">
                 {protocol.meterReadings.map((m, i) => (
                   <div key={i} className="flex items-center justify-between text-sm gap-2">
@@ -173,7 +166,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
           </div>
 
           {/* Rooms per floor */}
-          <PreviewSection title="Raumzustand">
+          <PreviewSection title={t("protocols.roomCondition")}>
             <div className="space-y-3">
               {floors.map(floor => {
                 const rooms = protocol.rooms.filter(r => r.floor === floor);
@@ -181,7 +174,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
                 return (
                   <div key={floor}>
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                      {FLOOR_LABEL[floor] ?? floor}
+                      {(t("floors", { returnObjects: true }) as Record<string, string>)[floor] ?? floor}
                     </p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {rooms.map(room => {
@@ -222,27 +215,27 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-muted/50 rounded-xl p-3 text-center">
               <p className="text-lg font-bold text-primary">{totalPhotos}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Fotos</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t("protocols.photos")}</p>
             </div>
             <div className="bg-muted/50 rounded-xl p-3 text-center">
               <p className="text-lg font-bold text-primary">
                 {protocol.rooms.filter(r => r.bodenZustand || r.maengelSchaeden).length}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Räume ausgefüllt</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t("protocols.roomsFilled")}</p>
             </div>
             <div className={`rounded-xl p-3 text-center ${allSigned ? "bg-foreground text-background" : "bg-muted/50"}`}>
               <p className={`text-lg font-bold ${allSigned ? "text-background" : "text-primary"}`}>
                 {signedCount}/{allPersons.length}
               </p>
               <p className={`text-[11px] mt-0.5 ${allSigned ? "text-background/80" : "text-muted-foreground"}`}>
-                {allSigned ? "✓ Unterschriften" : "Unterschriften"}
+                {allSigned ? `✓ ${t("protocols.signatures")}` : t("protocols.signatures")}
               </p>
             </div>
           </div>
 
           {/* Zusatzvereinbarungen */}
           {(protocol.zusatzvereinbarungen?.length ?? 0) > 0 && (
-            <PreviewSection title={protocol.zusatzvereinbarungTitle || "Zusatzvereinbarungen"}>
+            <PreviewSection title={protocol.zusatzvereinbarungTitle || t("editor.additionalClauses")}>
               <div className="space-y-1">
                 {protocol.zusatzvereinbarungen.map((z, i) => (
                   <div key={z.id} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -258,11 +251,11 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
         {/* Footer actions */}
         <div className="border-t border-border px-5 py-3 flex gap-2 shrink-0 bg-card">
           <Button variant="outline" size="sm" onClick={onClose} className="flex-1 sm:flex-none">
-            Schließen
+            {t("common.close")}
           </Button>
           <Button size="sm" onClick={onEdit} className="flex-1 gap-1.5">
             <Pencil size={13} />
-            Bearbeiten
+            {t("common.edit")}
             <ChevronRight size={13} className="-ml-0.5" />
           </Button>
         </div>
@@ -313,7 +306,7 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
           <div className="min-w-0">
             <h2 className="font-semibold text-base">{t("protocols.shareLink")}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {protocol.mietobjekt || "Protokoll"}
+              {protocol.mietobjekt || t("protocols.unnamed")}
             </p>
           </div>
           <button
@@ -352,24 +345,24 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
               }`}
             >
               {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? "Kopiert!" : "Kopieren"}
+              {copied ? t("protocols.copiedLabel") : t("protocols.copyLabel")}
             </button>
           </div>
         </div>
 
         <div className="bg-muted/50 rounded-xl p-3 space-y-1.5 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground text-xs">Was die Mieterin sehen kann:</p>
+          <p className="font-medium text-foreground text-xs">{t("protocols.tenantCanSeeTitle")}</p>
           <ul className="space-y-1 list-none">
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Alle Protokollinhalte (schreibgeschützt)</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Alle Fotos und Raumzustände</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Zusatzvereinbarungen</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Eigene Unterschrift leisten (wird synchronisiert)</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> {t("protocols.tenantCanSeeAll")}</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> {t("protocols.tenantCanSeePhotos")}</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> {t("protocols.tenantCanSeeAdditional")}</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> {t("protocols.tenantCanSeeSign")}</li>
           </ul>
         </div>
 
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onClose} className="flex-1">
-            Schließen
+            {t("common.close")}
           </Button>
           <Button
             size="sm"
@@ -377,7 +370,7 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
             className="flex-1 gap-1.5"
           >
             <ExternalLink size={13} />
-            Ansicht öffnen
+            {t("protocols.openView")}
           </Button>
         </div>
       </div>
@@ -394,7 +387,8 @@ interface DeleteDialogProps {
 }
 
 function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
-  const label = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || "Dieses Protokoll";
+  const { t } = useTranslation();
+  const label = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(", ") || t("protocols.thisProtocol");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onCancel}>
@@ -407,10 +401,10 @@ function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
             <Trash2 size={18} className="text-muted-foreground" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-semibold text-base">In Papierkorb verschieben?</h2>
+            <h2 className="font-semibold text-base">{t("protocols.moveToTrashTitle")}</h2>
             <p className="text-sm text-muted-foreground mt-1">
               <span className="font-medium text-foreground truncate block">{label}</span>
-              wird in den Papierkorb verschoben und kann dort wiederhergestellt werden.
+              {t("protocols.moveToTrashHint")}
             </p>
           </div>
           <button
@@ -424,7 +418,7 @@ function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
 
         <div className="flex gap-2 justify-end">
           <Button variant="outline" size="sm" onClick={onCancel}>
-            Abbrechen
+            {t("common.cancel")}
           </Button>
           <Button
             variant="outline"
@@ -434,7 +428,7 @@ function DeleteDialog({ protocol, onConfirm, onCancel }: DeleteDialogProps) {
             autoFocus
           >
             <Trash2 size={14} />
-            In Papierkorb
+            {t("protocols.moveToTrashAction")}
           </Button>
         </div>
       </div>
@@ -451,6 +445,7 @@ interface PermanentDeleteDialogProps {
 }
 
 function PermanentDeleteDialog({ label, onConfirm, onCancel }: PermanentDeleteDialogProps) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onCancel}>
       <div
@@ -462,10 +457,10 @@ function PermanentDeleteDialog({ label, onConfirm, onCancel }: PermanentDeleteDi
             <AlertTriangle size={18} className="text-destructive" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-semibold text-base">Endgültig löschen?</h2>
+            <h2 className="font-semibold text-base">{t("protocols.deleteForeverTitle")}</h2>
             <p className="text-sm text-muted-foreground mt-1">
               <span className="font-medium text-foreground truncate block">{label}</span>
-              wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              {t("protocols.deleteForeverHint")}
             </p>
           </div>
           <button type="button" onClick={onCancel} className="p-1 rounded-md text-muted-foreground hover:bg-muted shrink-0 ml-auto">
@@ -473,10 +468,10 @@ function PermanentDeleteDialog({ label, onConfirm, onCancel }: PermanentDeleteDi
           </button>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" size="sm" onClick={onCancel}>Abbrechen</Button>
+          <Button variant="outline" size="sm" onClick={onCancel}>{t("common.cancel")}</Button>
           <Button variant="destructive" size="sm" onClick={onConfirm} autoFocus className="gap-1.5">
             <Trash2 size={14} />
-            Endgültig löschen
+            {t("protocols.permanentlyDelete")}
           </Button>
         </div>
       </div>
@@ -556,8 +551,8 @@ export default function ProtocolListPage({
               <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-7" />
               <p className="text-xs text-neutral-500">
                 {sorted.length === 0
-                  ? "Noch keine Protokolle"
-                  : `${sorted.length} Protokoll${sorted.length === 1 ? "" : "e"}`}
+                  ? t("protocols.emptyCount")
+                  : `${sorted.length} ${sorted.length === 1 ? t("protocols.protocol") : t("protocols.protocols")}`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -566,7 +561,7 @@ export default function ProtocolListPage({
                 <button
                   type="button"
                   onClick={onLogout}
-                  title="Abmelden"
+                  title={t("auth.logout")}
                   className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors"
                 >
                   <LogOut size={15} />
@@ -574,7 +569,7 @@ export default function ProtocolListPage({
               )}
               <Button size="sm" onClick={onCreate} className="gap-1.5 bg-black text-white hover:bg-neutral-800">
                 <Plus size={15} />
-                Neu
+                {t("common.new")}
               </Button>
             </div>
           </div>
@@ -589,19 +584,19 @@ export default function ProtocolListPage({
               <ClipboardList size={36} className="text-muted-foreground" />
             </div>
             <div>
-              <p className="font-semibold text-base">Noch kein Protokoll vorhanden</p>
+              <p className="font-semibold text-base">{t("protocols.emptyTitle")}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Erstelle dein erstes Protokoll.
+                {t("protocols.emptyDesc")}
               </p>
             </div>
             <Button onClick={onCreate} className="gap-1.5 mt-2">
               <Plus size={15} />
-              Erstes Protokoll anlegen
+              {t("protocols.createFirstBtn")}
             </Button>
           </div>
         ) : (
           sorted.map(p => {
-            const title = p.mietobjekt || "Unbenanntes Protokoll";
+            const title = p.mietobjekt || t("protocols.unnamed");
             const subtitle = [p.adresse, p.datum].filter(Boolean).join(" · ");
             return (
               <div
@@ -632,7 +627,7 @@ export default function ProtocolListPage({
                           type="button"
                           onMouseDown={e => { e.preventDefault(); commitRename(); }}
                           className="p-1 rounded text-foreground hover:bg-muted shrink-0"
-                          title="Speichern"
+                          title={t("common.save")}
                         >
                           <Check size={14} />
                         </button>
@@ -640,7 +635,7 @@ export default function ProtocolListPage({
                           type="button"
                           onMouseDown={e => { e.preventDefault(); cancelRename(); }}
                           className="p-1 rounded text-muted-foreground hover:bg-muted shrink-0"
-                          title="Abbrechen"
+                          title={t("common.cancel")}
                         >
                           <X size={14} />
                         </button>
@@ -652,7 +647,7 @@ export default function ProtocolListPage({
                           type="button"
                           onClick={() => startRename(p)}
                           className="p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
-                          title="Bezeichnung ändern"
+                          title={t("protocols.rename")}
                         >
                           <Pencil size={11} />
                         </button>
@@ -662,7 +657,7 @@ export default function ProtocolListPage({
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
                     )}
                     <p className="text-xs text-muted-foreground/50 mt-0.5">
-                      Zuletzt: {formatDate(p.lastSaved)}
+                      {t("protocols.lastSaved")}{formatDate(p.lastSaved)}
                     </p>
                   </div>
                 </div>
@@ -673,7 +668,7 @@ export default function ProtocolListPage({
                   <button
                     type="button"
                     onClick={() => onToggleSync(p.id)}
-                    title={p.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
+                    title={p.syncEnabled ? t("protocols.syncDisable") : t("protocols.syncEnable")}
                     className={`p-2 rounded-lg transition-colors ${
                       p.syncEnabled
                         ? "text-foreground bg-muted hover:bg-muted/70"
@@ -685,7 +680,7 @@ export default function ProtocolListPage({
                   <button
                     type="button"
                     onClick={() => setPreviewId(p.id)}
-                    title="Vorschau"
+                    title={t("protocols.preview")}
                     className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
                     <Eye size={15} />
@@ -701,7 +696,7 @@ export default function ProtocolListPage({
                   <button
                     type="button"
                     onClick={() => onDuplicate(p.id)}
-                    title="Protokoll duplizieren"
+                    title={t("protocols.duplicate")}
                     className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
                     <Copy size={15} />
@@ -716,14 +711,14 @@ export default function ProtocolListPage({
                     className="gap-1.5 h-8 px-3 text-xs"
                   >
                     <Pencil size={12} />
-                    Bearbeiten
+                    {t("protocols.editProtocol")}
                   </Button>
 
                   {/* Delete (far right, visually separated) */}
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(p.id)}
-                    title="In Papierkorb verschieben"
+                    title={t("protocols.moveToTrash")}
                     className="ml-1 p-2 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <Trash2 size={15} />
@@ -744,7 +739,7 @@ export default function ProtocolListPage({
           >
             <span className="flex items-center gap-2 font-medium">
               <Trash2 size={14} />
-              Papierkorb
+              {t("protocols.trash")}
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted-foreground/20 text-[11px] font-bold">
                 {trashCount}
               </span>
@@ -763,12 +758,12 @@ export default function ProtocolListPage({
                   className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
                 >
                   <Trash2 size={12} />
-                  Papierkorb leeren
+                  {t("protocols.emptyTrash")}
                 </Button>
               </div>
 
               {trashEntries.map(([id, entry]) => {
-                const title = entry.protocol.mietobjekt || "Unbenanntes Protokoll";
+                const title = entry.protocol.mietobjekt || t("protocols.unnamed");
                 const subtitle = [entry.protocol.adresse, entry.protocol.datum].filter(Boolean).join(" · ");
                 return (
                   <div
@@ -784,7 +779,7 @@ export default function ProtocolListPage({
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
                       )}
                       <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        Gelöscht: {formatDate(entry.deletedAt)}
+                        {t("protocols.deletedDate")}{formatDate(entry.deletedAt)}
                       </p>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
@@ -793,17 +788,17 @@ export default function ProtocolListPage({
                         size="sm"
                         onClick={() => onRestore(id)}
                         className="gap-1 text-xs"
-                        title="Wiederherstellen"
+                        title={t("protocols.restoreProtocol")}
                       >
                         <RotateCcw size={12} />
-                        <span className="hidden sm:inline">Wiederherstellen</span>
+                        <span className="hidden sm:inline">{t("protocols.restoreProtocol")}</span>
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setPermDeleteTarget(id)}
                         className="p-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Endgültig löschen"
+                        title={t("protocols.permanentlyDelete")}
                       >
                         <X size={14} />
                       </Button>
@@ -852,7 +847,7 @@ export default function ProtocolListPage({
               trashedProtocols[permDeleteTarget].protocol.adresse,
             ]
               .filter(Boolean)
-              .join(", ") || "Dieses Protokoll"
+              .join(", ") || t("protocols.thisProtocol")
           }
           onConfirm={() => {
             onPermanentlyDelete(permDeleteTarget);
@@ -865,7 +860,7 @@ export default function ProtocolListPage({
       {/* Empty trash confirm dialog */}
       {emptyTrashConfirm && (
         <PermanentDeleteDialog
-          label={`alle ${trashCount} Protokoll${trashCount !== 1 ? "e" : ""} im Papierkorb`}
+          label={t("protocols.allInTrash", { count: trashCount, plural: trashCount !== 1 ? "e" : "" })}
           onConfirm={() => {
             onEmptyTrash();
             setEmptyTrashConfirm(false);

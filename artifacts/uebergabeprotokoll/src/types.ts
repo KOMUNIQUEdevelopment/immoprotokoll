@@ -25,8 +25,8 @@ export interface Property {
 export const UNASSIGNED_PROPERTY: Property = {
   id: "__unassigned__",
   accountId: "",
-  name: "Nicht zugeordnet",
-  adresse: "Protokolle ohne Liegenschaft",
+  name: "__unassigned__",
+  adresse: "",
   language: "de-CH",
   createdAt: "",
   updatedAt: "",
