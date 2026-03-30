@@ -245,7 +245,7 @@ export default function LandingPage() {
         </section>
 
         {/* BOTTOM CTA */}
-        <section className="py-32 bg-black text-white text-center px-4">
+        <section className="py-32 bg-black/5 text-black text-center px-4">
           <motion.div 
             initial="hidden"
             whileInView="visible"
@@ -256,14 +256,14 @@ export default function LandingPage() {
             <h2 className="text-5xl md:text-6xl font-black tracking-tight mb-8">
               {lang === "de" ? "Bereit für den Wechsel?" : "Ready to switch?"}
             </h2>
-            <p className="text-xl text-white/70 mb-12 font-medium">
+            <p className="text-xl text-black/60 mb-12 font-medium">
               {lang === "de" 
                 ? "Digitalisieren Sie Ihre Übergabeprotokolle noch heute." 
                 : "Digitize your handover protocols today."}
             </p>
             <a 
               href="https://app.immoprotokoll.com" 
-              className="inline-block bg-white text-black px-10 py-5 text-xl font-bold rounded-2xl hover:bg-white/90 transition-colors shadow-lg"
+              className="inline-block bg-black text-white px-10 py-5 text-xl font-bold rounded-2xl hover:bg-black/80 transition-colors shadow-lg"
             >
               {t.hero.cta_primary}
             </a>
