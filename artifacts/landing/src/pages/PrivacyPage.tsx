@@ -48,7 +48,7 @@ export default function PrivacyPage() {
             <p>Die Verarbeitung erfolgt zur Vertragserfüllung (Bereitstellung des ImmoProtokoll-Dienstes) sowie aufgrund unseres berechtigten Interesses an der Verbesserung und Absicherung der Anwendung.</p>
 
             <h2>4. Hosting und Datenverarbeitung</h2>
-            <p>Das Hosting der Anwendung erfolgt bei einem US-basierten Anbieter. Um die Einhaltung der DSGVO und des Schweizer nDSG zu gewährleisten, haben wir mit dem Anbieter ein Data Processing Agreement (DPA) inkl. Standardvertragsklauseln (SCC) abgeschlossen.</p>
+            <p>Das Hosting der Anwendung erfolgt bei einem US-basierten Anbieter. Wir haben mit dem Anbieter ein Data Processing Agreement (DPA) abgeschlossen, um den Schutz Ihrer Daten vertraglich zu sichern.</p>
 
             <h2>5. Zahlungsabwicklung</h2>
             <p>Für kostenpflichtige Pläne nutzen wir Stripe als Zahlungsdienstleister. Zahlungsdaten werden direkt an Stripe übermittelt und dort verarbeitet. Mit Stripe besteht ein entsprechendes DPA.</p>
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
             <p>Data is processed to fulfill our contract with you (providing the ImmoProtokoll service) and based on our legitimate interest in improving and securing the application.</p>
 
             <h2>4. Hosting and Processing</h2>
-            <p>The application is hosted with a US-based provider. To ensure compliance with GDPR and the Swiss nDSG, we have executed a Data Processing Agreement (DPA) including Standard Contractual Clauses (SCCs).</p>
+            <p>The application is hosted with a US-based provider. We have executed a Data Processing Agreement (DPA) with the provider to contractually ensure the protection of your data.</p>
 
             <h2>5. Payment Processing</h2>
             <p>For paid plans, we use Stripe as our payment processor. Payment details are transmitted directly to and processed by Stripe. A DPA is in place with Stripe.</p>

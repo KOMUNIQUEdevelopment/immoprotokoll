@@ -4,7 +4,7 @@ import PricingSection from "../components/PricingSection";
 import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
 import { useState } from "react";
 
 export default function LandingPage() {
@@ -14,8 +14,8 @@ export default function LandingPage() {
     ? "ImmoProtokoll - Das präzise digitale Übergabeprotokoll" 
     : "ImmoProtokoll - The digital handover protocol";
   const description = lang === 'de'
-    ? "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow für Immobilienübergaben weltweit."
-    : "Replace clipboards and paper with a flawless digital workflow for property handovers worldwide.";
+    ? "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow für Immobilienübergaben."
+    : "Replace clipboards and paper with a flawless digital workflow for property handovers.";
 
   const schema = {
     "@context": "https://schema.org",
@@ -69,7 +69,8 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.05] mb-8"
+              className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.05] mb-8 [overflow-wrap:anywhere] [hyphens:auto]"
+              lang={lang}
             >
               {t.hero.title}
             </motion.h1>
@@ -89,14 +90,14 @@ export default function LandingPage() {
             >
               <a 
                 href="https://app.immoprotokoll.com" 
-                className="bg-black text-white px-8 py-4 text-lg font-bold w-full sm:w-auto hover:bg-black/80 transition-colors flex items-center justify-center gap-2"
+                className="bg-black text-white px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-xl hover:bg-black/80 transition-colors flex items-center justify-center gap-2 shadow-md"
               >
                 {t.hero.cta_primary}
                 <ArrowRight size={20} />
               </a>
               <a 
                 href="#features" 
-                className="bg-white text-black border-2 border-black px-8 py-4 text-lg font-bold w-full sm:w-auto hover:bg-black/5 transition-colors"
+                className="bg-white text-black border-2 border-black px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-xl hover:bg-black/5 transition-colors shadow-sm"
               >
                 {t.hero.cta_secondary}
               </a>
@@ -113,9 +114,9 @@ export default function LandingPage() {
             variants={fadeUp}
             className="container mx-auto max-w-6xl"
           >
-            <div className="aspect-[16/9] w-full bg-black/5 border border-black/10 overflow-hidden relative">
+            <div className="aspect-[16/9] w-full bg-black/5 border border-black/10 rounded-2xl overflow-hidden relative">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3/4 h-3/4 bg-white shadow-2xl border border-black/10 flex flex-col">
+                <div className="w-3/4 h-3/4 bg-white shadow-2xl border border-black/10 rounded-xl flex flex-col">
                   <div className="h-12 border-b border-black/10 flex items-center px-4">
                     <div className="w-32 h-4 bg-black/10"></div>
                   </div>
@@ -161,13 +162,15 @@ export default function LandingPage() {
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
               variants={staggerContainer}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-12"
+              className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
-              {t.features.items.map((item, i) => (
-                <motion.div key={i} variants={fadeUp} className="border-t border-white/20 pt-6">
-                  <div className="text-2xl font-bold mb-4 opacity-50">0{i + 1}</div>
-                  <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                  <p className="text-white/70 font-medium leading-relaxed">{item.desc}</p>
+              {[Camera, PenLine, FileDown, Share2, Monitor, Users].map((Icon, i) => (
+                <motion.div key={i} variants={fadeUp} className="bg-white/5 rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-5">
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{t.features.items[i].title}</h3>
+                  <p className="text-white/60 leading-relaxed text-sm">{t.features.items[i].desc}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -200,7 +203,7 @@ export default function LandingPage() {
                   <div className="flex items-center justify-center w-14 h-14 rounded-full bg-black text-white font-bold text-xl border-4 border-white z-10 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm">
                     {i + 1}
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] p-6 border border-black/10 bg-white">
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] p-6 border border-black/8 bg-white rounded-2xl shadow-sm">
                     <h3 className="font-bold text-xl mb-2">{step.title}</h3>
                     <p className="text-black/60 font-medium">{step.desc}</p>
                   </div>
@@ -259,7 +262,7 @@ export default function LandingPage() {
             </p>
             <a 
               href="https://app.immoprotokoll.com" 
-              className="inline-block bg-white text-black px-10 py-5 text-xl font-bold hover:bg-white/90 transition-colors"
+              className="inline-block bg-white text-black px-10 py-5 text-xl font-bold rounded-2xl hover:bg-white/90 transition-colors shadow-lg"
             >
               {t.hero.cta_primary}
             </a>
@@ -276,7 +279,7 @@ export default function LandingPage() {
 function FaqItem({ question, answer }: { question: string, answer: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-black/10 bg-white">
+    <div className="border border-black/10 bg-white rounded-2xl overflow-hidden shadow-xs">
       <button 
         className="w-full px-6 py-5 flex items-center justify-between text-left font-bold text-lg hover:bg-black/5 transition-colors"
         onClick={() => setOpen(!open)}
