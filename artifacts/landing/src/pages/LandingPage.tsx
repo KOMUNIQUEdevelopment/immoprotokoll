@@ -14,8 +14,8 @@ export default function LandingPage() {
     ? "ImmoProtokoll - Das präzise digitale Übergabeprotokoll" 
     : "ImmoProtokoll - The digital handover protocol";
   const description = lang === 'de'
-    ? "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow für Immobilienübergaben in der Schweiz."
-    : "Replace clipboards and paper with a flawless digital workflow for property handovers in Switzerland.";
+    ? "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow für Immobilienübergaben weltweit."
+    : "Replace clipboards and paper with a flawless digital workflow for property handovers worldwide.";
 
   const schema = {
     "@context": "https://schema.org",

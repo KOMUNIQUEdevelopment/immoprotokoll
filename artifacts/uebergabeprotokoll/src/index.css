@@ -113,15 +113,15 @@
   --app-font-sans: 'Inter', system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.375rem;
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,.04);
-  --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,.06);
-  --shadow-sm: 0px 2px 4px 0px rgba(0,0,0,.06);
-  --shadow: 0px 4px 8px 0px rgba(0,0,0,.08);
-  --shadow-md: 0px 4px 12px 0px rgba(0,0,0,.10);
-  --shadow-lg: 0px 8px 16px 0px rgba(0,0,0,.12);
-  --shadow-xl: 0px 16px 32px 0px rgba(0,0,0,.14);
-  --shadow-2xl: 0px 24px 48px 0px rgba(0,0,0,.16);
+  --radius: 0.625rem;
+  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,.05);
+  --shadow-xs: 0px 1px 4px 0px rgba(0,0,0,.07);
+  --shadow-sm: 0px 2px 6px 0px rgba(0,0,0,.08);
+  --shadow: 0px 4px 10px 0px rgba(0,0,0,.10);
+  --shadow-md: 0px 4px 16px 0px rgba(0,0,0,.12);
+  --shadow-lg: 0px 8px 24px 0px rgba(0,0,0,.14);
+  --shadow-xl: 0px 16px 40px 0px rgba(0,0,0,.16);
+  --shadow-2xl: 0px 24px 56px 0px rgba(0,0,0,.18);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 

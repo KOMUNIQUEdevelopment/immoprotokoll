@@ -11,7 +11,7 @@ export const translations = {
     },
     hero: {
       title: "Das präzise digitale Übergabeprotokoll.",
-      subtitle: "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow. Für private Vermieter und Immobilienagenturen in der Schweiz.",
+      subtitle: "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow. Für private Vermieter und Immobilienagenturen weltweit.",
       cta_primary: "Jetzt kostenlos starten",
       cta_secondary: "Mehr erfahren"
     },
@@ -72,7 +72,7 @@ export const translations = {
       title: "Häufig gestellte Fragen",
       questions: [
         { q: "Was ist ein Übergabeprotokoll?", a: "Ein Dokument, das den Zustand einer Immobilie bei Ein- oder Auszug festhält, um spätere Streitigkeiten zu vermeiden." },
-        { q: "Sind meine Daten sicher?", a: "Ja, wir hosten DSGVO- und nDSG-konform mit modernsten Sicherheitsstandards." },
+        { q: "Sind meine Daten sicher?", a: "Ja, wir hosten DSGVO-konform mit modernsten Sicherheitsstandards und verschlüsselter Datenübertragung." },
         { q: "Kann ich die App auf dem Smartphone nutzen?", a: "Absolut. ImmoProtokoll ist vollständig für mobile Geräte optimiert." },
         { q: "Wie funktioniert der kostenlose Plan?", a: "Sie können 1 Immobilie anlegen und 1 Protokoll erstellen. Die PDFs enthalten ein Wasserzeichen." },
         { q: "Kann ich jederzeit wechseln?", a: "Ja, Up- und Downgrades sind jederzeit möglich." },
@@ -98,7 +98,7 @@ export const translations = {
     },
     hero: {
       title: "The precise digital handover protocol.",
-      subtitle: "Replace clipboards and paper with a flawless digital workflow. Built for private landlords and real estate agencies in Switzerland.",
+      subtitle: "Replace clipboards and paper with a flawless digital workflow. Built for private landlords and real estate agencies worldwide.",
       cta_primary: "Start for free",
       cta_secondary: "Learn more"
     },
@@ -159,7 +159,7 @@ export const translations = {
       title: "Frequently asked questions",
       questions: [
         { q: "What is a handover protocol?", a: "A document that records the condition of a property upon move-in or move-out to avoid later disputes." },
-        { q: "Is my data secure?", a: "Yes, we host in compliance with GDPR and nDSG using state-of-the-art security standards." },
+        { q: "Is my data secure?", a: "Yes, we host in full GDPR compliance with state-of-the-art security standards and encrypted data transfer." },
         { q: "Can I use the app on my smartphone?", a: "Absolutely. ImmoProtokoll is fully optimized for mobile devices." },
         { q: "How does the free plan work?", a: "You can add 1 property and create 1 protocol. The exported PDFs include a watermark." },
         { q: "Can I switch plans at any time?", a: "Yes, upgrades and downgrades are possible at any time." },
