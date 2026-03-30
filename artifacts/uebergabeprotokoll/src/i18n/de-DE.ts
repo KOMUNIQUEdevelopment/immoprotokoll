@@ -372,6 +372,7 @@ const deDE: Translations = {
     connectionError: "Verbindungsfehler.",
     checkoutError: "Verbindungsfehler beim Erstellen der Zahlungssitzung.",
     checkoutFailed: "Checkout fehlgeschlagen.",
+    noCheckoutUrl: "Keine Checkout-URL erhalten.",
     portalError: "Verbindungsfehler beim Öffnen des Portals.",
     portalFailed: "Portal konnte nicht geöffnet werden.",
     noPortalUrl: "Keine Portal-URL erhalten.",

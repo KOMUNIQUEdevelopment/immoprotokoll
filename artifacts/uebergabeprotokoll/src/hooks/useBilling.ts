@@ -27,7 +27,7 @@ export function useBilling() {
           window.location.href = data.url;
           return {};
         } else {
-          const msg = "Keine Checkout-URL erhalten.";
+          const msg = i18n.t("billing.noCheckoutUrl");
           setError(msg);
           return { error: msg };
         }

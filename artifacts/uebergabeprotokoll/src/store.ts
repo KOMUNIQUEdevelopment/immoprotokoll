@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ProtocolData, ProtocolSeeds, RoomPhoto, createDefaultProtocol, migrateProtocol } from "./types";
+import i18n from "./i18n";
 import { SyncMessage } from "./hooks/useSync";
 import {
   savePhotosToDb,
@@ -556,7 +557,7 @@ export function useProtocolsStore(accountId: string | null) {
       const copy: ProtocolData = {
         ...JSON.parse(JSON.stringify(source)),
         id: newId,
-        mietobjekt: (source.mietobjekt ? source.mietobjekt + " (Kopie)" : "Kopie"),
+        mietobjekt: (source.mietobjekt ? source.mietobjekt + " " + i18n.t("common.copy") : i18n.t("protocols.unnamed")),
         syncEnabled: false,
         lastSaved: new Date().toISOString(),
         personSignatures: [],

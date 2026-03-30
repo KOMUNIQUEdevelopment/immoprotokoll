@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
@@ -31,10 +32,16 @@ interface PropertyProtocolsPageProps {
   onRename: (id: string, name: string) => void;
 }
 
+function langToLocale(lang: string): string {
+  if (lang === "de-CH") return "de-CH";
+  if (lang === "de-DE") return "de-DE";
+  return "en-GB";
+}
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("de-DE", {
+    return new Date(iso).toLocaleString(langToLocale(i18n.language), {
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit",
     });

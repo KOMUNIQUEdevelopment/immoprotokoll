@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ProtocolData } from "../types";
 import { TrashedEntry } from "../store";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 import { Plus, Pencil, Trash2, ClipboardList, X, AlertTriangle, Cloud, CloudOff, Check, Eye, MapPin, Calendar, Key, Zap, Droplets, Flame, Image, PenLine, CheckCircle2, ChevronRight, Link, Copy, ExternalLink, LogOut, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +24,16 @@ interface ProtocolListPageProps {
   onLogout?: () => void;
 }
 
+function langToLocale(lang: string): string {
+  if (lang === "de-CH") return "de-CH";
+  if (lang === "de-DE") return "de-DE";
+  return "en-GB";
+}
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("de-DE", {
+    return new Date(iso).toLocaleString(langToLocale(i18n.language), {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",

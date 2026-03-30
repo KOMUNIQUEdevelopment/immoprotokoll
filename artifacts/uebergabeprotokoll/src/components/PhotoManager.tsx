@@ -1,4 +1,5 @@
 import React, { useRef, useCallback } from "react";
+import i18n from "../i18n";
 import {
   DndContext,
   closestCenter,
@@ -40,7 +41,8 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const ts = new Date(photo.timestamp).toLocaleString("de-DE", {
+  const _tsLocale = i18n.language === "de-CH" ? "de-CH" : i18n.language === "de-DE" ? "de-DE" : "en-GB";
+  const ts = new Date(photo.timestamp).toLocaleString(_tsLocale, {
     day: "2-digit",
     month: "2-digit",
     year: "2-digit",

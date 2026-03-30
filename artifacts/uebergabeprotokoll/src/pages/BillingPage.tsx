@@ -39,7 +39,7 @@ const PLAN_LABELS: Record<string, string> = {
 
 
 export default function BillingPage({ onBack, onShowPricing, accountId: _accountId, userRole }: BillingPageProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -111,9 +111,15 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
     }
   };
 
+  const langToLocale = (lang: string) => {
+    if (lang === "de-CH") return "de-CH";
+    if (lang === "de-DE") return "de-DE";
+    return "en-GB";
+  };
+
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("de-CH", {
+    return new Date(iso).toLocaleDateString(langToLocale(i18n.language), {
       day: "2-digit",
       month: "long",
       year: "numeric",

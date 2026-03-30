@@ -372,6 +372,7 @@ const en: Translations = {
     connectionError: "Connection error.",
     checkoutError: "Connection error while creating payment session.",
     checkoutFailed: "Checkout failed.",
+    noCheckoutUrl: "No checkout URL received.",
     portalError: "Connection error while opening the portal.",
     portalFailed: "Could not open portal.",
     noPortalUrl: "No portal URL received.",

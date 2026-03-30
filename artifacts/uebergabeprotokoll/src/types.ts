@@ -82,8 +82,8 @@ export interface Person {
   gender: Gender;
 }
 
-export function getPersonRole(_person: Person, side: "uebergeber" | "uebernehmer"): string {
-  return side === "uebergeber" ? "Vermieter" : "Mieter";
+export function getPersonRole(_person: Person, side: "uebergeber" | "uebernehmer"): "uebergeber" | "uebernehmer" {
+  return side;
 }
 
 export interface PersonSignature {
@@ -250,7 +250,7 @@ export interface ProtocolSeeds {
 
 export function createDefaultProtocol(propertyId: string | null = null, seeds?: ProtocolSeeds): ProtocolData {
   const today = new Date();
-  const datum = today.toLocaleDateString("de-CH");
+  const datum = today.toISOString().slice(0, 10);
   return {
     id: crypto.randomUUID(),
     propertyId,

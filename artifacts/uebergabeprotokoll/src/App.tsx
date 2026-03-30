@@ -20,7 +20,7 @@ import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
 import { InstallButton } from "./components/InstallButton";
-import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage, getTranslations } from "./i18n";
+import i18n, { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage, getTranslations } from "./i18n";
 import {
   Save,
   FileDown,
@@ -49,7 +49,8 @@ function formatRelative(date: Date | null, t: (key: string, opts?: Record<string
   if (diff < 5) return t("common.savedJustNow");
   if (diff < 60) return t("common.savedSecondsAgo", { count: diff });
   if (diff < 3600) return t("common.savedMinutesAgo", { count: Math.floor(diff / 60) });
-  return date.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+  const locale = i18n.language === "de-CH" ? "de-CH" : i18n.language === "de-DE" ? "de-DE" : "en-GB";
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 type EditorTab = "protokoll" | "unterschriften";
