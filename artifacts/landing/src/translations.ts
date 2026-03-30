@@ -10,7 +10,7 @@ export const translations = {
       login: "Anmelden"
     },
     hero: {
-      title: "Das präzise digitale Übergabeprotokoll.",
+      title: "Jede Mietübergabe. Sauber dokumentiert.",
       subtitle: "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow. Für private Vermieter und Immobilienagenturen.",
       cta_primary: "Jetzt kostenlos starten",
       cta_secondary: "Mehr erfahren"
@@ -97,7 +97,7 @@ export const translations = {
       login: "Log in"
     },
     hero: {
-      title: "The precise digital handover protocol.",
+      title: "Every rental handover. Cleanly documented.",
       subtitle: "Replace clipboards and paper with a flawless digital workflow. For private landlords and real estate agencies.",
       cta_primary: "Start for free",
       cta_secondary: "Learn more"

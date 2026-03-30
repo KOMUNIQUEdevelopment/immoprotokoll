@@ -32,8 +32,8 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-black/10 bg-white">
       <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-        <Link href={`/${lang}`} className="font-bold text-xl tracking-tight uppercase">
-          ImmoProtokoll
+        <Link href={`/${lang}`} className="flex items-center">
+          <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-8" />
         </Link>
 
         {/* Desktop Nav */}
@@ -58,7 +58,7 @@ export default function Navbar() {
           </a>
           <a 
             href="https://app.immoprotokoll.com" 
-            className="bg-black text-white px-5 py-2 text-sm font-bold hover:bg-black/80 transition-colors"
+            className="bg-black text-white px-5 py-2 text-sm font-bold rounded-xl hover:bg-black/80 transition-colors"
           >
             {t.nav.start_free}
           </a>
@@ -94,7 +94,7 @@ export default function Navbar() {
           
           <a 
             href="https://app.immoprotokoll.com" 
-            className="bg-black text-white text-center py-3 mt-2 font-bold w-full"
+            className="bg-black text-white text-center py-3 mt-2 font-bold w-full rounded-xl"
           >
             {t.nav.start_free}
           </a>

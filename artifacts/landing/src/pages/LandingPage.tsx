@@ -11,8 +11,8 @@ export default function LandingPage() {
   const { t, lang } = useLanguage();
 
   const title = lang === 'de' 
-    ? "ImmoProtokoll - Das präzise digitale Übergabeprotokoll" 
-    : "ImmoProtokoll - The digital handover protocol";
+    ? "ImmoProtokoll – Jede Mietübergabe. Sauber dokumentiert." 
+    : "ImmoProtokoll – Every rental handover. Cleanly documented.";
   const description = lang === 'de'
     ? "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow für Immobilienübergaben."
     : "Replace clipboards and paper with a flawless digital workflow for property handovers.";

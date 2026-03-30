@@ -17,13 +17,13 @@ export default function Footer() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <Link href={`/${lang}`} className="font-bold text-2xl tracking-tight uppercase">
-              ImmoProtokoll
+            <Link href={`/${lang}`} className="flex items-center mb-2">
+              <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-8" />
             </Link>
             <p className="text-sm mt-2 text-black/60 max-w-xs">
               {lang === "de" 
-                ? "Das präzise digitale Übergabeprotokoll." 
-                : "The precise digital handover protocol."}
+                ? "Jede Mietübergabe. Sauber dokumentiert." 
+                : "Every rental handover. Cleanly documented."}
             </p>
           </div>
           
