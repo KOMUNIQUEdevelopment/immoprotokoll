@@ -10,7 +10,7 @@ export function useBilling() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const startCheckout = useCallback(async (opts: BillingCheckoutOptions) => {
+  const startCheckout = useCallback(async (opts: BillingCheckoutOptions): Promise<{ error?: string }> => {
     setLoading(true);
     setError(null);
     try {
@@ -24,15 +24,22 @@ export function useBilling() {
         const data = await res.json() as { url: string };
         if (data.url) {
           window.location.href = data.url;
+          return {};
         } else {
-          setError("Keine Checkout-URL erhalten.");
+          const msg = "Keine Checkout-URL erhalten.";
+          setError(msg);
+          return { error: msg };
         }
       } else {
         const err = await res.json() as { error: string };
-        setError(err.error ?? "Checkout fehlgeschlagen.");
+        const msg = err.error ?? "Checkout fehlgeschlagen.";
+        setError(msg);
+        return { error: msg };
       }
     } catch {
-      setError("Verbindungsfehler beim Erstellen der Zahlungssitzung.");
+      const msg = "Verbindungsfehler beim Erstellen der Zahlungssitzung.";
+      setError(msg);
+      return { error: msg };
     } finally {
       setLoading(false);
     }

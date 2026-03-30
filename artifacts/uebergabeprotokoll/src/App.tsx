@@ -247,9 +247,9 @@ function AppContent({
         <PricingPage
           onBack={() => setAppScreen("protocols")}
           onSelectPlan={async (plan, interval, currency) => {
-            await billing.startCheckout({ plan, interval, currency });
-            if (billing.error) {
-              toast({ title: "Zahlung fehlgeschlagen", description: billing.error, variant: "destructive" });
+            const result = await billing.startCheckout({ plan, interval, currency });
+            if (result.error) {
+              toast({ title: "Zahlung fehlgeschlagen", description: result.error, variant: "destructive" });
             }
           }}
           currentPlan={account?.plan}
@@ -548,7 +548,14 @@ export default function App() {
     return (
       <QueryClientProvider client={queryClient}>
         <PricingPage
-          onBack={() => { window.location.hash = ""; }}
+          onBack={() => {
+            // Navigate back correctly for both /pricing path and #/pricing hash
+            if (pathname.endsWith("/pricing")) {
+              window.location.href = "/";
+            } else {
+              window.location.hash = "";
+            }
+          }}
           isLoggedIn={false}
         />
         <Toaster />
