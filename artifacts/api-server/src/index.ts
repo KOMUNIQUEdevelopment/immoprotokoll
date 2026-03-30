@@ -303,30 +303,33 @@ wss.on("connection", async (ws, request) => {
           }
         }
 
+        // Build canonical payload — the server is authoritative for propertyId.
+        // This prevents client-controlled JSON from diverging from the DB column,
+        // and ensures all connected clients receive the authoritative binding.
+        const canonical = { ...incoming, propertyId: effectivePropertyId };
+
         // Upsert to DB — conflict target is composite (account_id, id) so
         // a different account using the same UUID cannot overwrite this row.
-        // effectivePropertyId is used (not incoming.propertyId) to ensure the server
-        // is the authoritative source for property binding — clients cannot remap protocols.
         await db
           .insert(syncProtocolsTable)
           .values({
-            id: incoming.id,
+            id: canonical.id,
             accountId: accountId!,
             propertyId: effectivePropertyId,
-            data: incoming as unknown as Record<string, unknown>,
+            data: canonical as unknown as Record<string, unknown>,
           })
           .onConflictDoUpdate({
             target: [syncProtocolsTable.accountId, syncProtocolsTable.id],
             set: {
               propertyId: effectivePropertyId,
-              data: incoming as unknown as Record<string, unknown>,
+              data: canonical as unknown as Record<string, unknown>,
               updatedAt: new Date(),
             },
           });
 
-        logger.info({ id: incoming.id, accountId }, "Protocol updated");
+        logger.info({ id: canonical.id, accountId }, "Protocol updated");
 
-        const broadcastPayload = JSON.stringify({ type: "update", protocol: incoming });
+        const broadcastPayload = JSON.stringify({ type: "update", protocol: canonical });
         wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             const c = client as AugmentedWs;
