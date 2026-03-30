@@ -98,14 +98,14 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
       notizen: "",
       photos: [],
     };
-    updateProtocol(p => ({ ...p, rooms: [...p.rooms, newRoom] }));
+    updateProtocol(p => ({ ...p, rooms: [...p.rooms, newRoom] }), { immediate: true });
     setAddingFloor(null);
     setNewRoomName("");
   };
 
   const confirmDeleteRoom = () => {
     if (!deleteRoomTarget) return;
-    updateProtocol(p => ({ ...p, rooms: p.rooms.filter(r => r.id !== deleteRoomTarget.id) }));
+    updateProtocol(p => ({ ...p, rooms: p.rooms.filter(r => r.id !== deleteRoomTarget.id) }), { immediate: true });
     setDeleteRoomTarget(null);
   };
 

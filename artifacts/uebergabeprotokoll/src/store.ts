@@ -602,19 +602,37 @@ export function useProtocolsStore() {
   }, [currentId]);
 
   const updateProtocol = useCallback(
-    (updater: (prev: ProtocolData) => ProtocolData) => {
+    (updater: (prev: ProtocolData) => ProtocolData, { immediate = false } = {}) => {
       if (!currentId) return;
+      // Capture the id in a local variable so it's stable in the closure below
+      const id = currentId;
       setProtocols(prev => {
-        if (!prev[currentId]) return prev;
-        const updated = updater(prev[currentId]);
-        const next = { ...prev, [currentId]: updated };
+        if (!prev[id]) return prev;
+        const updated = updater(prev[id]);
+        const next = { ...prev, [id]: updated };
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        autoSaveTimer.current = setTimeout(() => {
+        if (immediate) {
+          // Structural changes (add/delete room) must be persisted right away so
+          // a concurrent WS sync from the server cannot restore the old state.
           saveAll(next);
           if (updated.syncEnabled) {
             wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
           }
-        }, 1500);
+        } else {
+          autoSaveTimer.current = setTimeout(() => {
+            // Re-read from the ref so we always save the latest known state,
+            // not a stale snapshot captured at timer-creation time.
+            setProtocols(latest => {
+              if (latest[id]) {
+                saveAll(latest);
+                if (latest[id].syncEnabled) {
+                  wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
+                }
+              }
+              return latest; // no state change, purely a side-effect read
+            });
+          }, 1500);
+        }
         return next;
       });
     },
