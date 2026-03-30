@@ -138,6 +138,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /auth/users/invite:
     post:
       operationId: inviteUser
       tags: [auth]
@@ -317,11 +319,19 @@ components:
 
     AuthResponse:
       type: object
+      description: >
+        Returned by register, login, and /me. Includes the authenticated user
+        and their associated account.
       properties:
         user:
           $ref: "#/components/schemas/AuthUser"
+        account:
+          oneOf:
+            - $ref: "#/components/schemas/Account"
+            - type: "null"
       required:
         - user
+        - account
 
     ErrorResponse:
       type: object
