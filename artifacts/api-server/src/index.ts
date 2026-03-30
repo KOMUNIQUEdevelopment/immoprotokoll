@@ -10,7 +10,7 @@ import {
   syncPhotosTable,
   propertiesTable,
 } from "@workspace/db";
-import { getPlanLimits } from "./routes/properties";
+import { getPlanLimits, setWss } from "./routes/properties";
 import { requireAuth, type AuthRequest } from "./middleware/auth";
 import app from "./app";
 import { logger } from "./lib/logger";
@@ -76,6 +76,9 @@ async function resolveSessionFromRequest(
 
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
+// Provide wss to properties router so DELETE /api/properties/:id can broadcast
+// per-protocol delete events when cascade removes synced protocols.
+setWss(wss);
 
 // Extended request type for WS connection metadata
 type AugmentedRequest = IncomingMessage & {

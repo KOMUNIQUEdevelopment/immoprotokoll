@@ -1,10 +1,26 @@
 import { Router, type Response } from "express";
 import { eq, and, count } from "drizzle-orm";
+import { WebSocketServer, WebSocket } from "ws";
 import { db } from "@workspace/db";
 import { propertiesTable, syncProtocolsTable, accountsTable } from "@workspace/db";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
+
+// Injected from index.ts after WSS is created, so we can broadcast delete events
+let _wss: WebSocketServer | null = null;
+export function setWss(wss: WebSocketServer) { _wss = wss; }
+
+/** Broadcast a JSON message to all authenticated clients in the same account. */
+function broadcastToAccount(accountId: string, payload: unknown) {
+  if (!_wss) return;
+  const msg = JSON.stringify(payload);
+  _wss.clients.forEach((client) => {
+    if (client.readyState !== WebSocket.OPEN) return;
+    const c = client as WebSocket & { accountId?: string };
+    if (c.accountId === accountId) client.send(msg);
+  });
+}
 
 // ── Plan limits ───────────────────────────────────────────────────────────────
 export const PLAN_LIMITS = {
@@ -139,6 +155,18 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    // Fetch protocol IDs that will be cascade-deleted so we can broadcast removal
+    // events to all connected clients in this account.
+    const cascadedProtocols = await db
+      .select({ id: syncProtocolsTable.id })
+      .from(syncProtocolsTable)
+      .where(
+        and(
+          eq(syncProtocolsTable.accountId, accountId),
+          eq(syncProtocolsTable.propertyId, id)
+        )
+      );
+
     const [deleted] = await db
       .delete(propertiesTable)
       .where(and(eq(propertiesTable.id, id), eq(propertiesTable.accountId, accountId)))
@@ -148,6 +176,12 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "Property not found" });
       return;
     }
+
+    // Notify all connected clients to remove the cascaded protocols from local state
+    for (const { id: protocolId } of cascadedProtocols) {
+      broadcastToAccount(accountId, { type: "delete", id: protocolId });
+    }
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
