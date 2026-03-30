@@ -516,8 +516,9 @@ function SwUpdatePopup({
 
 type AuthScreen = "login" | "register";
 
-function hashToInitialScreen(hash: string): AppScreen {
-  if (hash === "#/pricing") return "pricing";
+function hashToInitialScreen(hash: string, pathname: string): AppScreen {
+  // Support both /pricing (clean path) and #/pricing (hash)
+  if (pathname.endsWith("/pricing") || hash === "#/pricing") return "pricing";
   if (hash === "#/billing") return "billing";
   if (hash === "#/billing/success") return "billing-success";
   if (hash === "#/billing/cancel") return "billing-cancel";
@@ -526,8 +527,9 @@ function hashToInitialScreen(hash: string): AppScreen {
 
 export default function App() {
   const hash = window.location.hash;
+  const pathname = window.location.pathname;
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
-  const isPricingHash = hash === "#/pricing";
+  const isPricingPage = pathname.endsWith("/pricing") || hash === "#/pricing";
 
   const { user, account, loading, login, register, logout } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
@@ -541,8 +543,8 @@ export default function App() {
     );
   }
 
-  // Pricing page is public (accessible without login)
-  if (isPricingHash && !user) {
+  // Pricing page is public (accessible without login) — supports both /pricing and #/pricing
+  if (isPricingPage && !user) {
     return (
       <QueryClientProvider client={queryClient}>
         <PricingPage
@@ -591,7 +593,7 @@ export default function App() {
         accountId={user.accountId}
         account={account}
         userRole={user.role}
-        initialScreen={hashToInitialScreen(hash)}
+        initialScreen={hashToInitialScreen(hash, pathname)}
       />
       <Toaster />
     </QueryClientProvider>

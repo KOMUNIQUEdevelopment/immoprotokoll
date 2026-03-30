@@ -40,6 +40,30 @@ function getStripePriceId(
   return process.env[key];
 }
 
+type PlanInfo = { plan: "privat" | "agentur"; interval: "monthly" | "annual"; currency: string };
+
+/** Reverse lookup: Stripe priceId → { plan, interval, currency } derived from env vars */
+function buildPriceIdLookup(): Map<string, PlanInfo> {
+  const lookup = new Map<string, PlanInfo>();
+  const plans = ["privat", "agentur"] as const;
+  const intervals = ["monthly", "annual"] as const;
+  const currencies = ["CHF", "EUR", "USD"] as const;
+  for (const plan of plans) {
+    for (const interval of intervals) {
+      for (const currency of currencies) {
+        const key = `STRIPE_PRICE_${plan.toUpperCase()}_${interval.toUpperCase()}_${currency}`;
+        const priceId = process.env[key];
+        if (priceId) {
+          lookup.set(priceId, { plan, interval, currency: currency.toLowerCase() });
+        }
+      }
+    }
+  }
+  return lookup;
+}
+
+const PRICE_ID_LOOKUP = buildPriceIdLookup();
+
 // ── GET /api/billing/config — return publishable key + plan prices ─────────
 router.get("/config", async (_req: Request, res: Response) => {
   res.json({
@@ -330,9 +354,26 @@ async function syncSubscription(sub: Stripe.Subscription) {
     return;
   }
 
-  const plan = (sub.metadata?.plan as "privat" | "agentur") ?? "free";
-  const interval = (sub.metadata?.interval as "monthly" | "annual") ?? "monthly";
-  const currency = sub.metadata?.currency ?? "chf";
+  // Derive plan/interval/currency from actual Stripe price IDs (source of truth)
+  // Fallback to subscription metadata if price ID is not in our lookup (e.g. portal changes)
+  const firstPriceId = sub.items?.data?.[0]?.price?.id;
+  const fromPriceId = firstPriceId ? PRICE_ID_LOOKUP.get(firstPriceId) : undefined;
+
+  const plan = (fromPriceId?.plan
+    ?? sub.metadata?.plan as "privat" | "agentur" | undefined
+    ?? "free") as "free" | "privat" | "agentur";
+  const interval = (fromPriceId?.interval
+    ?? sub.metadata?.interval as "monthly" | "annual" | undefined
+    ?? "monthly");
+  const currency = fromPriceId?.currency
+    ?? sub.metadata?.currency
+    ?? "chf";
+
+  if (fromPriceId) {
+    logger.debug({ priceId: firstPriceId, plan, interval, currency }, "Plan derived from price ID");
+  } else {
+    logger.debug({ priceId: firstPriceId, plan, interval, currency }, "Plan derived from metadata fallback");
+  }
   const stripeStatus = sub.status as "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "incomplete";
   const periodEnd = new Date((sub as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000);
   const periodStart = new Date((sub as Stripe.Subscription & { current_period_start: number }).current_period_start * 1000);
