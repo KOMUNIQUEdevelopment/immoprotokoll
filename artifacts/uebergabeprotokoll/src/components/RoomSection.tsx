@@ -4,12 +4,15 @@ import { RoomData, Condition } from "../types";
 import PhotoManager from "./PhotoManager";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import { Input } from "@/components/ui/input";
+import { getTranslations, type SupportedLanguage } from "../i18n";
+import type { Translations } from "../i18n/de-CH";
 
 interface RoomSectionProps {
   room: RoomData;
   onChange: (updated: RoomData) => void;
   floorLabel?: string;
   onDelete?: () => void;
+  language?: SupportedLanguage;
 }
 
 const CONDITIONS: Condition[] = ["sehr gut", "gut", "Mängel"];
@@ -22,7 +25,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c: Condition) => void }) {
+function ConditionButtons({ value, onChange, tr }: { value: Condition; onChange: (c: Condition) => void; tr: Translations }) {
   return (
     <div className="flex gap-2 flex-wrap">
       {CONDITIONS.map((c) => (
@@ -36,15 +39,16 @@ function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c:
               : "bg-background border-border text-foreground hover:bg-accent"
           }`}
         >
-          {c}
+          {(tr.editor.condition as Record<string, string>)[c] ?? c}
         </button>
       ))}
     </div>
   );
 }
 
-export default function RoomSection({ room, onChange, floorLabel, onDelete }: RoomSectionProps) {
+export default function RoomSection({ room, onChange, floorLabel, onDelete, language = "de-CH" }: RoomSectionProps) {
   const [open, setOpen] = useState(false);
+  const tr = getTranslations(language) as Translations;
 
   const update = (field: keyof RoomData, value: unknown) => {
     onChange({ ...room, [field]: value });
@@ -53,9 +57,18 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
   const hasContent = room.bodenZustand || room.maengelSchaeden || room.notizen || room.photos.length > 0;
   const isWaschraum = room.id === "ug-waschraum";
 
+  const conditionLabel = room.bodenZustand
+    ? ((tr.editor.condition as Record<string, string>)[room.bodenZustand] ?? room.bodenZustand)
+    : undefined;
+
+  const photoCountStr = room.photos.length > 0
+    ? tr.editor.roomPhotoCount
+        .replace("{{count}}", String(room.photos.length))
+        .replace("{{plural}}", room.photos.length !== 1 ? "s" : "")
+    : undefined;
+
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card">
-      {/* Header: expand area + optional delete button */}
       <div className="flex items-stretch">
         <button
           type="button"
@@ -65,15 +78,15 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
           <div className="flex items-center gap-3 min-w-0">
             <span className="font-semibold text-sm truncate">{room.name}</span>
             {hasContent && (
-              <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" title="Ausgefüllt" />
+              <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" />
             )}
-            {room.bodenZustand && (
+            {conditionLabel && (
               <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-muted text-muted-foreground">
-                {room.bodenZustand}
+                {conditionLabel}
               </span>
             )}
-            {room.photos.length > 0 && (
-              <span className="text-xs text-muted-foreground shrink-0">{room.photos.length} Foto{room.photos.length > 1 ? "s" : ""}</span>
+            {photoCountStr && (
+              <span className="text-xs text-muted-foreground shrink-0">{photoCountStr}</span>
             )}
           </div>
           {open ? <ChevronUp size={18} className="text-muted-foreground shrink-0 ml-2" /> : <ChevronDown size={18} className="text-muted-foreground shrink-0 ml-2" />}
@@ -82,7 +95,7 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
           <button
             type="button"
             onClick={onDelete}
-            title="Raum löschen"
+            title={tr.editor.deleteRoom}
             className="px-3 border-l border-border text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5 transition-colors"
           >
             <Trash2 size={14} />
@@ -92,34 +105,33 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
 
       {open && (
         <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">
-          {/* Boden Zustand */}
           <div>
-            <FieldLabel>Boden Zustand</FieldLabel>
-            <ConditionButtons value={room.bodenZustand} onChange={(c) => update("bodenZustand", c)} />
+            <FieldLabel>{tr.editor.roomFloor}</FieldLabel>
+            <ConditionButtons value={room.bodenZustand} onChange={(c) => update("bodenZustand", c)} tr={tr} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <FieldLabel>Wände / Decken</FieldLabel>
+              <FieldLabel>{tr.editor.roomWalls}</FieldLabel>
               <AutoGrowTextarea
                 value={room.waendeDecken}
                 onChange={(e) => update("waendeDecken", e.target.value)}
-                placeholder="Zustand beschreiben..."
+                placeholder={tr.editor.roomWallsPlaceholder}
               />
             </div>
             <div>
-              <FieldLabel>Fenster / Türen</FieldLabel>
+              <FieldLabel>{tr.editor.roomWindows}</FieldLabel>
               <AutoGrowTextarea
                 value={room.fensterTueren}
                 onChange={(e) => update("fensterTueren", e.target.value)}
-                placeholder="Zustand beschreiben..."
+                placeholder={tr.editor.roomWallsPlaceholder}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <FieldLabel>Elektrik</FieldLabel>
+              <FieldLabel>{tr.editor.roomElectric}</FieldLabel>
               <Input
                 value={room.elektrik}
                 onChange={(e) => update("elektrik", e.target.value)}
@@ -127,7 +139,7 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
               />
             </div>
             <div>
-              <FieldLabel>Heizung</FieldLabel>
+              <FieldLabel>{tr.editor.roomHeating}</FieldLabel>
               <Input
                 value={room.heizung}
                 onChange={(e) => update("heizung", e.target.value)}
@@ -137,28 +149,27 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
           </div>
 
           <div>
-            <FieldLabel>Mängel / Schäden</FieldLabel>
+            <FieldLabel>{tr.editor.roomDefects}</FieldLabel>
             <AutoGrowTextarea
               value={room.maengelSchaeden}
               onChange={(e) => update("maengelSchaeden", e.target.value)}
-              placeholder="Mängel und Schäden beschreiben..."
+              placeholder={tr.editor.roomDefectsPlaceholder}
             />
           </div>
 
           <div>
-            <FieldLabel>Notizen</FieldLabel>
+            <FieldLabel>{tr.editor.roomNotes}</FieldLabel>
             <AutoGrowTextarea
               value={room.notizen}
               onChange={(e) => update("notizen", e.target.value)}
-              placeholder="Weitere Notizen..."
+              placeholder={tr.editor.roomNotesPlaceholder}
             />
           </div>
 
-          {/* Waschraum special section */}
           {isWaschraum && (
             <div className="border border-border rounded-lg p-3 space-y-3 bg-muted/30">
               <div>
-                <FieldLabel>Waschmaschine vorhanden?</FieldLabel>
+                <FieldLabel>{tr.editor.washingMachinePresent}</FieldLabel>
                 <div className="flex gap-2">
                   {[true, false].map((val) => (
                     <button
@@ -171,7 +182,7 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
                           : "bg-background border-border text-foreground hover:bg-accent"
                       }`}
                     >
-                      {val ? "Ja" : "Nein"}
+                      {val ? tr.editor.yes : tr.editor.no}
                     </button>
                   ))}
                 </div>
@@ -180,18 +191,19 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
               {room.waschmaschineVorhanden === true && (
                 <>
                   <div>
-                    <FieldLabel>Zustand der Waschmaschine</FieldLabel>
+                    <FieldLabel>{tr.editor.washingMachineCondition}</FieldLabel>
                     <ConditionButtons
                       value={room.waschmaschinenZustand ?? ""}
                       onChange={(c) => update("waschmaschinenZustand", c)}
+                      tr={tr}
                     />
                   </div>
                   <div>
-                    <FieldLabel>Notizen zur Waschmaschine</FieldLabel>
+                    <FieldLabel>{tr.editor.washingMachineNotes}</FieldLabel>
                     <AutoGrowTextarea
                       value={room.waschmaschinenNotizen ?? ""}
                       onChange={(e) => update("waschmaschinenNotizen", e.target.value)}
-                      placeholder="z.B. Marke, Modell, Besonderheiten..."
+                      placeholder={tr.editor.washingMachineNotesPlaceholder}
                     />
                   </div>
                 </>
@@ -199,9 +211,8 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
             </div>
           )}
 
-          {/* Photos */}
           <div>
-            <FieldLabel>Fotos</FieldLabel>
+            <FieldLabel>{tr.editor.roomPhotos}</FieldLabel>
             <PhotoManager
               photos={room.photos}
               onChange={(photos) => update("photos", photos)}

@@ -1,6 +1,8 @@
 import jsPDF from "jspdf";
 import JSZip from "jszip";
 import { ProtocolData, RoomPhoto, FloorDef, getPersonRole } from "./types";
+import { getTranslations, type SupportedLanguage } from "./i18n";
+import type { Translations } from "./i18n/de-CH";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,8 @@ function resolveFloorSafe(floorId: string, floorMap: Record<string, FloorDef>): 
 export interface ExportOptions {
   /** If true, adds ImmoProtokoll branding watermark to each page (Free plan) */
   watermark?: boolean;
+  /** Language for PDF labels (de-CH, de-DE, en). Defaults to de-CH. */
+  language?: SupportedLanguage;
 }
 
 async function loadLogoDataUrl(): Promise<string | null> {
@@ -116,6 +120,10 @@ function addWatermark(doc: jsPDF, pageCount: number, logoDataUrl: string | null)
 }
 
 export async function exportToPDF(protocol: ProtocolData, options?: ExportOptions): Promise<void> {
+  const language = options?.language ?? "de-CH";
+  const tr = getTranslations(language) as Translations;
+  const pdf = tr.pdf;
+
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = 210;
   const pageH = 297;
@@ -176,20 +184,20 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text("Uebergabeprotokoll", margin, 22);
+  doc.text(safeText(pdf.title), margin, 22);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   const bannerSub = [protocol.mietobjekt, protocol.adresse].filter(Boolean).join(" - ");
   doc.text(safeText(bannerSub), margin, 33);
   doc.setFontSize(10);
-  doc.text(safeText("Uebergabe am " + protocol.datum), margin, 43);
+  doc.text(safeText(`${pdf.handoverDate} ${protocol.datum}`), margin, 43);
   y = 62;
 
   // ── General Info ─────────────────────────────────────────────────────────
-  h1("Allgemeine Informationen");
-  field("Mietobjekt", protocol.mietobjekt);
-  field("Adresse", protocol.adresse);
-  field("Datum", protocol.datum);
+  h1(pdf.generalInfo);
+  field(pdf.property, protocol.mietobjekt);
+  field(pdf.address, protocol.adresse);
+  field(pdf.date, protocol.datum);
 
   const vermieterNames =
     protocol.uebergeber
@@ -201,15 +209,15 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
       .filter(p => p.name.trim())
       .map(p => `${p.name} (${getPersonRole(p, "uebernehmer")})`)
       .join(", ") || "-";
-  field("Uebergeber", vermieterNames);
-  field("Uebernehmer", mieterNames);
+  field(pdf.handingOver, vermieterNames);
+  field(pdf.takingOver, mieterNames);
 
-  if (protocol.schluessel) field("Schluessel", protocol.schluessel);
-  if (protocol.schluesselDetails) field("Details", protocol.schluesselDetails);
+  if (protocol.schluessel) field(pdf.keys, protocol.schluessel);
+  if (protocol.schluesselDetails) field(pdf.keyDetails, protocol.schluesselDetails);
   y += 4;
 
   // ── Meter Readings ────────────────────────────────────────────────────────
-  h1("Zaehlerstaende");
+  h1(pdf.meters);
   for (const meter of protocol.meterReadings) {
     field(meter.type, meter.stand ? `${meter.stand} ${meter.einheit}` : "-");
   }
@@ -217,22 +225,22 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   // Meter photos
   if (protocol.meterPhotos?.length) {
-    await addPhotosBlock(doc, protocol.meterPhotos, "Zählerstände", "", margin, contentW, usableH, () => y, (v) => { y = v; });
+    await addPhotosBlock(doc, protocol.meterPhotos, pdf.meters, "", margin, contentW, usableH, () => y, (v) => { y = v; });
   }
 
   // ── Kitchen ───────────────────────────────────────────────────────────────
-  h1("Kueche - Geraete & Zustand");
+  h1(pdf.kitchen);
   for (const app of protocol.appliances) {
     field(app.name, app.zustand || "-");
   }
   if (protocol.allgemeinerZustandKueche) {
-    field("Allg. Zustand", protocol.allgemeinerZustandKueche);
+    field(pdf.generalCondition, protocol.allgemeinerZustandKueche);
   }
   y += 4;
 
   // Kitchen photos
   if (protocol.kitchenPhotos?.length) {
-    await addPhotosBlock(doc, protocol.kitchenPhotos, "Küche", "", margin, contentW, usableH, () => y, (v) => { y = v; });
+    await addPhotosBlock(doc, protocol.kitchenPhotos, pdf.kitchen, "", margin, contentW, usableH, () => y, (v) => { y = v; });
   }
 
   // ── Rooms by floor ────────────────────────────────────────────────────────
@@ -262,27 +270,27 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
     if (rooms.length === 0) continue;
 
     addPage();
-    h1(`Raumprotokoll - ${safeText(resolveFloorLabel(floorId, floorMap))}`);
+    h1(`${pdf.roomProtocol} - ${safeText(resolveFloorLabel(floorId, floorMap))}`);
 
     for (const room of rooms) {
       checkPage(35);
       h2(safeText(room.name));
 
-      field("Boden Zustand", room.bodenZustand || "-");
-      field("Waende / Decken", room.waendeDecken || "-");
-      field("Fenster / Tueren", room.fensterTueren || "-");
-      field("Elektrik", room.elektrik || "OK");
-      field("Heizung", room.heizung || "OK");
-      if (room.maengelSchaeden) field("Maengel / Schaeden", room.maengelSchaeden);
-      if (room.notizen) field("Notizen", room.notizen);
+      field(pdf.floor, room.bodenZustand || "-");
+      field(pdf.walls, room.waendeDecken || "-");
+      field(pdf.windows, room.fensterTueren || "-");
+      field(pdf.electric, room.elektrik || "OK");
+      field(pdf.heating, room.heizung || "OK");
+      if (room.maengelSchaeden) field(pdf.defects, room.maengelSchaeden);
+      if (room.notizen) field(pdf.notes, room.notizen);
 
       if (room.id === "ug-waschraum" && room.waschmaschineVorhanden !== undefined) {
-        field("Waschmaschine", room.waschmaschineVorhanden ? "Vorhanden" : "Nicht vorhanden");
+        field(pdf.washingMachine, room.waschmaschineVorhanden ? pdf.present : pdf.notPresent);
         if (room.waschmaschineVorhanden && room.waschmaschinenZustand) {
-          field("Zustand Waschmaschine", room.waschmaschinenZustand);
+          field(pdf.washingMachineCondition, room.waschmaschinenZustand);
         }
         if (room.waschmaschineVorhanden && room.waschmaschinenNotizen) {
-          field("Notizen Waschmaschine", room.waschmaschinenNotizen);
+          field(pdf.washingMachineNotes, room.waschmaschinenNotizen);
         }
       }
 
@@ -352,7 +360,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   // ── Signatures page ───────────────────────────────────────────────────────
   addPage();
-  h1("Unterschriften");
+  h1(pdf.signatures);
 
   // Note
   checkPage(14);
@@ -360,15 +368,15 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   doc.text(
-    safeText("Hinweis: Unterschriften gelten fuer das gesamte Protokoll einschliesslich der Zusatzvereinbarungen."),
+    safeText(pdf.signaturesNote),
     margin,
     y,
     { maxWidth: contentW }
   );
   y += 10;
 
-  field("Ort", protocol.signaturOrt || "-");
-  field("Datum", protocol.signaturDatum || "-");
+  field(pdf.signatureLocation, protocol.signaturOrt || "-");
+  field(pdf.date, protocol.signaturDatum || "-");
   y += 10;
 
   const allPersons = [
@@ -415,13 +423,13 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
     doc.setFontSize(7);
     doc.setTextColor(160, 160, 160);
     const title = safeText([protocol.mietobjekt, protocol.adresse].filter(Boolean).join(" - "));
-    doc.text(`Uebergabeprotokoll - ${title} - ${protocol.datum}`, margin, pageH - 8);
-    doc.text(`Seite ${i} / ${totalPages}`, pageW - margin, pageH - 8, { align: "right" });
+    doc.text(`${pdf.title} - ${title} - ${protocol.datum}`, margin, pageH - 8);
+    doc.text(`${pdf.page} ${i} / ${totalPages}`, pageW - margin, pageH - 8, { align: "right" });
   }
 
   const safeAddr = (protocol.adresse || "Objekt").replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
   const safeDatum = protocol.datum.replace(/\./g, "-");
-  const fileName = `Uebergabeprotokoll_${safeAddr}_${safeDatum}.pdf`;
+  const fileName = `${pdf.title}_${safeAddr}_${safeDatum}.pdf`;
 
   // Add watermark to all pages for Free plan accounts
   if (options?.watermark) {

@@ -183,6 +183,31 @@ router.get("/me", async (req: Request, res: Response) => {
   res.json({ user: toSafeUser(user), account: accounts[0] ?? null });
 });
 
+// ── Update current user's preferred language ──────────────────────────────────
+router.patch("/me", requireAuth, async (req: AuthRequest, res: Response) => {
+  const { preferredLanguage } = req.body as { preferredLanguage?: string };
+  const validLangs = ["de-CH", "de-DE", "en"];
+  if (!preferredLanguage || !validLangs.includes(preferredLanguage)) {
+    res.status(400).json({ error: "preferredLanguage must be one of: de-CH, de-DE, en" });
+    return;
+  }
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ preferredLanguage, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user!.id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const { passwordHash: _pw, ...safe } = updated;
+    res.json({ user: safe });
+  } catch {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── Account info (requires auth) ─────────────────────────────────────────────
 router.get("/account", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json({ account: req.account ?? null });

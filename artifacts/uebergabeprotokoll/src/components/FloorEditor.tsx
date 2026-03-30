@@ -26,13 +26,14 @@ import { Button } from "@/components/ui/button";
 import {
   GripVertical, Plus, X, Check, Pencil, Trash2, ChevronDown, ChevronUp, AlertTriangle
 } from "lucide-react";
+import { getTranslations, type SupportedLanguage } from "../i18n";
+import type { Translations } from "../i18n/de-CH";
 
 interface FloorEditorProps {
   protocol: ProtocolData;
   updateProtocol: (fn: (p: ProtocolData) => ProtocolData) => void;
+  language?: SupportedLanguage;
 }
-
-// ── Drag handle ───────────────────────────────────────────────────────────────
 
 function DragHandle({ listeners, attributes }: {
   listeners?: DraggableSyntheticListeners;
@@ -51,16 +52,15 @@ function DragHandle({ listeners, attributes }: {
   );
 }
 
-// ── Sortable room row ─────────────────────────────────────────────────────────
-
 interface SortableRoomProps {
   room: RoomData;
   floorName: string;
   onUpdate: (updated: RoomData) => void;
   onDelete: () => void;
+  language: SupportedLanguage;
 }
 
-function SortableRoom({ room, floorName, onUpdate, onDelete }: SortableRoomProps) {
+function SortableRoom({ room, floorName, onUpdate, onDelete, language }: SortableRoomProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: `room:${room.id}` });
 
@@ -80,13 +80,12 @@ function SortableRoom({ room, floorName, onUpdate, onDelete }: SortableRoomProps
           onChange={onUpdate}
           floorLabel={getFloorLabel(floorName)}
           onDelete={onDelete}
+          language={language}
         />
       </div>
     </div>
   );
 }
-
-// ── Sortable floor section ────────────────────────────────────────────────────
 
 interface SortableFloorProps {
   floor: FloorDef;
@@ -96,6 +95,8 @@ interface SortableFloorProps {
   onAddRoom: (name: string) => void;
   onUpdateRoom: (roomId: string, updated: RoomData) => void;
   onDeleteRoom: (roomId: string) => void;
+  tr: Translations;
+  language: SupportedLanguage;
 }
 
 function SortableFloor({
@@ -106,6 +107,8 @@ function SortableFloor({
   onAddRoom,
   onUpdateRoom,
   onDeleteRoom,
+  tr,
+  language,
 }: SortableFloorProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: `floor:${floor.id}` });
@@ -145,7 +148,6 @@ function SortableFloor({
 
   return (
     <div ref={setNodeRef} style={style} className="mb-4">
-      {/* Floor header */}
       <div className="flex items-center gap-1 bg-black text-white rounded-xl px-3 py-2.5">
         <DragHandle listeners={listeners} attributes={attributes} />
 
@@ -177,7 +179,7 @@ function SortableFloor({
               type="button"
               onClick={() => { setEditName(floor.name); setEditing(true); }}
               className="p-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              title="Umbenennen"
+              title={tr.editor.renameFloor}
             >
               <Pencil size={13} />
             </button>
@@ -186,7 +188,7 @@ function SortableFloor({
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             className="p-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            title="Etage löschen"
+            title={tr.editor.deleteFloor}
           >
             <Trash2 size={13} />
           </button>
@@ -200,7 +202,6 @@ function SortableFloor({
         </div>
       </div>
 
-      {/* Floor body */}
       {open && (
         <div className="mt-2 space-y-2 pl-1">
           <SortableContext items={roomIds} strategy={verticalListSortingStrategy}>
@@ -211,12 +212,13 @@ function SortableFloor({
                 floorName={floor.name}
                 onUpdate={updated => onUpdateRoom(room.id, updated)}
                 onDelete={() => onDeleteRoom(room.id)}
+                language={language}
               />
             ))}
           </SortableContext>
 
           {rooms.length === 0 && !addingRoom && (
-            <p className="text-xs text-neutral-400 px-2 py-1 italic">Noch keine Räume in dieser Etage.</p>
+            <p className="text-xs text-neutral-400 px-2 py-1 italic">{tr.editor.noRoomsInFloor}</p>
           )}
 
           {addingRoom ? (
@@ -229,7 +231,7 @@ function SortableFloor({
                   if (e.key === "Enter") commitAddRoom();
                   if (e.key === "Escape") { setNewRoomName(""); setAddingRoom(false); }
                 }}
-                placeholder="Raumbezeichnung…"
+                placeholder={tr.editor.roomNamePlaceholder}
                 className="h-8 text-sm flex-1"
               />
               <Button
@@ -239,7 +241,7 @@ function SortableFloor({
                 className="gap-1 h-8 px-3 text-xs bg-black text-white hover:bg-neutral-800"
               >
                 <Check size={13} />
-                Hinzufügen
+                {tr.common.add}
               </Button>
               <button
                 type="button"
@@ -256,13 +258,12 @@ function SortableFloor({
               className="w-full flex items-center gap-1.5 text-xs text-neutral-500 hover:text-black hover:bg-neutral-50 rounded-lg px-3 py-2.5 border border-dashed border-neutral-200 transition-colors mt-1"
             >
               <Plus size={13} />
-              Raum hinzufügen
+              {tr.editor.addRoom}
             </button>
           )}
         </div>
       )}
 
-      {/* Delete floor confirm */}
       {showDeleteConfirm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
@@ -277,20 +278,21 @@ function SortableFloor({
                 <AlertTriangle size={18} className="text-neutral-700" />
               </div>
               <div>
-                <h2 className="font-semibold text-black text-sm">Etage löschen?</h2>
+                <h2 className="font-semibold text-black text-sm">{tr.editor.deleteFloorTitle}</h2>
                 <p className="text-xs text-neutral-500 mt-1">
-                  <span className="font-medium text-black">{floor.name}</span> und alle zugehörigen Räume werden gelöscht.
-                  {rooms.length > 0 && ` (${rooms.length} Raum${rooms.length !== 1 ? "räume" : ""})`}
+                  <span className="font-medium text-black">{floor.name}</span>{" "}
+                  {tr.editor.deleteFloorHint}
+                  {rooms.length > 0 && ` (${rooms.length})`}
                 </p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)} className="border-neutral-200">
-                Abbrechen
+                {tr.common.cancel}
               </Button>
               <Button size="sm" onClick={() => { onDelete(); setShowDeleteConfirm(false); }}
                 className="bg-black text-white hover:bg-neutral-800">
-                Löschen
+                {tr.common.delete}
               </Button>
             </div>
           </div>
@@ -300,9 +302,8 @@ function SortableFloor({
   );
 }
 
-// ── Main FloorEditor ──────────────────────────────────────────────────────────
-
-export default function FloorEditor({ protocol, updateProtocol }: FloorEditorProps) {
+export default function FloorEditor({ protocol, updateProtocol, language = "de-CH" }: FloorEditorProps) {
+  const tr = getTranslations(language) as Translations;
   const [addingFloor, setAddingFloor] = useState(false);
   const [newFloorName, setNewFloorName] = useState("");
   const addFloorRef = useRef<HTMLInputElement>(null);
@@ -316,8 +317,6 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
 
   const floors = protocol.floors;
   const floorIds = floors.map(f => `floor:${f.id}`);
-
-  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const roomsForFloor = (floorId: string) =>
     protocol.rooms.filter(r => r.floor === floorId);
@@ -382,8 +381,6 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
     }));
   };
 
-  // ── DnD handlers ─────────────────────────────────────────────────────────────
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -415,8 +412,6 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={floorIds} strategy={verticalListSortingStrategy}>
@@ -430,16 +425,16 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
             onAddRoom={name => addRoomToFloor(floor.id, name)}
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
+            tr={tr}
+            language={language}
           />
         ))}
       </SortableContext>
 
       {floors.length === 0 && !addingFloor && (
         <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-neutral-200 rounded-xl">
-          <p className="text-sm font-medium text-black mb-1">Noch keine Etagen</p>
-          <p className="text-xs text-neutral-500 max-w-xs">
-            Fügen Sie Etagen hinzu, um Räume strukturiert zu erfassen.
-          </p>
+          <p className="text-sm font-medium text-black mb-1">{tr.editor.noFloors}</p>
+          <p className="text-xs text-neutral-500 max-w-xs">{tr.editor.noFloorsHint}</p>
         </div>
       )}
 
@@ -453,7 +448,7 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
               if (e.key === "Enter") addFloor();
               if (e.key === "Escape") { setNewFloorName(""); setAddingFloor(false); }
             }}
-            placeholder="Name der Etage…"
+            placeholder={tr.editor.floorNamePlaceholder}
             className="h-9 text-sm flex-1"
           />
           <Button
@@ -463,7 +458,7 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
             className="gap-1 h-9 px-3 text-xs bg-black text-white hover:bg-neutral-800"
           >
             <Check size={13} />
-            Erstellen
+            {tr.common.create}
           </Button>
           <button
             type="button"
@@ -480,7 +475,7 @@ export default function FloorEditor({ protocol, updateProtocol }: FloorEditorPro
           className="w-full flex items-center justify-center gap-2 text-sm font-medium text-black bg-neutral-100 hover:bg-neutral-200 rounded-xl px-4 py-3 transition-colors mt-2"
         >
           <Plus size={15} />
-          Etage hinzufügen
+          {tr.editor.addFloor}
         </button>
       )}
     </DndContext>

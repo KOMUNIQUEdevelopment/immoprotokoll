@@ -10,6 +10,7 @@ export const propertiesTable = pgTable("properties", {
     .references(() => accountsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   adresse: text("adresse").notNull().default(""),
+  language: text("language").notNull().default("de-CH"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

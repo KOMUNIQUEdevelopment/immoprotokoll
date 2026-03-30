@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
 import { InstallButton } from "./components/InstallButton";
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "./i18n";
 import {
   Save,
   FileDown,
@@ -34,18 +36,19 @@ import {
   Cloud,
   CloudOff,
   LogOut,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const queryClient = new QueryClient();
 
-function formatRelative(date: Date | null): string {
+function formatRelative(date: Date | null, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (!date) return "";
   const now = new Date();
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 5) return "gerade eben";
-  if (diff < 60) return `vor ${diff} Sek.`;
-  if (diff < 3600) return `vor ${Math.floor(diff / 60)} Min.`;
+  if (diff < 5) return t("common.savedJustNow");
+  if (diff < 60) return t("common.savedSecondsAgo", { count: diff });
+  if (diff < 3600) return t("common.savedMinutesAgo", { count: Math.floor(diff / 60) });
   return date.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -53,19 +56,68 @@ type EditorTab = "protokoll" | "unterschriften";
 
 type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel";
 
+function LanguageSelector({
+  currentLang,
+  onChangeLang,
+}: {
+  currentLang: string;
+  onChangeLang: (lang: SupportedLanguage) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        title={LANGUAGE_LABELS[currentLang as SupportedLanguage] ?? currentLang}
+        className="flex items-center gap-1 p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors"
+      >
+        <Globe size={15} />
+        <span className="text-xs font-medium hidden sm:inline">
+          {currentLang === "de-CH" ? "DE-CH" : currentLang === "de-DE" ? "DE-DE" : "EN"}
+        </span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-9 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden">
+            {SUPPORTED_LANGUAGES.map(lang => (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => { onChangeLang(lang); setOpen(false); }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
+                  currentLang === lang ? "font-semibold text-black" : "text-neutral-700"
+                }`}
+              >
+                {LANGUAGE_LABELS[lang]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AppContent({
   onLogout,
   accountId,
   account,
   userRole,
+  userLang,
   initialScreen = "protocols",
+  onChangeLang,
 }: {
   onLogout: () => void;
   accountId: string;
   account: { plan: "free" | "privat" | "agentur" | "custom" } | null;
   userRole?: "owner" | "administrator" | "property_manager";
+  userLang: string;
   initialScreen?: AppScreen;
+  onChangeLang: (lang: SupportedLanguage) => void;
 }) {
+  const { t } = useTranslation();
   const {
     protocols,
     trashedProtocols,
@@ -83,7 +135,6 @@ function AppContent({
     emptyTrash,
     renameProtocol,
     updateProtocol,
-
     toggleSync,
     receiveInit,
     receiveRemote,
@@ -110,8 +161,8 @@ function AppContent({
     onError: (err) => {
       if (err.code === "PROTOCOL_LIMIT_EXCEEDED") {
         toast({
-          title: "Protokoll-Limit erreicht",
-          description: err.message || "Ihr Plan erlaubt keine weiteren Protokolle in dieser Liegenschaft.",
+          title: t("protocols.protocolLimitReached"),
+          description: err.message || t("protocols.protocolLimitHint"),
           variant: "destructive",
         });
       }
@@ -119,18 +170,20 @@ function AppContent({
     sendRef: wsSendRef,
   });
 
+  const propertyLang = (selectedProperty?.language ?? "de-CH") as SupportedLanguage;
+
   const handleExport = async () => {
     if (!currentProtocol) return;
     setIsExporting(true);
     try {
       const freePlan = !account || account.plan === "free";
-      await exportToPDF(currentProtocol, { watermark: freePlan });
-      toast({ title: "PDF erstellt", description: "Das Protokoll wurde erfolgreich exportiert." });
+      await exportToPDF(currentProtocol, { watermark: freePlan, language: propertyLang });
+      toast({ title: t("protocols.pdfExported"), description: t("protocols.pdfExportSuccess") });
     } catch (e) {
       console.error(e);
       toast({
-        title: "Export fehlgeschlagen",
-        description: "Bitte erneut versuchen.",
+        title: t("protocols.pdfExportError"),
+        description: t("protocols.pdfExportErrorHint"),
         variant: "destructive",
       });
     } finally {
@@ -145,17 +198,18 @@ function AppContent({
       (currentProtocol.kitchenPhotos?.length ?? 0) +
       currentProtocol.rooms.reduce((s, r) => s + r.photos.length, 0);
     if (totalPhotos === 0) {
-      toast({ title: "Keine Fotos", description: "Es sind noch keine Fotos vorhanden." });
+      toast({ title: t("protocols.noPhotos"), description: t("protocols.noPhotosHint") });
       return;
     }
     setIsZipping(true);
     try {
       const freePlan = !account || account.plan === "free";
-      await exportPhotosAsZip(currentProtocol, { watermark: freePlan });
-      toast({ title: "ZIP erstellt", description: `${totalPhotos} Foto${totalPhotos !== 1 ? "s" : ""} exportiert.` });
+      await exportPhotosAsZip(currentProtocol, { watermark: freePlan, language: propertyLang });
+      const plural = totalPhotos !== 1 ? "s" : "";
+      toast({ title: t("protocols.zipExported"), description: t("protocols.zipExportedCount", { count: totalPhotos, plural }) });
     } catch (e) {
       console.error(e);
-      toast({ title: "Export fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+      toast({ title: t("protocols.pdfExportError"), description: t("protocols.pdfExportErrorHint"), variant: "destructive" });
     } finally {
       setIsZipping(false);
     }
@@ -163,7 +217,7 @@ function AppContent({
 
   const handleSave = () => {
     manualSave();
-    toast({ title: "Gespeichert", description: "Das Protokoll wurde gespeichert." });
+    toast({ title: t("protocols.savedMsg"), description: t("protocols.savedMsgHint") });
   };
 
   const handleCreate = () => {
@@ -178,7 +232,6 @@ function AppContent({
 
   const handleBackToList = () => {
     backToList();
-    // stay on PropertyProtocolsPage if we came from one
   };
 
   const allSigned =
@@ -199,10 +252,8 @@ function AppContent({
             <div className="w-16 h-16 rounded-full border-2 border-black flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8 text-black" />
             </div>
-            <h1 className="text-2xl font-semibold text-black">Abonnement aktiviert</h1>
-            <p className="text-sm text-neutral-600">
-              Ihr Abonnement wurde erfolgreich aktiviert. Die Änderungen sind sofort wirksam.
-            </p>
+            <h1 className="text-2xl font-semibold text-black">{t("billing.activatedTitle")}</h1>
+            <p className="text-sm text-neutral-600">{t("billing.activatedDesc")}</p>
             <button
               className="inline-flex items-center gap-2 px-6 py-2 border border-black rounded-md text-sm font-medium hover:bg-neutral-50 transition-colors"
               onClick={() => {
@@ -210,7 +261,7 @@ function AppContent({
                 setAppScreen("billing");
               }}
             >
-              Zum Abonnement
+              {t("billing.toSubscription")}
             </button>
           </div>
         </div>
@@ -224,10 +275,8 @@ function AppContent({
             <div className="w-16 h-16 rounded-full border-2 border-neutral-300 flex items-center justify-center mx-auto">
               <X className="w-8 h-8 text-neutral-400" />
             </div>
-            <h1 className="text-2xl font-semibold text-black">Zahlung abgebrochen</h1>
-            <p className="text-sm text-neutral-600">
-              Der Zahlungsvorgang wurde abgebrochen. Ihr aktueller Plan bleibt unverändert.
-            </p>
+            <h1 className="text-2xl font-semibold text-black">{t("billing.cancelledTitle")}</h1>
+            <p className="text-sm text-neutral-600">{t("billing.cancelledDesc")}</p>
             <button
               className="inline-flex items-center gap-2 px-6 py-2 border border-black rounded-md text-sm font-medium hover:bg-neutral-50 transition-colors"
               onClick={() => {
@@ -235,7 +284,7 @@ function AppContent({
                 setAppScreen("pricing");
               }}
             >
-              Zur Preisübersicht
+              {t("billing.toPricing")}
             </button>
           </div>
         </div>
@@ -249,7 +298,7 @@ function AppContent({
           onSelectPlan={async (plan, interval, currency) => {
             const result = await billing.startCheckout({ plan, interval, currency });
             if (result.error) {
-              toast({ title: "Zahlung fehlgeschlagen", description: result.error, variant: "destructive" });
+              toast({ title: t("protocols.paymentFailed"), description: result.error, variant: "destructive" });
             }
           }}
           currentPlan={account?.plan}
@@ -280,6 +329,8 @@ function AppContent({
             onShowBilling={() => setAppScreen("billing")}
             onShowPricing={() => setAppScreen("pricing")}
             currentPlan={account?.plan ?? "free"}
+            userLang={userLang}
+            onChangeLang={onChangeLang}
           />
           <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
         </>
@@ -317,13 +368,13 @@ function AppContent({
                 type="button"
                 onClick={handleBackToList}
                 className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors shrink-0"
-                title="Zur Übersicht"
+                title={t("protocols.overview")}
               >
                 <ArrowLeft size={16} />
               </button>
               <div className="min-w-0">
                 <h1 className="font-semibold text-sm leading-tight truncate text-black">
-                  {currentProtocol?.mietobjekt || "Protokoll"}
+                  {currentProtocol?.mietobjekt || t("protocols.unnamed")}
                 </h1>
                 <p className="text-xs text-neutral-500 truncate">
                   {currentProtocol?.adresse || ""}
@@ -336,7 +387,7 @@ function AppContent({
                 <button
                   type="button"
                   onClick={() => toggleSync(currentProtocol.id)}
-                  title={currentProtocol.syncEnabled ? "Sync aktiv – auf allen Geräten sichtbar. Klicken zum Deaktivieren." : "Sync deaktiviert – nur lokal. Klicken zum Aktivieren."}
+                  title={currentProtocol.syncEnabled ? t("protocols.syncActive") : t("protocols.syncInactive")}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium transition-colors ${
                     currentProtocol.syncEnabled
                       ? "border-black bg-black text-white"
@@ -348,17 +399,17 @@ function AppContent({
                   ) : (
                     <CloudOff size={13} />
                   )}
-                  <span className="hidden sm:inline">Sync</span>
+                  <span className="hidden sm:inline">{t("protocols.syncLabel")}</span>
                 </button>
               )}
 
               <span
                 title={
                   syncStatus === "connected"
-                    ? "Verbunden"
+                    ? t("protocols.connected")
                     : syncStatus === "connecting"
-                    ? "Verbinde..."
-                    : "Offline"
+                    ? t("protocols.connecting")
+                    : t("protocols.offline")
                 }
                 className="hidden sm:flex items-center"
               >
@@ -371,16 +422,18 @@ function AppContent({
 
               {lastSaved && (
                 <span className="text-xs text-neutral-400 hidden sm:block whitespace-nowrap">
-                  {isSaving ? "Speichert..." : `Gespeichert ${formatRelative(lastSaved)}`}
+                  {isSaving ? t("common.saving") : `${t("common.saved")} ${formatRelative(lastSaved, t)}`}
                 </span>
               )}
 
               <InstallButton />
 
+              <LanguageSelector currentLang={userLang} onChangeLang={onChangeLang} />
+
               <button
                 type="button"
                 onClick={onLogout}
-                title="Abmelden"
+                title={t("auth.logout")}
                 className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors hidden sm:flex"
               >
                 <LogOut size={15} />
@@ -398,7 +451,7 @@ function AppContent({
                 ) : (
                   <Save size={14} />
                 )}
-                <span className="hidden sm:inline">{isSaving ? "OK" : "Speichern"}</span>
+                <span className="hidden sm:inline">{isSaving ? t("common.ok") : t("common.save")}</span>
               </Button>
 
               <Button
@@ -407,10 +460,10 @@ function AppContent({
                 onClick={handleZipExport}
                 disabled={isZipping}
                 className="gap-1.5 border-neutral-200 hover:bg-neutral-50"
-                title="Alle Fotos als ZIP exportieren"
+                title={t("protocols.photos")}
               >
                 <FolderArchive size={14} />
-                <span className="hidden sm:inline">{isZipping ? "..." : "Fotos"}</span>
+                <span className="hidden sm:inline">{isZipping ? "..." : t("protocols.photos")}</span>
               </Button>
 
               <Button
@@ -440,7 +493,7 @@ function AppContent({
               }`}
             >
               <ClipboardList size={15} />
-              Protokoll
+              {t("protocols.protocol")}
             </button>
             <button
               type="button"
@@ -452,7 +505,7 @@ function AppContent({
               }`}
             >
               <PenLine size={15} />
-              Unterschriften
+              {t("protocols.signatures")}
               {allSigned && <CheckCircle2 size={13} className="text-black" />}
             </button>
           </div>
@@ -461,17 +514,17 @@ function AppContent({
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4">
         {currentProtocol && activeTab === "protokoll" && (
-          <ProtocolPage protocol={currentProtocol} updateProtocol={updateProtocol} />
+          <ProtocolPage protocol={currentProtocol} updateProtocol={updateProtocol} language={propertyLang} />
         )}
         {currentProtocol && activeTab === "unterschriften" && (
-          <SignaturePage protocol={currentProtocol} updateProtocol={updateProtocol} />
+          <SignaturePage protocol={currentProtocol} updateProtocol={updateProtocol} language={propertyLang} />
         )}
       </main>
 
       {isSaving && (
         <div className="sm:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
           <span className="bg-black text-white text-xs px-3 py-1.5 rounded-full shadow-md">
-            Automatisch gespeichert
+            {t("common.autoSaved")}
           </span>
         </div>
       )}
@@ -490,6 +543,7 @@ function SwUpdatePopup({
   applyUpdate: () => void;
   dismiss: () => void;
 }) {
+  const { t } = useTranslation();
   if (!needsUpdate) return null;
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0 sm:right-4">
@@ -502,12 +556,12 @@ function SwUpdatePopup({
           <X size={12} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-black">Update verfügbar</p>
-          <p className="text-xs text-neutral-500">Eine neue Version ist bereit.</p>
+          <p className="text-sm font-semibold text-black">{t("common.updateAvailable")}</p>
+          <p className="text-xs text-neutral-500">{t("common.updateReady")}</p>
         </div>
         <Button size="sm" variant="outline" onClick={applyUpdate} className="shrink-0 gap-1.5 font-semibold border-neutral-200">
           <RefreshCw size={13} />
-          Aktualisieren
+          {t("common.update")}
         </Button>
       </div>
     </div>
@@ -517,7 +571,6 @@ function SwUpdatePopup({
 type AuthScreen = "login" | "register";
 
 function hashToInitialScreen(hash: string, pathname: string): AppScreen {
-  // Support both /pricing (clean path) and #/pricing (hash)
   if (pathname.endsWith("/pricing") || hash === "#/pricing") return "pricing";
   if (hash === "#/billing") return "billing";
   if (hash === "#/billing/success") return "billing-success";
@@ -531,8 +584,13 @@ export default function App() {
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
   const isPricingPage = pathname.endsWith("/pricing") || hash === "#/pricing";
 
-  const { user, account, loading, login, register, logout } = useAuth();
+  const { user, account, loading, login, register, logout, updateLanguage } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
+  const { t } = useTranslation();
+
+  const handleChangeLang = async (lang: SupportedLanguage) => {
+    await updateLanguage(lang);
+  };
 
   if (viewMatch) {
     return (
@@ -543,13 +601,11 @@ export default function App() {
     );
   }
 
-  // Pricing page is public (accessible without login) — supports both /pricing and #/pricing
   if (isPricingPage && !user) {
     return (
       <QueryClientProvider client={queryClient}>
         <PricingPage
           onBack={() => {
-            // Navigate back correctly for both /pricing path and #/pricing hash
             if (pathname.endsWith("/pricing")) {
               window.location.href = "/";
             } else {
@@ -600,7 +656,9 @@ export default function App() {
         accountId={user.accountId}
         account={account}
         userRole={user.role}
+        userLang={user.preferredLanguage ?? "de-CH"}
         initialScreen={hashToInitialScreen(hash, pathname)}
+        onChangeLang={handleChangeLang}
       />
       <Toaster />
     </QueryClientProvider>

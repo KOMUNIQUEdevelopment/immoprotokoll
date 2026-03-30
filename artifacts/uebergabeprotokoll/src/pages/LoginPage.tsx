@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -36,15 +38,15 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
             className="h-10 mx-auto"
           />
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-black">Anmelden</h1>
-            <p className="text-sm text-neutral-500">Willkommen zurück</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-black">{t("auth.login")}</h1>
+            <p className="text-sm text-neutral-500">{t("auth.welcomeBack")}</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-              E-Mail
+              {t("auth.email")}
             </label>
             <Input
               type="email"
@@ -60,7 +62,7 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-              Passwort
+              {t("auth.password")}
             </label>
             <div className="relative">
               <Input
@@ -97,19 +99,19 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
             ) : (
               <LogIn size={15} />
             )}
-            {loading ? "Wird geprüft…" : "Anmelden"}
+            {loading ? t("auth.checking") : t("auth.loginAction")}
           </Button>
         </form>
 
         <div className="text-center">
           <p className="text-sm text-neutral-500">
-            Noch kein Konto?{" "}
+            {t("auth.noAccount")}{" "}
             <button
               type="button"
               onClick={onGoToRegister}
               className="text-black font-medium hover:underline"
             >
-              Registrieren
+              {t("auth.register")}
             </button>
           </p>
         </div>

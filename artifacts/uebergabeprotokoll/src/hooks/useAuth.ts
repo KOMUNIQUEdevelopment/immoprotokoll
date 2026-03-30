@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { setLanguage } from "../i18n";
 
 export interface AuthUser {
   id: string;
@@ -46,6 +47,7 @@ export function useAuth() {
       const res = await apiFetch("/auth/me");
       if (res.ok) {
         const data = await res.json() as { user: AuthUser; account: AuthAccount };
+        setLanguage(data.user.preferredLanguage ?? "de-CH");
         setState({ user: data.user, account: data.account, loading: false });
       } else {
         setState({ user: null, account: null, loading: false });
@@ -67,6 +69,7 @@ export function useAuth() {
       });
       if (res.ok) {
         const data = await res.json() as { user: AuthUser; account: AuthAccount };
+        setLanguage(data.user.preferredLanguage ?? "de-CH");
         setState({ user: data.user, account: data.account, loading: false });
         return {};
       } else {
@@ -110,6 +113,22 @@ export function useAuth() {
     setState({ user: null, account: null, loading: false });
   }, []);
 
+  const updateLanguage = useCallback(async (lang: string): Promise<void> => {
+    try {
+      const res = await apiFetch("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ preferredLanguage: lang }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { user: AuthUser };
+        setLanguage(data.user.preferredLanguage ?? "de-CH");
+        setState(prev => prev.user ? { ...prev, user: { ...prev.user, preferredLanguage: data.user.preferredLanguage } } : prev);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   return {
     ...state,
     isAuthenticated: !!state.user,
@@ -117,5 +136,6 @@ export function useAuth() {
     register,
     logout,
     checkSession,
+    updateLanguage,
   };
 }

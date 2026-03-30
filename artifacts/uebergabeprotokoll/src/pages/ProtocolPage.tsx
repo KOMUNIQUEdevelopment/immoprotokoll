@@ -6,11 +6,14 @@ import PhotoManager from "../components/PhotoManager";
 import FloorEditor from "../components/FloorEditor";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Plus, X, Pencil, Trash2, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2, Pencil } from "lucide-react";
+import { getTranslations, type SupportedLanguage } from "../i18n";
+import type { Translations } from "../i18n/de-CH";
 
 interface ProtocolPageProps {
   protocol: ProtocolData;
   updateProtocol: (fn: (p: ProtocolData) => ProtocolData) => void;
+  language?: SupportedLanguage;
 }
 
 function CollapsibleSection({ title, children, defaultOpen = false }: {
@@ -42,85 +45,82 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageProps) {
+export default function ProtocolPage({ protocol, updateProtocol, language = "de-CH" }: ProtocolPageProps) {
+  const tr = getTranslations(language) as Translations;
   const setField = (field: keyof ProtocolData, value: unknown) => {
     updateProtocol(p => ({ ...p, [field]: value }));
   };
 
   return (
     <div className="space-y-2">
-      {/* General Info */}
-      <CollapsibleSection title="Allgemeine Informationen" defaultOpen={true}>
+      <CollapsibleSection title={tr.editor.generalInfo} defaultOpen={true}>
         <div className="px-1 space-y-3">
-          {/* Mietobjekt + Adresse */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <FieldLabel>Mietobjekt</FieldLabel>
+              <FieldLabel>{tr.editor.rentalObject}</FieldLabel>
               <Input
                 value={protocol.mietobjekt}
                 onChange={(e) => setField("mietobjekt", e.target.value)}
-                placeholder="Art des Mietobjekts"
+                placeholder={tr.editor.rentalObjectPlaceholder}
               />
             </div>
             <div>
-              <FieldLabel>Datum der Übergabe</FieldLabel>
+              <FieldLabel>{tr.editor.handoverDate}</FieldLabel>
               <Input
                 value={protocol.datum}
                 onChange={(e) => setField("datum", e.target.value)}
-                placeholder="TT.MM.JJJJ"
+                placeholder={tr.editor.datePlaceholder}
               />
             </div>
           </div>
 
           <div>
-            <FieldLabel>Adresse</FieldLabel>
+            <FieldLabel>{tr.common.address}</FieldLabel>
             <Input
               value={protocol.adresse}
               onChange={(e) => setField("adresse", e.target.value)}
-              placeholder="Straße, PLZ Ort"
+              placeholder={tr.editor.addressPlaceholder}
             />
           </div>
 
-          {/* Übergeber */}
           <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
             <PersonList
-              label="Übergeber (Vermieter)"
+              label={tr.editor.landlord}
               persons={protocol.uebergeber}
               onChange={(persons) => setField("uebergeber", persons)}
+              language={language}
             />
           </div>
 
-          {/* Übernehmer */}
           <div className="border border-border rounded-xl p-3 space-y-2 bg-card">
             <PersonList
-              label="Übernehmer (Mieter)"
+              label={tr.editor.tenant}
               persons={protocol.uebernehmer}
               onChange={(persons) => setField("uebernehmer", persons)}
+              language={language}
             />
           </div>
 
-          {/* Keys */}
           <div>
-            <FieldLabel>Schlüsselübergabe</FieldLabel>
+            <FieldLabel>{tr.editor.keyHandover}</FieldLabel>
             <Input
               value={protocol.schluessel}
               onChange={(e) => setField("schluessel", e.target.value)}
-              placeholder="Anzahl und Art der Schlüssel"
+              placeholder={tr.editor.keyHandoverPlaceholder}
             />
           </div>
           <div>
-            <FieldLabel>Details / Besonderheiten</FieldLabel>
+            <FieldLabel>{tr.editor.keyDetails}</FieldLabel>
             <AutoGrowTextarea
               value={protocol.schluesselDetails}
               onChange={(e) => setField("schluesselDetails", e.target.value)}
-              placeholder="z.B. 3× Haustürschlüssel, 2× Briefkastenschlüssel..."
+              placeholder={tr.editor.keyDetailsPlaceholder}
             />
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Meter Readings */}
-      <CollapsibleSection title="Zählerstände">
+      <CollapsibleSection title={tr.editor.meterReadings}>
         <div className="px-1 space-y-4">
           <div className="space-y-3">
             {protocol.meterReadings.map((meter, i) => (
@@ -133,7 +133,7 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                     updated[i] = { ...meter, stand: e.target.value };
                     setField("meterReadings", updated);
                   }}
-                  placeholder={`Stand in ${meter.einheit}`}
+                  placeholder={tr.editor.meterReadingIn.replace("{{unit}}", meter.einheit)}
                   className="text-sm"
                 />
                 <span className="text-sm text-muted-foreground shrink-0">{meter.einheit}</span>
@@ -141,18 +141,17 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
             ))}
           </div>
           <div>
-            <p className="text-sm font-medium mb-2">Fotos Zählerstände</p>
+            <p className="text-sm font-medium mb-2">{tr.editor.meterPhotos}</p>
             <PhotoManager
               photos={protocol.meterPhotos ?? []}
               onChange={(photos) => setField("meterPhotos", photos)}
-              roomName="Zählerstände"
+              roomName={tr.editor.meterReadings}
             />
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Kitchen Appliances */}
-      <CollapsibleSection title="Küche – Geräte & Zustand">
+      <CollapsibleSection title={tr.editor.kitchen}>
         <div className="px-1 space-y-3">
           {protocol.appliances.map((app, i) => (
             <div key={i} className="grid grid-cols-2 gap-2 items-center">
@@ -164,41 +163,40 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
                   updated[i] = { ...app, zustand: e.target.value };
                   setField("appliances", updated);
                 }}
-                placeholder="Zustand"
+                placeholder={tr.editor.applianceCondition}
                 className="text-sm"
               />
             </div>
           ))}
           <div>
-            <FieldLabel>Allgemeiner Zustand Küche</FieldLabel>
+            <FieldLabel>{tr.editor.kitchenCondition}</FieldLabel>
             <AutoGrowTextarea
               value={protocol.allgemeinerZustandKueche}
               onChange={(e) => setField("allgemeinerZustandKueche", e.target.value)}
-              placeholder="Allgemeinen Zustand der Küche beschreiben..."
+              placeholder={tr.editor.kitchenConditionPlaceholder}
             />
           </div>
           <div>
-            <FieldLabel>Fotos Küche</FieldLabel>
+            <FieldLabel>{tr.editor.kitchenPhotos}</FieldLabel>
             <PhotoManager
               photos={protocol.kitchenPhotos ?? []}
               onChange={(photos) => setField("kitchenPhotos", photos)}
-              roomName="Küche"
+              roomName={tr.editor.kitchen}
             />
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Rooms & Floors */}
       <div>
-        <FloorEditor protocol={protocol} updateProtocol={updateProtocol} />
+        <FloorEditor protocol={protocol} updateProtocol={updateProtocol} language={language} />
       </div>
 
-      {/* Zusatzvereinbarung */}
       <ZusatzvereinbarungSection
-        sectionTitle={protocol.zusatzvereinbarungTitle ?? "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen"}
+        sectionTitle={protocol.zusatzvereinbarungTitle ?? tr.editor.defaultClauseTitle}
         entries={protocol.zusatzvereinbarungen ?? []}
         onTitleChange={val => updateProtocol(p => ({ ...p, zusatzvereinbarungTitle: val }))}
         onEntriesChange={entries => updateProtocol(p => ({ ...p, zusatzvereinbarungen: entries }))}
+        tr={tr}
       />
     </div>
   );
@@ -209,9 +207,10 @@ interface ZusatzvereinbarungSectionProps {
   entries: ZusatzvereinbarungEntry[];
   onTitleChange: (val: string) => void;
   onEntriesChange: (entries: ZusatzvereinbarungEntry[]) => void;
+  tr: Translations;
 }
 
-function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEntriesChange }: ZusatzvereinbarungSectionProps) {
+function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEntriesChange, tr }: ZusatzvereinbarungSectionProps) {
   const [open, setOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(sectionTitle);
@@ -219,15 +218,15 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
   const addEntry = () => {
     const newEntry: ZusatzvereinbarungEntry = {
       id: crypto.randomUUID(),
-      title: "Neuer Abschnitt",
+      title: tr.editor.newSection,
       content: "",
     };
     onEntriesChange([...entries, newEntry]);
   };
 
   const removeEntry = (id: string, title: string) => {
-    const label = title.trim() || "diesen Abschnitt";
-    if (!window.confirm(`„${label}" wirklich löschen?`)) return;
+    const label = title.trim() || tr.editor.deleteSection;
+    if (!window.confirm(`„${label}" ${tr.editor.deleteSection.toLowerCase()}?`)) return;
     onEntriesChange(entries.filter(e => e.id !== id));
   };
 
@@ -248,7 +247,6 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
 
   return (
     <div className="mb-4">
-      {/* Section header – styled like CollapsibleSection */}
       <button
         type="button"
         onClick={() => !editingTitle && setOpen(o => !o)}
@@ -277,7 +275,7 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
               role="button"
               onClick={startEdit}
               className="p-1 rounded hover:bg-primary-foreground/10 transition-colors"
-              title="Titel bearbeiten"
+              title={tr.common.edit}
             >
               <Pencil size={13} className="opacity-70" />
             </span>
@@ -286,7 +284,6 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
         </div>
       </button>
 
-      {/* Entries – only visible when open */}
       {open && (
         <div className="mt-3 space-y-4 px-1">
           {entries.map((entry, idx) => (
@@ -297,13 +294,13 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
                   value={entry.title}
                   onChange={e => updateEntry(entry.id, { title: e.target.value })}
                   className="flex-1 h-7 text-sm font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0"
-                  placeholder="Titel"
+                  placeholder={tr.editor.sectionTitle}
                 />
                 <button
                   type="button"
                   onClick={() => removeEntry(entry.id, entry.title)}
                   className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                  title="Abschnitt löschen"
+                  title={tr.editor.deleteSection}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -312,21 +309,20 @@ function ZusatzvereinbarungSection({ sectionTitle, entries, onTitleChange, onEnt
                 <AutoGrowTextarea
                   value={entry.content}
                   onChange={e => updateEntry(entry.id, { content: e.target.value })}
-                  placeholder="Inhalt des Abschnitts..."
+                  placeholder={tr.editor.sectionContent}
                   className="text-sm leading-relaxed"
                 />
               </div>
             </div>
           ))}
 
-          {/* Add button */}
           <button
             type="button"
             onClick={addEntry}
             className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
           >
             <Plus size={15} />
-            Abschnitt hinzufügen
+            {tr.editor.addAdditionalClause}
           </button>
         </div>
       )}

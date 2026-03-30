@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ interface RegisterPageProps {
 }
 
 export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPageProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -33,7 +35,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password.length < 8) {
-      setError("Passwort muss mindestens 8 Zeichen lang sein.");
+      setError(t("auth.passwordTooShort"));
       return;
     }
     setError("");
@@ -55,8 +57,8 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
             className="h-10 mx-auto"
           />
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-black">Konto erstellen</h1>
-            <p className="text-sm text-neutral-500">Kostenlos starten</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-black">{t("auth.createAccount")}</h1>
+            <p className="text-sm text-neutral-500">{t("auth.startFree")}</p>
           </div>
         </div>
 
@@ -64,7 +66,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                Vorname
+                {t("auth.firstName")}
               </label>
               <Input
                 type="text"
@@ -79,7 +81,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                Nachname
+                {t("auth.lastName")}
               </label>
               <Input
                 type="text"
@@ -95,7 +97,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-              Kontoname / Firma
+              {t("auth.accountName")}
             </label>
             <Input
               type="text"
@@ -109,7 +111,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-              E-Mail
+              {t("auth.email")}
             </label>
             <Input
               type="email"
@@ -124,13 +126,13 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
-              Passwort
+              {t("auth.password")}
             </label>
             <Input
               type="password"
               value={form.password}
               onChange={set("password")}
-              placeholder="Mindestens 8 Zeichen"
+              placeholder={t("auth.passwordMin")}
               autoComplete="new-password"
               required
               className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-neutral-900" : ""}`}
@@ -151,19 +153,19 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
             ) : (
               <UserPlus size={15} />
             )}
-            {loading ? "Wird erstellt…" : "Konto erstellen"}
+            {loading ? t("auth.registering") : t("auth.registerAction")}
           </Button>
         </form>
 
         <div className="text-center">
           <p className="text-sm text-neutral-500">
-            Bereits ein Konto?{" "}
+            {t("auth.alreadyAccount")}{" "}
             <button
               type="button"
               onClick={onGoToLogin}
               className="text-black font-medium hover:underline"
             >
-              Anmelden
+              {t("auth.loginAction")}
             </button>
           </p>
         </div>

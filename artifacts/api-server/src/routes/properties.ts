@@ -75,7 +75,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
 // ── POST /api/properties — create a new property ─────────────────────────────
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { name, adresse } = req.body as { name?: string; adresse?: string };
+  const { name, adresse, language } = req.body as { name?: string; adresse?: string; language?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
     return;
@@ -100,10 +100,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     }
   }
 
+  const validLangs = ["de-CH", "de-DE", "en"];
+  const resolvedLanguage = language && validLangs.includes(language) ? language : "de-CH";
+
   try {
     const [property] = await db
       .insert(propertiesTable)
-      .values({ accountId, name: name.trim(), adresse: adresse?.trim() ?? "" })
+      .values({ accountId, name: name.trim(), adresse: adresse?.trim() ?? "", language: resolvedLanguage })
       .returning();
     res.status(201).json(property);
   } catch (err) {
@@ -114,7 +117,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // ── PATCH /api/properties/:id — update property name/address ─────────────────
 const updatePropertyHandler = async (req: AuthRequest, res: Response): Promise<void> => {
   const id = String(req.params.id);
-  const { name, adresse } = req.body as { name?: string; adresse?: string };
+  const { name, adresse, language } = req.body as { name?: string; adresse?: string; language?: string };
 
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
@@ -122,11 +125,18 @@ const updatePropertyHandler = async (req: AuthRequest, res: Response): Promise<v
   }
 
   const accountId = req.user!.accountId;
+  const validLangs = ["de-CH", "de-DE", "en"];
+  const resolvedLanguage = language && validLangs.includes(language) ? language : undefined;
 
   try {
     const [updated] = await db
       .update(propertiesTable)
-      .set({ name: name.trim(), adresse: adresse?.trim() ?? "", updatedAt: new Date() })
+      .set({
+        name: name.trim(),
+        adresse: adresse?.trim() ?? "",
+        ...(resolvedLanguage ? { language: resolvedLanguage } : {}),
+        updatedAt: new Date(),
+      })
       .where(and(eq(propertiesTable.id, id), eq(propertiesTable.accountId, accountId)))
       .returning();
 

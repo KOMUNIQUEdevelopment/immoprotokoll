@@ -3,17 +3,17 @@ import { Trash2 } from "lucide-react";
 import { ProtocolData, Person, PersonSignature, getPersonRole } from "../types";
 import SignatureCanvasComponent from "../components/SignatureCanvas";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { getTranslations, type SupportedLanguage } from "../i18n";
+import type { Translations } from "../i18n/de-CH";
 
 interface SignaturePageProps {
   protocol: ProtocolData;
   updateProtocol: (fn: (p: ProtocolData) => ProtocolData) => void;
+  language?: SupportedLanguage;
 }
 
 function getSignatureFor(signatures: PersonSignature[], personId: string): string | null {
   const val = signatures.find(s => s.personId === personId)?.signatureDataUrl;
-  // Treat empty string the same as null (stripped protocol sent "" instead of null
-  // in older versions; callers rely on a truthy/falsy distinction).
   return val || null;
 }
 
@@ -32,9 +32,10 @@ interface PersonSignatureBlockProps {
   onSignatureChange: (dataUrl: string | null) => void;
   onNameChange: (name: string) => void;
   onRemove?: () => void;
+  tr: Translations;
 }
 
-function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChange, onNameChange, onRemove }: PersonSignatureBlockProps) {
+function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChange, onNameChange, onRemove, tr }: PersonSignatureBlockProps) {
   const role = getPersonRole(person, side);
 
   return (
@@ -44,7 +45,7 @@ function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChang
           <Input
             value={person.name}
             onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Vorname Nachname"
+            placeholder={tr.person.namePlaceholder}
             className="text-sm"
           />
         </div>
@@ -62,7 +63,7 @@ function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChang
 
       {person.name && (
         <p className="text-xs text-muted-foreground">
-          Unterschrift: <strong>{person.name}, {role}</strong>
+          {tr.signature.sign}: <strong>{person.name}, {role}</strong>
         </p>
       )}
 
@@ -74,7 +75,9 @@ function PersonSignatureBlock({ person, side, signatureDataUrl, onSignatureChang
   );
 }
 
-export default function SignaturePage({ protocol, updateProtocol }: SignaturePageProps) {
+export default function SignaturePage({ protocol, updateProtocol, language = "de-CH" }: SignaturePageProps) {
+  const tr = getTranslations(language) as Translations;
+
   const updatePersonName = (side: "uebergeber" | "uebernehmer", id: string, name: string) => {
     updateProtocol(p => ({
       ...p,
@@ -96,8 +99,6 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
       personSignatures: upsertSignature(p.personSignatures, personId, dataUrl),
     }));
 
-    // Push non-null signatures to the server sign endpoint so all devices
-    // receive the actual dataUrl via WS broadcast (same path as TenantView).
     if (dataUrl && protocol.syncEnabled && protocol.id) {
       fetch(`/api/protocol/${protocol.id}/sign`, {
         method: "POST",
@@ -112,18 +113,15 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
 
   return (
     <div className="space-y-6">
-      {/* Note */}
       <div className="bg-muted/60 border border-border rounded-xl px-4 py-3 flex items-start gap-2">
         <span className="text-muted-foreground mt-0.5 shrink-0 text-base">ℹ</span>
         <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">Hinweis:</strong>{" "}
-          Unterschriften gelten für das gesamte Protokoll einschliesslich der Zusatzvereinbarungen.
+          {tr.signature.hint}
         </p>
       </div>
 
-      {/* Location & Date */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-        <h3 className="font-semibold text-sm">Ort und Datum</h3>
+        <h3 className="font-semibold text-sm">{tr.pdf.date} &amp; Ort</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
@@ -137,23 +135,22 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-              Datum
+              {tr.pdf.date}
             </label>
             <Input
               value={protocol.signaturDatum}
               onChange={(e) => updateProtocol(p => ({ ...p, signaturDatum: e.target.value }))}
-              placeholder="TT.MM.JJJJ"
+              placeholder={tr.editor.datePlaceholder}
             />
           </div>
         </div>
       </div>
 
-      {/* Vermieter Signatures */}
       <div className="space-y-3">
         <h3 className="font-semibold text-sm flex items-center gap-2">
-          Übergeber (Vermieter)
+          {tr.editor.landlord}
           {allVermieterSigned && protocol.uebergeber.length > 0 && (
-            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{tr.signature.allSigned}</span>
           )}
         </h3>
 
@@ -166,16 +163,16 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebergeber", person.id, name)}
             onRemove={protocol.uebergeber.length > 1 ? () => removePerson("uebergeber", person.id) : undefined}
+            tr={tr}
           />
         ))}
       </div>
 
-      {/* Mieter Signatures */}
       <div className="space-y-3">
         <h3 className="font-semibold text-sm flex items-center gap-2">
-          Übernehmer (Mieter)
+          {tr.editor.tenant}
           {allMieterSigned && protocol.uebernehmer.length > 0 && (
-            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{tr.signature.allSigned}</span>
           )}
         </h3>
 
@@ -188,6 +185,7 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
             onSignatureChange={(dataUrl) => updateSignature(person.id, dataUrl)}
             onNameChange={(name) => updatePersonName("uebernehmer", person.id, name)}
             onRemove={protocol.uebernehmer.length > 1 ? () => removePerson("uebernehmer", person.id) : undefined}
+            tr={tr}
           />
         ))}
       </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ProtocolData, Property, UNASSIGNED_PROPERTY, getPersonRole } from "../types";
+import { useTranslation } from "react-i18next";
+import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
   ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
@@ -47,6 +48,7 @@ interface DeleteConfirmProps {
 }
 
 function DeleteConfirm({ label, onConfirm, onCancel }: DeleteConfirmProps) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
@@ -55,15 +57,16 @@ function DeleteConfirm({ label, onConfirm, onCancel }: DeleteConfirmProps) {
             <AlertTriangle size={18} className="text-neutral-700" />
           </div>
           <div>
-            <h2 className="font-semibold text-black text-sm">Protokoll löschen?</h2>
+            <h2 className="font-semibold text-black text-sm">{t("protocols.deleteProtocol")}</h2>
             <p className="text-xs text-neutral-500 mt-1">
-              <span className="font-medium text-black">{label}</span> wird in den Papierkorb verschoben.
+              <span className="font-medium text-black">{label}</span>{" "}
+              {t("protocols.deleteProtocolHint", { name: "" }).replace("{{name}} ", "")}
             </p>
           </div>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" size="sm" onClick={onCancel} className="border-neutral-200">Abbrechen</Button>
-          <Button size="sm" onClick={onConfirm} className="bg-black text-white hover:bg-neutral-800">Löschen</Button>
+          <Button variant="outline" size="sm" onClick={onCancel} className="border-neutral-200">{t("common.cancel")}</Button>
+          <Button size="sm" onClick={onConfirm} className="bg-black text-white hover:bg-neutral-800">{t("common.delete")}</Button>
         </div>
       </div>
     </div>
@@ -77,12 +80,13 @@ interface RenameModalProps {
 }
 
 function RenameModal({ current, onSave, onClose }: RenameModalProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(current);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-black text-sm">Protokoll umbenennen</h2>
+          <h2 className="font-semibold text-black text-sm">{t("protocols.rename")}</h2>
           <button type="button" onClick={onClose} className="p-1 rounded-full text-neutral-500 hover:bg-neutral-100"><X size={16} /></button>
         </div>
         <Input
@@ -90,13 +94,14 @@ function RenameModal({ current, onSave, onClose }: RenameModalProps) {
           onChange={e => setName(e.target.value)}
           autoFocus
           className="text-sm mb-3"
+          placeholder={t("protocols.renamePlaceholder")}
           onKeyDown={e => { if (e.key === "Enter" && name.trim()) { onSave(name.trim()); onClose(); } }}
         />
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" size="sm" onClick={onClose} className="border-neutral-200">Abbrechen</Button>
+          <Button variant="outline" size="sm" onClick={onClose} className="border-neutral-200">{t("common.cancel")}</Button>
           <Button size="sm" disabled={!name.trim()} onClick={() => { onSave(name.trim()); onClose(); }}
             className="bg-black text-white hover:bg-neutral-800 gap-1.5">
-            <Check size={13} />Speichern
+            <Check size={13} />{t("common.save")}
           </Button>
         </div>
       </div>
@@ -127,6 +132,7 @@ export default function PropertyProtocolsPage({
   onToggleSync,
   onRename,
 }: PropertyProtocolsPageProps) {
+  const { t } = useTranslation();
   const [deleteTarget, setDeleteTarget] = useState<ProtocolData | null>(null);
   const [renameTarget, setRenameTarget] = useState<ProtocolData | null>(null);
   const [showTrash, setShowTrash] = useState(false);
@@ -160,9 +166,7 @@ export default function PropertyProtocolsPage({
         p => p.propertyId === property.id
       ).length;
       if (activeCount >= planLimits.protocolsPerProperty) {
-        setLimitError(
-          `Ihr ${planLimits.plan}-Plan erlaubt maximal ${planLimits.protocolsPerProperty} Protokoll(e) pro Liegenschaft.`
-        );
+        setLimitError(t("protocols.protocolLimitHint"));
         return;
       }
     }
@@ -184,7 +188,7 @@ export default function PropertyProtocolsPage({
             type="button"
             onClick={onBack}
             className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors shrink-0"
-            title="Zurück"
+            title={t("common.back")}
           >
             <ArrowLeft size={16} />
           </button>
@@ -203,8 +207,8 @@ export default function PropertyProtocolsPage({
               className="bg-black text-white hover:bg-neutral-800 gap-1.5 shrink-0"
             >
               <Plus size={14} />
-              <span className="hidden sm:inline">Neues Protokoll</span>
-              <span className="sm:hidden">Neu</span>
+              <span className="hidden sm:inline">{t("protocols.newProtocol")}</span>
+              <span className="sm:hidden">{t("common.create")}</span>
             </Button>
           )}
         </div>
@@ -225,12 +229,9 @@ export default function PropertyProtocolsPage({
             <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
               <ClipboardList size={24} className="text-neutral-400" />
             </div>
-            <p className="font-semibold text-black text-sm">Keine Protokolle</p>
+            <p className="font-semibold text-black text-sm">{t("protocols.noProtocols")}</p>
             <p className="text-xs text-neutral-500 mt-1 max-w-xs">
-              {isUnassignedView
-                ? "Es gibt keine Protokolle ohne Liegenschaft."
-                : "Erstellen Sie das erste Protokoll für diese Liegenschaft."
-              }
+              {t("protocols.noProtocolsHint")}
             </p>
             {!isUnassignedView && (
               <Button
@@ -239,7 +240,7 @@ export default function PropertyProtocolsPage({
                 className="mt-4 bg-black text-white hover:bg-neutral-800 gap-1.5"
               >
                 <Plus size={14} />
-                Protokoll erstellen
+                {t("protocols.createFirst")}
               </Button>
             )}
           </div>
@@ -271,7 +272,7 @@ export default function PropertyProtocolsPage({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm text-black truncate">
-                          {protocol.mietobjekt || "Unbenanntes Protokoll"}
+                          {protocol.mietobjekt || t("common.unnamed")}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
                           {protocol.datum && (
@@ -281,7 +282,7 @@ export default function PropertyProtocolsPage({
                           )}
                           {protocol.lastSaved && (
                             <span className="text-xs text-neutral-400">
-                              Gespeichert {formatDate(protocol.lastSaved)}
+                              {formatDate(protocol.lastSaved)}
                             </span>
                           )}
                         </div>
@@ -306,7 +307,7 @@ export default function PropertyProtocolsPage({
                         type="button"
                         onClick={() => setRenameTarget(protocol)}
                         className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                        title="Umbenennen"
+                        title={t("protocols.rename")}
                       >
                         <Pencil size={13} />
                       </button>
@@ -314,7 +315,7 @@ export default function PropertyProtocolsPage({
                         type="button"
                         onClick={() => onDuplicate(protocol.id)}
                         className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                        title="Duplizieren"
+                        title={t("protocols.duplicate")}
                       >
                         <Copy size={13} />
                       </button>
@@ -323,7 +324,7 @@ export default function PropertyProtocolsPage({
                           type="button"
                           onClick={() => handleCopyLink(protocol.id)}
                           className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                          title="Freigabe-Link kopieren"
+                          title={t("protocols.copyLink")}
                         >
                           {copiedId === protocol.id ? <Check size={13} /> : <Eye size={13} />}
                         </button>
@@ -332,7 +333,7 @@ export default function PropertyProtocolsPage({
                         type="button"
                         onClick={() => onToggleSync(protocol.id)}
                         className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                        title={protocol.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
+                        title={protocol.syncEnabled ? t("protocols.syncActive") : t("protocols.syncInactive")}
                       >
                         {protocol.syncEnabled ? <Cloud size={13} /> : <CloudOff size={13} />}
                       </button>
@@ -340,7 +341,7 @@ export default function PropertyProtocolsPage({
                         type="button"
                         onClick={() => setDeleteTarget(protocol)}
                         className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
-                        title="Löschen"
+                        title={t("common.delete")}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -360,7 +361,7 @@ export default function PropertyProtocolsPage({
               className="flex items-center gap-2 text-xs font-medium text-neutral-500 hover:text-black transition-colors mb-3"
             >
               <Trash2 size={13} />
-              Papierkorb ({propertyTrashed.length})
+              {t("protocols.trash")} ({propertyTrashed.length})
               {showTrash ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
             {showTrash && (
@@ -370,10 +371,10 @@ export default function PropertyProtocolsPage({
                     <li key={id} className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-neutral-600 truncate">
-                          {entry.protocol.mietobjekt || "Protokoll"}
+                          {entry.protocol.mietobjekt || t("protocols.unnamed")}
                         </p>
                         <p className="text-xs text-neutral-400 mt-0.5">
-                          Gelöscht {formatDate(entry.deletedAt)}
+                          {t("protocols.deletedOn")} {formatDate(entry.deletedAt)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -381,7 +382,7 @@ export default function PropertyProtocolsPage({
                           type="button"
                           onClick={() => onRestore(id)}
                           className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-black transition-colors"
-                          title="Wiederherstellen"
+                          title={t("protocols.restoreProtocol")}
                         >
                           <RotateCcw size={13} />
                         </button>
@@ -389,7 +390,7 @@ export default function PropertyProtocolsPage({
                           type="button"
                           onClick={() => onPermanentlyDelete(id)}
                           className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-black transition-colors"
-                          title="Endgültig löschen"
+                          title={t("protocols.permanentlyDelete")}
                         >
                           <X size={13} />
                         </button>
@@ -403,7 +404,7 @@ export default function PropertyProtocolsPage({
                     onClick={onEmptyTrash}
                     className="text-xs text-neutral-500 hover:text-black transition-colors underline"
                   >
-                    Papierkorb leeren
+                    {t("protocols.emptyTrash")}
                   </button>
                 )}
               </>
@@ -414,7 +415,7 @@ export default function PropertyProtocolsPage({
 
       {deleteTarget && (
         <DeleteConfirm
-          label={deleteTarget.mietobjekt || "Dieses Protokoll"}
+          label={deleteTarget.mietobjekt || t("protocols.unnamed")}
           onConfirm={() => { onDelete(deleteTarget.id); setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />

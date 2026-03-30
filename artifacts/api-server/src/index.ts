@@ -403,7 +403,27 @@ app.get("/api/protocol/:id", async (req, res) => {
       res.status(404).json({ error: "Protokoll nicht gefunden" });
       return;
     }
-    res.json({ protocol: rows[0].data });
+
+    const protocolData = rows[0].data as Record<string, unknown>;
+    let propertyLanguage: string | null = null;
+
+    const propertyId = protocolData.propertyId as string | undefined;
+    if (propertyId) {
+      try {
+        const propRows = await db
+          .select({ language: propertiesTable.language })
+          .from(propertiesTable)
+          .where(eq(propertiesTable.id, propertyId))
+          .limit(1);
+        if (propRows.length > 0) {
+          propertyLanguage = propRows[0].language ?? null;
+        }
+      } catch {
+        // non-critical — fall back to null
+      }
+    }
+
+    res.json({ protocol: protocolData, propertyLanguage });
   } catch (err) {
     logger.error({ err }, "Failed to fetch protocol");
     res.status(500).json({ error: "Internal server error" });

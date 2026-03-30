@@ -12,6 +12,7 @@ export interface Property {
   accountId: string;
   name: string;
   adresse: string;
+  language: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +27,7 @@ export const UNASSIGNED_PROPERTY: Property = {
   accountId: "",
   name: "Nicht zugeordnet",
   adresse: "Protokolle ohne Liegenschaft",
+  language: "de-CH",
   createdAt: "",
   updatedAt: "",
 };

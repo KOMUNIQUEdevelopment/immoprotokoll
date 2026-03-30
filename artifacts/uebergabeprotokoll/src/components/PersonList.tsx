@@ -2,14 +2,19 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Person } from "../types";
 import { Input } from "@/components/ui/input";
+import { getTranslations, type SupportedLanguage } from "../i18n";
+import type { Translations } from "../i18n/de-CH";
 
 interface PersonListProps {
   label: string;
   persons: Person[];
   onChange: (persons: Person[]) => void;
+  language?: SupportedLanguage;
 }
 
-export default function PersonList({ label, persons, onChange }: PersonListProps) {
+export default function PersonList({ label, persons, onChange, language = "de-CH" }: PersonListProps) {
+  const tr = getTranslations(language) as Translations;
+
   const addPerson = () => {
     onChange([...persons, { id: crypto.randomUUID(), name: "", gender: "m" }]);
   };
@@ -33,10 +38,10 @@ export default function PersonList({ label, persons, onChange }: PersonListProps
           type="button"
           onClick={addPerson}
           className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-          title="Person hinzufügen"
+          title={tr.person.addPerson}
         >
           <Plus size={13} />
-          Person hinzufügen
+          {tr.person.addPerson}
         </button>
       </div>
 
@@ -46,7 +51,7 @@ export default function PersonList({ label, persons, onChange }: PersonListProps
             <Input
               value={person.name}
               onChange={(e) => updatePerson(person.id, e.target.value)}
-              placeholder="Vorname Nachname"
+              placeholder={tr.person.namePlaceholder}
               className="flex-1 text-sm"
             />
             {persons.length > 1 && (
@@ -54,7 +59,7 @@ export default function PersonList({ label, persons, onChange }: PersonListProps
                 type="button"
                 onClick={() => removePerson(person.id)}
                 className="p-1.5 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                title="Entfernen"
+                title={tr.person.removePerson}
               >
                 <Trash2 size={14} />
               </button>
