@@ -218,6 +218,7 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete, lang
               onChange={(photos) => update("photos", photos)}
               roomName={room.name}
               floorLabel={floorLabel}
+              language={language}
             />
           </div>
         </div>

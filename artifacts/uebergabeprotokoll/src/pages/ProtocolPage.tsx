@@ -146,6 +146,7 @@ export default function ProtocolPage({ protocol, updateProtocol, language = "de-
               photos={protocol.meterPhotos ?? []}
               onChange={(photos) => setField("meterPhotos", photos)}
               roomName={tr.editor.meterReadings}
+              language={language}
             />
           </div>
         </div>
@@ -182,6 +183,7 @@ export default function ProtocolPage({ protocol, updateProtocol, language = "de-
               photos={protocol.kitchenPhotos ?? []}
               onChange={(photos) => setField("kitchenPhotos", photos)}
               roomName={tr.editor.kitchen}
+              language={language}
             />
           </div>
         </div>

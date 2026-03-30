@@ -1,5 +1,4 @@
 import React, { useRef, useCallback } from "react";
-import i18n from "../i18n";
 import {
   DndContext,
   closestCenter,
@@ -21,15 +20,20 @@ import { Camera, ImagePlus, Trash2, GripVertical } from "lucide-react";
 import { RoomPhoto } from "../types";
 import { Button } from "@/components/ui/button";
 import exifr from "exifr";
+import { type SupportedLanguage, getTranslations } from "../i18n";
+import { type Translations } from "../i18n/de-CH";
+import i18n from "../i18n";
 
 interface SortablePhotoProps {
   photo: RoomPhoto;
   onDelete: (id: string) => void;
   roomName?: string;
   floorLabel?: string;
+  tr: Translations["editor"];
+  locale: string;
 }
 
-function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoProps) {
+function SortablePhoto({ photo, onDelete, roomName, floorLabel, tr, locale }: SortablePhotoProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: photo.id,
   });
@@ -41,8 +45,7 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const _tsLocale = i18n.language === "de-CH" ? "de-CH" : i18n.language === "de-DE" ? "de-DE" : "en-GB";
-  const ts = new Date(photo.timestamp).toLocaleString(_tsLocale, {
+  const ts = new Date(photo.timestamp).toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "2-digit",
@@ -58,25 +61,23 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
     >
       <img
         src={photo.dataUrl}
-        alt={`Foto ${ts}`}
+        alt={`${tr.roomPhotos} ${ts}`}
         className="w-full aspect-[4/3] object-cover"
       />
-      {/* Drag handle + overlay controls – visible on hover (desktop) */}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <button
           {...listeners}
           {...attributes}
           className="p-1.5 bg-white/20 rounded-md cursor-grab active:cursor-grabbing text-white hover:bg-white/30"
-          title="Verschieben"
+          title={tr.photoMove}
         >
           <GripVertical size={16} />
         </button>
       </div>
-      {/* Delete button – always visible so it works on touch/mobile */}
       <button
         onClick={() => onDelete(photo.id)}
         className="absolute top-1.5 right-1.5 p-1 bg-foreground/80 rounded-md text-background hover:bg-foreground active:bg-foreground shadow"
-        title="Löschen"
+        title={tr.photoDelete}
       >
         <Trash2 size={14} />
       </button>
@@ -94,6 +95,7 @@ interface PhotoManagerProps {
   onChange: (photos: RoomPhoto[]) => void;
   roomName?: string;
   floorLabel?: string;
+  language?: SupportedLanguage;
 }
 
 const MAX_DIM = 1280;
@@ -133,11 +135,9 @@ function compressImage(file: File): Promise<string> {
 // constructing an explicit local-time string (no trailing "Z").
 function parseExifDate(raw: unknown): string | null {
   if (raw instanceof Date && !isNaN(raw.getTime())) {
-    // exifr already built a Date – use it directly (it applied local-time rules)
     return raw.toISOString();
   }
   if (typeof raw === "string" && raw.trim()) {
-    // "YYYY:MM:DD HH:MM:SS" → "YYYY-MM-DDTHH:MM:SS" (no Z = local time in JS)
     const normalized = raw.trim().replace(
       /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}:\d{2}:\d{2})$/,
       "$1-$2-$3T$4"
@@ -148,17 +148,8 @@ function parseExifDate(raw: unknown): string | null {
   return null;
 }
 
-// Determine the best timestamp for a photo file.
-// Priority:
-//   1. EXIF DateTimeOriginal  – actual camera shutter moment
-//   2. EXIF CreateDate        – digitisation / creation date (also in XMP)
-//   3. Any other recognisable EXIF/XMP date field
-//   4. file.lastModified      – file-system date (only useful for freshly taken photos)
-//   5. current time           – absolute last resort (upload moment)
 async function getPhotoTimestamp(file: File): Promise<string> {
   try {
-    // Parse broadly: all EXIF segments + XMP (used by Google Photos / Drive)
-    // translateValues:false keeps raw strings so we can normalise ourselves
     const tags = await exifr.parse(file, {
       tiff: true,
       xmp: true,
@@ -166,19 +157,18 @@ async function getPhotoTimestamp(file: File): Promise<string> {
       icc: false,
       jfif: false,
       translateValues: false,
-      reviveValues: true, // still convert date strings to Date objects where possible
+      reviveValues: true,
     }) as Record<string, unknown> | null | undefined;
 
     if (tags) {
-      // Ordered list of fields to try, from most to least authoritative
       const candidates = [
         tags["DateTimeOriginal"],
         tags["dateTimeOriginal"],
         tags["CreateDate"],
         tags["createDate"],
-        tags["DateCreated"],     // IPTC / XMP
+        tags["DateCreated"],
         tags["dateCreated"],
-        tags["MetadataDate"],    // XMP
+        tags["MetadataDate"],
         tags["ModifyDate"],
       ];
       for (const raw of candidates) {
@@ -190,21 +180,27 @@ async function getPhotoTimestamp(file: File): Promise<string> {
     // EXIF parsing failed – proceed to fallbacks
   }
 
-  // file.lastModified is reliable ONLY if it predates "now" by a meaningful margin
-  // (i.e. the file existed before the upload session started, not a just-downloaded copy).
   if (file.lastModified) {
     const fromFile = new Date(file.lastModified);
-    // Accept if the file was last modified more than 60 seconds before upload began
     if (!isNaN(fromFile.getTime()) && Date.now() - fromFile.getTime() > 60_000) {
       return fromFile.toISOString();
     }
   }
 
-  // Last resort: moment of upload
   return new Date().toISOString();
 }
 
-export default function PhotoManager({ photos, onChange, roomName, floorLabel }: PhotoManagerProps) {
+function langToLocale(lang: string): string {
+  if (lang === "de-CH") return "de-CH";
+  if (lang === "de-DE") return "de-DE";
+  return "en-GB";
+}
+
+export default function PhotoManager({ photos, onChange, roomName, floorLabel, language }: PhotoManagerProps) {
+  const effectiveLang = language ?? (i18n.language as SupportedLanguage) ?? "de-CH";
+  const tr = (getTranslations(effectiveLang) as Translations).editor;
+  const locale = langToLocale(effectiveLang);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -258,7 +254,7 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
           onClick={() => cameraInputRef.current?.click()}
         >
           <Camera size={15} />
-          Kamera
+          {tr.photoCamera}
         </Button>
         <Button
           type="button"
@@ -268,7 +264,7 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
           onClick={() => fileInputRef.current?.click()}
         >
           <ImagePlus size={15} />
-          Aus Galerie
+          {tr.photoGallery}
         </Button>
         <input
           ref={cameraInputRef}
@@ -298,7 +294,15 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
           <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {photos.map((photo) => (
-                <SortablePhoto key={photo.id} photo={photo} onDelete={deletePhoto} roomName={roomName} floorLabel={floorLabel} />
+                <SortablePhoto
+                  key={photo.id}
+                  photo={photo}
+                  onDelete={deletePhoto}
+                  roomName={roomName}
+                  floorLabel={floorLabel}
+                  tr={tr}
+                  locale={locale}
+                />
               ))}
             </div>
           </SortableContext>
@@ -306,7 +310,7 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel }:
       )}
 
       {photos.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Noch keine Fotos hinzugefügt</p>
+        <p className="text-xs text-muted-foreground italic">{tr.photoNoPhotos}</p>
       )}
     </div>
   );
