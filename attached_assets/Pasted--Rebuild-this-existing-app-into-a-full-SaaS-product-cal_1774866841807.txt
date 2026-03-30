@@ -1,0 +1,123 @@
+```
+Rebuild this existing app into a full SaaS product called 
+ImmoProtokoll (immoprotokoll.com). The current codebase is the 
+functional and visual foundation - retain all its core features 
+and extend it with the architecture below. 
+Use the provided logo asset for the brand.
+
+---
+
+ARCHITECTURE
+
+Account Structure:
+- A user registers and creates an account (= organization unit)
+- Each account has: users, properties, and protocols
+- Properties belong to an account
+- Protocols belong to a property
+- All users of an account see all properties and protocols of that account
+- A property's protocol history provides a complete overview across 
+  all tenancies
+
+User Roles (per account):
+- Owner: full rights + billing management
+- Administrator: full rights, no billing access
+- Property Manager: can create properties and protocols, 
+  no user/billing management
+
+Property & Protocol Structure:
+- Multiple properties per account
+- Multiple protocols per property
+- Floors and rooms are fully custom - no predefined structure
+- Users can create, name, rename and reorder (drag & drop) 
+  floors and rooms freely
+- All other existing protocol features are retained: photos with 
+  timestamps, room condition ratings, meter readings, key inventory, 
+  additional agreements, digital signatures (landlord + tenant), 
+  real-time sync via WebSocket, tenant view (read-only shareable link), 
+  PDF export (DIN A4), ZIP photo export, PWA
+
+---
+
+PRICING PLANS
+
+Implement all plans via Stripe. Currencies: CHF, EUR and USD. 
+The numeric price is identical across all three currencies 
+(no conversion, no FX adjustments).
+
+Free:
+- 1 property
+- 1 protocol
+- All PDF exports and photo exports carry ImmoProtokoll branding 
+  (logo + immoprotokoll.com watermark)
+
+Privat (CHF/EUR/USD 9/month | CHF/EUR/USD 86/year):
+- 1 property
+- Up to 30 protocols
+- Exports without ImmoProtokoll branding
+
+Agentur (CHF/EUR/USD 49/month | CHF/EUR/USD 470/year):
+- Up to 50 properties
+- Up to 30 protocols per property
+- Up to 20 users per account
+- Exports without ImmoProtokoll branding
+
+Custom (on request, no self-service signup):
+- Show "Contact us" CTA on pricing page
+- All limits and pricing configured manually via superadmin dashboard
+
+Annual billing: 20% discount vs monthly (display monthly equivalent 
+and total annual amount on pricing page).
+
+---
+
+SUPERADMIN
+
+Account: support@immoprotokoll.com
+Dashboard features:
+- View all accounts and their current plan
+- Configure or remove any limits for Custom accounts
+- Set individual pricing for Custom accounts
+- Basic support tools (impersonate account, view protocol count, etc.)
+
+---
+
+LANGUAGES
+
+Supported UI and export languages:
+- DE-CH: German with Swiss spelling (ss instead of ß, umlauts ä/ö/ü)
+- DE-DE: German with standard German spelling (ß where applicable, 
+  umlauts ä/ö/ü)
+- EN: English
+
+Language logic:
+- Each user sets their preferred UI language in their profile
+- Each property has a language setting (DE-CH / DE-DE / EN)
+- The property language governs: the protocol UI for that property, 
+  all PDF and photo exports, and the tenant view
+- Default language at account creation: DE-CH
+
+---
+
+INFRASTRUCTURE
+
+- Deploy on Google Cloud with server region: europe-west6 (Zürich)
+- Architecture must be GDPR and Swiss nDSG compliant 
+  (data residency in Switzerland)
+- Retain PWA functionality (offline capable, installable)
+
+---
+
+DESIGN
+
+Visual style: Stylish, professional, minimalist.
+Color palette: Black and white only.
+- Background: #ffffff
+- Foreground / primary: #000000
+- No gradients, no color accents, no brand colors beyond black and white
+- UI elements (buttons, borders, inputs, icons) follow the same 
+  strict black/white palette
+- Typography: clean, modern sans-serif
+- Spacing and layout: generous whitespace, clear visual hierarchy
+- The design should feel premium and editorial - 
+  think high-end Swiss product, not startup dashboard
+```
