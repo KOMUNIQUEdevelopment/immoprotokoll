@@ -75,6 +75,8 @@ export interface ProtocolData {
   allgemeinerZustandKueche: string;
   kitchenPhotos: RoomPhoto[];
   rooms: RoomData[];
+  /** IDs of rooms explicitly deleted by the user — never re-added by migration or server sync. */
+  deletedRoomIds: string[];
   zusatzvereinbarungTitle: string;
   zusatzvereinbarungen: ZusatzvereinbarungEntry[];
   signaturOrt: string;
@@ -213,6 +215,7 @@ export function createDefaultProtocol(): ProtocolData {
     allgemeinerZustandKueche: "",
     kitchenPhotos: [],
     rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
+    deletedRoomIds: [],
     zusatzvereinbarungTitle: "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen",
     zusatzvereinbarungen: DEFAULT_ZUSATZVEREINBARUNGEN.map(e => ({ ...e })),
     signaturOrt: "",
@@ -263,11 +266,20 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     return { ...r, id: newId, name: newName };
   });
 
+  // Rooms explicitly deleted by the user — never re-add them.
+  const deletedRoomIds: string[] = Array.isArray(data.deletedRoomIds)
+    ? (data.deletedRoomIds as string[])
+    : [];
+  const deletedSet = new Set(deletedRoomIds);
+
   const existingRoomIds = new Set(rooms.map(r => r.id));
-  const missingRooms = DEFAULT_ROOMS.filter(r => !existingRoomIds.has(r.id)).map(r => ({ ...r, photos: [] }));
+  const missingRooms = DEFAULT_ROOMS
+    .filter(r => !existingRoomIds.has(r.id) && !deletedSet.has(r.id))
+    .map(r => ({ ...r, photos: [] }));
   if (missingRooms.length > 0) {
     rooms.push(...missingRooms);
   }
+  data.deletedRoomIds = deletedRoomIds;
 
   const defaultOrder = DEFAULT_ROOMS.map(r => r.id);
   rooms.sort((a, b) => {
