@@ -7,23 +7,31 @@ export type SyncMessage =
   | { type: "update"; protocol: ProtocolData }
   | { type: "delete"; id: string };
 
+export interface SyncError {
+  code: string;
+  message: string;
+}
+
 interface UseSyncOptions {
   onInit: (protocols: Record<string, ProtocolData>) => void;
   onUpdate: (protocol: ProtocolData) => void;
   onDelete: (id: string) => void;
+  onError?: (err: SyncError) => void;
   sendRef: React.MutableRefObject<((msg: SyncMessage) => void) | null>;
 }
 
-export function useSync({ onInit, onUpdate, onDelete, sendRef }: UseSyncOptions) {
+export function useSync({ onInit, onUpdate, onDelete, onError, sendRef }: UseSyncOptions) {
   const [status, setStatus] = useState<SyncStatus>("connecting");
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onInitRef = useRef(onInit);
   const onUpdateRef = useRef(onUpdate);
   const onDeleteRef = useRef(onDelete);
+  const onErrorRef = useRef(onError);
   onInitRef.current = onInit;
   onUpdateRef.current = onUpdate;
   onDeleteRef.current = onDelete;
+  onErrorRef.current = onError;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -52,6 +60,8 @@ export function useSync({ onInit, onUpdate, onDelete, sendRef }: UseSyncOptions)
           onUpdateRef.current(msg.protocol as ProtocolData);
         } else if (msg.type === "delete" && msg.id) {
           onDeleteRef.current(msg.id as string);
+        } else if (msg.type === "error" && msg.code) {
+          onErrorRef.current?.({ code: msg.code as string, message: msg.message as string ?? msg.code });
         }
       } catch {}
     };

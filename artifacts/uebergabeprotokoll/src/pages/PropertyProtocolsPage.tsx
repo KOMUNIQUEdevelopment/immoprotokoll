@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ProtocolData, Property, getPersonRole } from "../types";
 import { TrashedEntry } from "../store";
 import {
@@ -7,6 +7,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+interface PlanLimits {
+  plan: string;
+  properties: number | null;
+  protocolsPerProperty: number | null;
+}
 
 interface PropertyProtocolsPageProps {
   property: Property;
@@ -125,6 +131,15 @@ export default function PropertyProtocolsPage({
   const [renameTarget, setRenameTarget] = useState<ProtocolData | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
+  const [limitError, setLimitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/properties/plan-limits", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPlanLimits(data); })
+      .catch(() => {});
+  }, []);
 
   const propertyProtocols = Object.values(protocols)
     .filter(p => p.propertyId === property.id)
@@ -136,6 +151,22 @@ export default function PropertyProtocolsPage({
 
   const propertyTrashed = Object.entries(trashedProtocols)
     .filter(([, e]) => e.protocol.propertyId === property.id);
+
+  const handleCreate = () => {
+    if (planLimits && planLimits.protocolsPerProperty !== null) {
+      const activeCount = Object.values(protocols).filter(
+        p => p.propertyId === property.id
+      ).length;
+      if (activeCount >= planLimits.protocolsPerProperty) {
+        setLimitError(
+          `Ihr ${planLimits.plan}-Plan erlaubt maximal ${planLimits.protocolsPerProperty} Protokoll(e) pro Liegenschaft.`
+        );
+        return;
+      }
+    }
+    setLimitError(null);
+    onCreate();
+  };
 
   const handleCopyLink = (id: string) => {
     copyToClipboard(syncShareLink(id));
@@ -165,7 +196,7 @@ export default function PropertyProtocolsPage({
           </div>
           <Button
             size="sm"
-            onClick={onCreate}
+            onClick={handleCreate}
             className="bg-black text-white hover:bg-neutral-800 gap-1.5 shrink-0"
           >
             <Plus size={14} />
@@ -176,6 +207,15 @@ export default function PropertyProtocolsPage({
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
+        {limitError && (
+          <div className="flex items-start gap-2 mb-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-neutral-500" />
+            <span className="flex-1">{limitError}</span>
+            <button type="button" onClick={() => setLimitError(null)} className="text-neutral-400 hover:text-black transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {propertyProtocols.length === 0 && propertyTrashed.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
@@ -187,7 +227,7 @@ export default function PropertyProtocolsPage({
             </p>
             <Button
               size="sm"
-              onClick={onCreate}
+              onClick={handleCreate}
               className="mt-4 bg-black text-white hover:bg-neutral-800 gap-1.5"
             >
               <Plus size={14} />

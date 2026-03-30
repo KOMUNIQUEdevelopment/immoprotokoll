@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Property } from "../types";
-import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle } from "lucide-react";
+import { Property, ProtocolData } from "../types";
+import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -23,6 +23,7 @@ async function apiFetch(path: string, options?: RequestInit) {
 interface PropertyListPageProps {
   onSelectProperty: (property: Property) => void;
   onLogout?: () => void;
+  protocols?: Record<string, ProtocolData>;
 }
 
 interface DeleteConfirmProps {
@@ -138,7 +139,7 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
   );
 }
 
-export default function PropertyListPage({ onSelectProperty, onLogout }: PropertyListPageProps) {
+export default function PropertyListPage({ onSelectProperty, onLogout, protocols = {} }: PropertyListPageProps) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -282,6 +283,15 @@ export default function PropertyListPage({ onSelectProperty, onLogout }: Propert
                         </p>
                       )}
                     </div>
+                    {(() => {
+                      const count = Object.values(protocols).filter(p => p.propertyId === property.id).length;
+                      return (
+                        <span className="inline-flex items-center gap-1 text-xs text-neutral-500 bg-neutral-100 rounded-md px-2 py-0.5 shrink-0">
+                          <ClipboardList size={11} />
+                          {count}
+                        </span>
+                      );
+                    })()}
                   </button>
                   <div className="flex items-center gap-1 pr-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button

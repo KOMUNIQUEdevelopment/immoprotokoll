@@ -26,6 +26,22 @@ export async function getPlanLimits(accountId: string) {
   return { plan, limits: PLAN_LIMITS[plan] };
 }
 
+// ── GET /api/properties/plan-limits — return current plan & limits ───────────
+router.get("/plan-limits", requireAuth, async (req: AuthRequest, res: Response) => {
+  const accountId = req.user!.accountId;
+  try {
+    const { plan, limits } = await getPlanLimits(accountId);
+    const safeLimit = (n: number) => (n === Infinity ? null : n);
+    res.json({
+      plan,
+      properties: safeLimit(limits.properties),
+      protocolsPerProperty: safeLimit(limits.protocolsPerProperty),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /api/properties — list all properties for the authenticated account ───
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const accountId = req.user!.accountId;

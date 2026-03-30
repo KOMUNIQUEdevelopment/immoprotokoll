@@ -87,6 +87,15 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     onInit: receiveInit,
     onUpdate: receiveRemote,
     onDelete: receiveDelete,
+    onError: (err) => {
+      if (err.code === "PROTOCOL_LIMIT_EXCEEDED") {
+        toast({
+          title: "Protokoll-Limit erreicht",
+          description: err.message || "Ihr Plan erlaubt keine weiteren Protokolle in dieser Liegenschaft.",
+          variant: "destructive",
+        });
+      }
+    },
     sendRef: wsSendRef,
   });
 
@@ -167,6 +176,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
           <PropertyListPage
             onSelectProperty={setSelectedProperty}
             onLogout={onLogout}
+            protocols={protocols}
           />
           <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
         </>
