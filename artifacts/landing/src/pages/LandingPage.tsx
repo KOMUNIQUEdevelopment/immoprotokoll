@@ -60,12 +60,12 @@ export default function LandingPage() {
   const base = import.meta.env.BASE_URL;
   const slides = useMemo(() => {
     const all = [
-      { src: `${base}slides/slide-1.jpg`, alt: lang === "de" ? "Vermieter mit Hausmodell" : "Landlord with house model" },
-      { src: `${base}slides/slide-2.jpg`, alt: lang === "de" ? "Nachdenklicher Vermieter" : "Thoughtful property owner" },
-      { src: `${base}slides/slide-3.jpg`, alt: lang === "de" ? "Lächelnder Mann mit Hausmodell" : "Smiling man with house model" },
-      { src: `${base}slides/slide-4.jpg`, alt: lang === "de" ? "Frau mit Hausmodell" : "Woman with house model" },
-      { src: `${base}slides/slide-5.jpg`, alt: lang === "de" ? "Junge Frau mit Hausmodell" : "Young woman with house model" },
-      { src: `${base}slides/slide-6.jpg`, alt: lang === "de" ? "Elegant gekleidete Frau mit Hausmodell" : "Elegantly dressed woman with house model" },
+      { src: `${base}slides/slide-1.jpg`, alt: lang === "de" ? "Vermieter mit Hausmodell" : "Landlord with house model", bg: "#41C5BD" },
+      { src: `${base}slides/slide-2.jpg`, alt: lang === "de" ? "Nachdenklicher Vermieter" : "Thoughtful property owner", bg: "#F0F0F0" },
+      { src: `${base}slides/slide-3.jpg`, alt: lang === "de" ? "Lächelnder Mann mit Hausmodell" : "Smiling man with house model", bg: "#41C5BD" },
+      { src: `${base}slides/slide-4.jpg`, alt: lang === "de" ? "Frau mit Hausmodell" : "Woman with house model", bg: "#4A8EC9" },
+      { src: `${base}slides/slide-5.jpg`, alt: lang === "de" ? "Junge Frau mit Hausmodell" : "Young woman with house model", bg: "#4A8EC9" },
+      { src: `${base}slides/slide-6.jpg`, alt: lang === "de" ? "Elegant gekleidete Frau mit Hausmodell" : "Elegantly dressed woman with house model", bg: "#4A8EC9" },
     ];
     for (let i = all.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -284,7 +284,13 @@ export default function LandingPage() {
         </section>
 
         {/* BOTTOM CTA */}
-        <section className="py-32 bg-black/5 text-black text-center px-4">
+        <section
+          className="py-32 text-black text-center px-4"
+          style={{
+            backgroundColor: slides[activeSlide].bg,
+            transition: "background-color 1200ms ease-in-out",
+          }}
+        >
           <motion.div 
             initial="hidden"
             whileInView="visible"
