@@ -537,8 +537,8 @@ export function useProtocolsStore(accountId: string | null) {
     });
   }, []);
 
-  const createNew = useCallback(() => {
-    const p = createDefaultProtocol();
+  const createNew = useCallback((propertyId: string | null = null) => {
+    const p = createDefaultProtocol(propertyId);
     setProtocols(prev => {
       const next = { ...prev, [p.id]: p };
       saveProt(next);

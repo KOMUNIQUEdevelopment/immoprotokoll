@@ -1,5 +1,21 @@
 export type Condition = "sehr gut" | "gut" | "Mängel" | "";
 
+/** A user-defined floor within a protocol (free-form name, ordered list). */
+export interface FloorDef {
+  id: string;
+  name: string;
+}
+
+/** A property managed by an account. */
+export interface Property {
+  id: string;
+  accountId: string;
+  name: string;
+  adresse: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RoomPhoto {
   id: string;
   dataUrl: string;
@@ -61,6 +77,8 @@ export interface PersonSignature {
 
 export interface ProtocolData {
   id: string;
+  /** Property this protocol belongs to (null for legacy/migrated protocols). */
+  propertyId: string | null;
   mietobjekt: string;
   adresse: string;
   datum: string;
@@ -74,6 +92,12 @@ export interface ProtocolData {
   appliances: ApplianceEntry[];
   allgemeinerZustandKueche: string;
   kitchenPhotos: RoomPhoto[];
+  /**
+   * Ordered list of user-defined floors.
+   * New protocols use UUIDs as floor IDs so rooms can be safely renamed.
+   * Legacy protocols (pre-migration) may have empty floors[] with room.floor as a plain name string.
+   */
+  floors: FloorDef[];
   rooms: RoomData[];
   /** IDs of rooms explicitly deleted by the user — never re-added by migration or server sync. */
   deletedRoomIds: string[];
@@ -198,11 +222,16 @@ export const DEFAULT_ZUSATZVEREINBARUNGEN: ZusatzvereinbarungEntry[] = [
   },
 ];
 
-export function createDefaultProtocol(): ProtocolData {
+/**
+ * Create a fresh protocol, optionally linked to a property.
+ * New protocols start with no floors/rooms — users build them freely.
+ */
+export function createDefaultProtocol(propertyId: string | null = null): ProtocolData {
   const today = new Date();
   const datum = today.toLocaleDateString("de-CH");
   return {
     id: crypto.randomUUID(),
+    propertyId,
     mietobjekt: "",
     adresse: "",
     datum,
@@ -211,12 +240,13 @@ export function createDefaultProtocol(): ProtocolData {
     gesamtZustand: "",
     schluessel: "",
     schluesselDetails: "",
-    meterReadings: DEFAULT_METER_READINGS,
+    meterReadings: DEFAULT_METER_READINGS.map(r => ({ ...r })),
     meterPhotos: [],
-    appliances: DEFAULT_APPLIANCES,
+    appliances: DEFAULT_APPLIANCES.map(a => ({ ...a })),
     allgemeinerZustandKueche: "",
     kitchenPhotos: [],
-    rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
+    floors: [],
+    rooms: [],
     deletedRoomIds: [],
     zusatzvereinbarungTitle: "Zusatzvereinbarungen",
     zusatzvereinbarungen: [],
@@ -226,6 +256,26 @@ export function createDefaultProtocol(): ProtocolData {
     lastSaved: null,
     syncEnabled: false,
   };
+}
+
+/**
+ * Derive legacy floors array from the room.floor strings (EG/OG/DG/UG/Außen).
+ * Used when migrating old protocols that have no floors[] field.
+ */
+function deriveLegacyFloors(rooms: RoomData[]): FloorDef[] {
+  const seen = new Map<string, string>();
+  for (const room of rooms) {
+    if (room.floor && !seen.has(room.floor)) {
+      seen.set(room.floor, room.floor);
+    }
+  }
+  // Canonical order for legacy floors
+  const FLOOR_ORDER = ["EG", "OG", "DG", "UG", "Außen"];
+  const orderedKeys = [
+    ...FLOOR_ORDER.filter(k => seen.has(k)),
+    ...[...seen.keys()].filter(k => !FLOOR_ORDER.includes(k)),
+  ];
+  return orderedKeys.map(name => ({ id: name, name }));
 }
 
 const ROOM_RENAMES: Record<string, string> = {
@@ -315,5 +365,14 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
   });
 
   data.rooms = rooms;
+
+  // Ensure propertyId is present (null for legacy protocols)
+  if (!("propertyId" in data)) data.propertyId = null;
+
+  // Derive floors from existing rooms if not set (legacy protocol migration)
+  if (!Array.isArray(data.floors) || (data.floors as unknown[]).length === 0) {
+    data.floors = deriveLegacyFloors(rooms);
+  }
+
   return { ...def, ...(data as Partial<ProtocolData>) } as ProtocolData;
 }

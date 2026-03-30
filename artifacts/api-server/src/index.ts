@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   sessionsTable,
@@ -9,6 +9,7 @@ import {
   syncProtocolsTable,
   syncPhotosTable,
 } from "@workspace/db";
+import { getPlanLimits } from "./routes/properties";
 import { requireAuth, type AuthRequest } from "./middleware/auth";
 import app from "./app";
 import { logger } from "./lib/logger";
@@ -188,6 +189,7 @@ wss.on("connection", async (ws, request) => {
     if (msg.type === "update" && msg.protocol && msg.protocol.id) {
       const incoming = msg.protocol as {
         id: string;
+        propertyId?: string | null;
         personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
       };
 
@@ -204,6 +206,31 @@ wss.on("connection", async (ws, request) => {
           .limit(1);
 
         const existing = existingRows[0]?.data as typeof incoming | undefined;
+        const isNew = !existingRows[0];
+
+        // Plan limit check for new protocols: count existing protocols for this property
+        if (isNew && incoming.propertyId) {
+          const { plan, limits } = await getPlanLimits(accountId!);
+          if (limits.protocolsPerProperty !== Infinity) {
+            const [{ value: protocolCount }] = await db
+              .select({ value: count() })
+              .from(syncProtocolsTable)
+              .where(
+                and(
+                  eq(syncProtocolsTable.accountId, accountId!),
+                  eq(syncProtocolsTable.propertyId, incoming.propertyId)
+                )
+              );
+            if (protocolCount >= limits.protocolsPerProperty) {
+              ws.send(JSON.stringify({
+                type: "error",
+                code: "PROTOCOL_LIMIT_EXCEEDED",
+                message: `Plan limit: your ${plan} plan allows ${limits.protocolsPerProperty} protocol(s) per property.`,
+              }));
+              return;
+            }
+          }
+        }
 
         // Preserve non-empty signatures that were already on the server
         if (existing?.personSignatures?.length && incoming.personSignatures) {
@@ -226,16 +253,20 @@ wss.on("connection", async (ws, request) => {
 
         // Upsert to DB — conflict target is composite (account_id, id) so
         // a different account using the same UUID cannot overwrite this row.
+        // propertyId is stored as a dedicated column for efficient per-property queries.
+        const propertyId = incoming.propertyId ?? null;
         await db
           .insert(syncProtocolsTable)
           .values({
             id: incoming.id,
             accountId: accountId!,
+            propertyId,
             data: incoming as unknown as Record<string, unknown>,
           })
           .onConflictDoUpdate({
             target: [syncProtocolsTable.accountId, syncProtocolsTable.id],
             set: {
+              propertyId,
               data: incoming as unknown as Record<string, unknown>,
               updatedAt: new Date(),
             },

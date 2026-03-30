@@ -36,6 +36,42 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Superadmin: `support@immoprotokoll.com` (init on server start via `SUPERADMIN_PASSWORD` env var)
 - Middleware: `requireAuth`, `requireRole`, `requireSuperAdmin` in `artifacts/api-server/src/middleware/auth.ts`
 
+## Navigation Flow
+
+1. Login → **PropertyListPage** (list of properties for the account)
+2. Click Property → **PropertyProtocolsPage** (protocols filtered by `propertyId`)
+3. Click Protocol → **ProtocolEditor** (existing editor with FloorEditor)
+4. Back from editor → returns to PropertyProtocolsPage
+
+## Protocols & Floors
+
+- `ProtocolData.propertyId: string | null` — links a protocol to a property (null for legacy)
+- `ProtocolData.floors: FloorDef[]` — user-defined ordered floors, each `{ id: string; name: string }`
+- `RoomData.floor` stores the floor ID (UUID for new protocols, floor name string for legacy)
+- Legacy protocols: `migrateProtocol()` derives `floors[]` from existing `room.floor` strings
+- New protocols: start with empty `floors[]` and `rooms[]`; users build structure via `FloorEditor`
+- `FloorEditor` component (`artifacts/uebergabeprotokoll/src/components/FloorEditor.tsx`) uses `@dnd-kit` for drag-to-reorder floors and rooms
+
+## Properties API
+
+- `GET /api/properties` → returns array of properties (flat, no wrapper object)
+- `POST /api/properties` → creates property, returns flat property object
+- `PATCH /api/properties/:id` → updates property, returns flat property object
+- `DELETE /api/properties/:id` → deletes property (not allowed for property_manager role)
+- `GET /api/properties/:id/protocols` → returns `{ protocols }` for a property
+
+## Plan Limits
+
+Defined in `artifacts/api-server/src/routes/properties.ts`:
+- `free`:    1 property, 1 protocol/property
+- `privat`:  1 property, 30 protocols/property
+- `agentur`: 50 properties, 30 protocols/property
+- `custom`:  unlimited
+
+## DB Package Build
+
+After changing `lib/db/src/schema/`, run `cd lib/db && pnpm exec tsc --build --force` to regenerate `.d.ts` declarations before TypeScript can pick up the new exports.
+
 ## Structure
 
 ```text

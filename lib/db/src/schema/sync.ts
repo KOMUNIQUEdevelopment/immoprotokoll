@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
 import { accountsTable } from "./accounts";
+import { propertiesTable } from "./properties";
 
 export const syncProtocolsTable = pgTable(
   "sync_protocols",
@@ -8,6 +9,8 @@ export const syncProtocolsTable = pgTable(
     accountId: text("account_id")
       .notNull()
       .references(() => accountsTable.id, { onDelete: "cascade" }),
+    propertyId: text("property_id")
+      .references(() => propertiesTable.id, { onDelete: "set null" }),
     data: jsonb("data").notNull().$type<Record<string, unknown>>(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

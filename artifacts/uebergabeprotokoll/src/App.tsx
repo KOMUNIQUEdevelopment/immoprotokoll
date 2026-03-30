@@ -3,9 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import { useProtocolsStore } from "./store";
+import { Property } from "./types";
 import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
-import ProtocolListPage from "./pages/ProtocolListPage";
+import PropertyListPage from "./pages/PropertyListPage";
+import PropertyProtocolsPage from "./pages/PropertyProtocolsPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -63,8 +65,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     emptyTrash,
     renameProtocol,
     updateProtocol,
-    addRoom,
-    deleteRoom,
+
     toggleSync,
     receiveInit,
     receiveRemote,
@@ -78,6 +79,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
   const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const { toast } = useToast();
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
@@ -134,13 +136,18 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
   };
 
   const handleCreate = () => {
-    createNew();
+    createNew(selectedProperty?.id ?? null);
     setActiveTab("protokoll");
   };
 
   const handleOpen = (id: string) => {
     switchTo(id);
     setActiveTab("protokoll");
+  };
+
+  const handleBackToList = () => {
+    backToList();
+    // stay on PropertyProtocolsPage if we came from one
   };
 
   const allSigned =
@@ -154,13 +161,26 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     );
 
   if (!isEditing) {
+    if (!selectedProperty) {
+      return (
+        <>
+          <PropertyListPage
+            onSelectProperty={setSelectedProperty}
+            onLogout={onLogout}
+          />
+          <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+        </>
+      );
+    }
     return (
       <>
-        <ProtocolListPage
+        <PropertyProtocolsPage
+          property={selectedProperty}
           protocols={protocols}
           trashedProtocols={trashedProtocols}
-          onOpen={handleOpen}
+          onBack={() => setSelectedProperty(null)}
           onCreate={handleCreate}
+          onOpen={handleOpen}
           onDelete={deleteProtocol}
           onRestore={restoreFromTrash}
           onPermanentlyDelete={permanentlyDelete}
@@ -168,7 +188,6 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
           onDuplicate={duplicateProtocol}
           onToggleSync={toggleSync}
           onRename={renameProtocol}
-          onLogout={onLogout}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
       </>
@@ -183,7 +202,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
             <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
-                onClick={backToList}
+                onClick={handleBackToList}
                 className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors shrink-0"
                 title="Zur Übersicht"
               >
@@ -329,7 +348,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4">
         {currentProtocol && activeTab === "protokoll" && (
-          <ProtocolPage protocol={currentProtocol} updateProtocol={updateProtocol} addRoom={addRoom} deleteRoom={deleteRoom} />
+          <ProtocolPage protocol={currentProtocol} updateProtocol={updateProtocol} />
         )}
         {currentProtocol && activeTab === "unterschriften" && (
           <SignaturePage protocol={currentProtocol} updateProtocol={updateProtocol} />
