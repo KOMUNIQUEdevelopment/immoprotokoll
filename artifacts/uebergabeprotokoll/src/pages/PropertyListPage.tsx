@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Property, ProtocolData } from "../types";
-import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList } from "lucide-react";
+import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
+import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -324,6 +324,34 @@ export default function PropertyListPage({ onSelectProperty, onLogout, protocols
             ))}
           </ul>
         )}
+
+        {/* Unassigned protocols (legacy protocols without a property) */}
+        {(() => {
+          const unassignedCount = Object.values(protocols).filter(p => !p.propertyId).length;
+          if (unassignedCount === 0) return null;
+          return (
+            <div className="mt-6">
+              <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-2">Nicht zugeordnet</p>
+              <button
+                type="button"
+                className="w-full flex items-center gap-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-white transition-colors p-4 text-left"
+                onClick={() => onSelectProperty(UNASSIGNED_PROPERTY)}
+              >
+                <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
+                  <Archive size={17} className="text-neutral-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm text-black">Nicht zugeordnete Protokolle</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">Protokolle ohne Liegenschaft (ältere Daten)</p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs text-neutral-500 bg-neutral-100 rounded-md px-2 py-0.5 shrink-0">
+                  <ClipboardList size={11} />
+                  {unassignedCount}
+                </span>
+              </button>
+            </div>
+          );
+        })()}
       </main>
 
       {showForm && (

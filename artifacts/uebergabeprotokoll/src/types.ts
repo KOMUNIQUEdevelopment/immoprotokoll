@@ -16,6 +16,20 @@ export interface Property {
   updatedAt: string;
 }
 
+/**
+ * Sentinel property used to surface legacy (pre-property) protocols that have
+ * no propertyId. The UI shows this as a read-only "Nicht zugeordnet" entry.
+ * Creating new protocols in this view is disabled — users must use a real property.
+ */
+export const UNASSIGNED_PROPERTY: Property = {
+  id: "__unassigned__",
+  accountId: "",
+  name: "Nicht zugeordnet",
+  adresse: "Protokolle ohne Liegenschaft",
+  createdAt: "",
+  updatedAt: "",
+};
+
 export interface RoomPhoto {
   id: string;
   dataUrl: string;

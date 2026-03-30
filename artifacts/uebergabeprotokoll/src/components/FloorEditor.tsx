@@ -3,6 +3,7 @@ import {
   DndContext,
   DragEndEvent,
   DraggableAttributes,
+  DraggableSyntheticListeners,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
@@ -34,8 +35,7 @@ interface FloorEditorProps {
 // ── Drag handle ───────────────────────────────────────────────────────────────
 
 function DragHandle({ listeners, attributes }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  listeners?: Record<string, any>;
+  listeners?: DraggableSyntheticListeners;
   attributes?: DraggableAttributes;
 }) {
   return (

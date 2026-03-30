@@ -206,8 +206,12 @@ wss.on("connection", async (ws, request) => {
           )
           .limit(1);
 
-        const existing = existingRows[0]?.data as typeof incoming | undefined;
-        const isNew = !existingRows[0];
+        const existingRow = existingRows[0];
+        const existing = existingRow?.data as typeof incoming | undefined;
+        const isNew = !existingRow;
+        // The DB-stored propertyId is the authoritative value for existing protocols.
+        // Clients cannot reassign a protocol to a different property after creation.
+        const storedPropertyId = existingRow?.propertyId ?? null;
 
         // New protocols MUST be associated with a property.
         // Updates to existing protocols (including legacy ones without propertyId) are still accepted.
@@ -220,14 +224,29 @@ wss.on("connection", async (ws, request) => {
           return;
         }
 
-        // Verify the property belongs to the same account before applying limits.
-        // Prevents a malicious client from assigning a foreign propertyId to bypass counts.
-        if (isNew && incoming.propertyId) {
+        // Determine the effective propertyId for this upsert.
+        // For new protocols: use the incoming propertyId (validated below).
+        // For updates: use the stored value. Exception: a legacy protocol (storedPropertyId=null)
+        // may have its propertyId set once (first-time assignment / migration).
+        let effectivePropertyId: string | null;
+        if (isNew) {
+          effectivePropertyId = incoming.propertyId ?? null;
+        } else if (storedPropertyId !== null) {
+          // Property already set — the client cannot change it.
+          effectivePropertyId = storedPropertyId;
+        } else {
+          // Legacy protocol (storedPropertyId = null): allow first-time assignment,
+          // but validate the new propertyId belongs to this account.
+          effectivePropertyId = incoming.propertyId ?? null;
+        }
+
+        // Verify the property belongs to the same account (for new protocols and first-time assignment).
+        if (effectivePropertyId && (isNew || storedPropertyId === null)) {
           const [propRow] = await db
             .select({ id: propertiesTable.id })
             .from(propertiesTable)
             .where(and(
-              eq(propertiesTable.id, incoming.propertyId),
+              eq(propertiesTable.id, effectivePropertyId),
               eq(propertiesTable.accountId, accountId!)
             ))
             .limit(1);
@@ -242,7 +261,7 @@ wss.on("connection", async (ws, request) => {
         }
 
         // Plan limit check for new protocols: count existing protocols for this property
-        if (isNew && incoming.propertyId) {
+        if (isNew && effectivePropertyId) {
           const { plan, limits } = await getPlanLimits(accountId!);
           if (limits.protocolsPerProperty !== Infinity) {
             const [{ value: protocolCount }] = await db
@@ -251,7 +270,7 @@ wss.on("connection", async (ws, request) => {
               .where(
                 and(
                   eq(syncProtocolsTable.accountId, accountId!),
-                  eq(syncProtocolsTable.propertyId, incoming.propertyId)
+                  eq(syncProtocolsTable.propertyId, effectivePropertyId)
                 )
               );
             if (protocolCount >= limits.protocolsPerProperty) {
@@ -286,20 +305,20 @@ wss.on("connection", async (ws, request) => {
 
         // Upsert to DB — conflict target is composite (account_id, id) so
         // a different account using the same UUID cannot overwrite this row.
-        // propertyId is stored as a dedicated column for efficient per-property queries.
-        const propertyId = incoming.propertyId ?? null;
+        // effectivePropertyId is used (not incoming.propertyId) to ensure the server
+        // is the authoritative source for property binding — clients cannot remap protocols.
         await db
           .insert(syncProtocolsTable)
           .values({
             id: incoming.id,
             accountId: accountId!,
-            propertyId,
+            propertyId: effectivePropertyId,
             data: incoming as unknown as Record<string, unknown>,
           })
           .onConflictDoUpdate({
             target: [syncProtocolsTable.accountId, syncProtocolsTable.id],
             set: {
-              propertyId,
+              propertyId: effectivePropertyId,
               data: incoming as unknown as Record<string, unknown>,
               updatedAt: new Date(),
             },

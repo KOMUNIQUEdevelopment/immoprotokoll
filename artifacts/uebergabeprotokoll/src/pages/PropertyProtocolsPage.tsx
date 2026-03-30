@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ProtocolData, Property, getPersonRole } from "../types";
+import { ProtocolData, Property, UNASSIGNED_PROPERTY, getPersonRole } from "../types";
 import { TrashedEntry } from "../store";
 import {
   ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
@@ -141,8 +141,10 @@ export default function PropertyProtocolsPage({
       .catch(() => {});
   }, []);
 
+  const isUnassignedView = property.id === UNASSIGNED_PROPERTY.id;
+
   const propertyProtocols = Object.values(protocols)
-    .filter(p => p.propertyId === property.id)
+    .filter(p => isUnassignedView ? !p.propertyId : p.propertyId === property.id)
     .sort((a, b) => {
       const aTime = a.lastSaved ? new Date(a.lastSaved).getTime() : 0;
       const bTime = b.lastSaved ? new Date(b.lastSaved).getTime() : 0;
@@ -150,7 +152,7 @@ export default function PropertyProtocolsPage({
     });
 
   const propertyTrashed = Object.entries(trashedProtocols)
-    .filter(([, e]) => e.protocol.propertyId === property.id);
+    .filter(([, e]) => isUnassignedView ? !e.protocol.propertyId : e.protocol.propertyId === property.id);
 
   const handleCreate = () => {
     if (planLimits && planLimits.protocolsPerProperty !== null) {
@@ -194,15 +196,17 @@ export default function PropertyProtocolsPage({
               </p>
             )}
           </div>
-          <Button
-            size="sm"
-            onClick={handleCreate}
-            className="bg-black text-white hover:bg-neutral-800 gap-1.5 shrink-0"
-          >
-            <Plus size={14} />
-            <span className="hidden sm:inline">Neues Protokoll</span>
-            <span className="sm:hidden">Neu</span>
-          </Button>
+          {!isUnassignedView && (
+            <Button
+              size="sm"
+              onClick={handleCreate}
+              className="bg-black text-white hover:bg-neutral-800 gap-1.5 shrink-0"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">Neues Protokoll</span>
+              <span className="sm:hidden">Neu</span>
+            </Button>
+          )}
         </div>
       </header>
 
@@ -223,16 +227,21 @@ export default function PropertyProtocolsPage({
             </div>
             <p className="font-semibold text-black text-sm">Keine Protokolle</p>
             <p className="text-xs text-neutral-500 mt-1 max-w-xs">
-              Erstellen Sie das erste Protokoll für diese Liegenschaft.
+              {isUnassignedView
+                ? "Es gibt keine Protokolle ohne Liegenschaft."
+                : "Erstellen Sie das erste Protokoll für diese Liegenschaft."
+              }
             </p>
-            <Button
-              size="sm"
-              onClick={handleCreate}
-              className="mt-4 bg-black text-white hover:bg-neutral-800 gap-1.5"
-            >
-              <Plus size={14} />
-              Protokoll erstellen
-            </Button>
+            {!isUnassignedView && (
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                className="mt-4 bg-black text-white hover:bg-neutral-800 gap-1.5"
+              >
+                <Plus size={14} />
+                Protokoll erstellen
+              </Button>
+            )}
           </div>
         )}
 
