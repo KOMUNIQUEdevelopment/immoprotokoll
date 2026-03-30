@@ -1,87 +1,81 @@
 import React, { useState } from "react";
-import { ClipboardList, Eye, EyeOff, LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin: (email: string, password: string) => Promise<{ error?: string }>;
+  onGoToRegister: () => void;
 }
 
-export default function LoginPage({ onLogin }: LoginPageProps) {
+export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
+    setError("");
     setLoading(true);
-
-    await new Promise((r) => setTimeout(r, 300));
-
-    const okEmail = email.trim().toLowerCase();
-    const okPass = password;
-
-    if (
-      okEmail === "philipp@komunique.com" &&
-      okPass === "TEMAHsDF$357yAjz"
-    ) {
-      localStorage.setItem("uebergabe_auth", "1");
-      onLogin();
-    } else {
-      setError(true);
+    const result = await onLogin(email.trim(), password);
+    if (result.error) {
+      setError(result.error);
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-1">
-            <ClipboardList size={26} className="text-primary" />
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="w-full max-w-sm space-y-8">
+        <div className="text-center space-y-3">
+          <img
+            src="/immoprotokoll-logo.png"
+            alt="ImmoProtokoll"
+            className="h-10 mx-auto"
+          />
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-black">Anmelden</h1>
+            <p className="text-sm text-neutral-500">Willkommen zurück</p>
           </div>
-          <h1 className="text-xl font-bold">Übergabeprotokoll</h1>
-          <p className="text-sm text-muted-foreground">Villa Albstadt · Anmelden</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
               E-Mail
             </label>
             <Input
               type="email"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(false); }}
+              onChange={(e) => { setEmail(e.target.value); setError(""); }}
               placeholder="name@beispiel.de"
               autoComplete="email"
               autoFocus
               required
-              className={error ? "border-destructive" : ""}
+              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
               Passwort
             </label>
             <div className="relative">
               <Input
                 type={showPw ? "text" : "password"}
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(false); }}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 required
-                className={`pr-10 ${error ? "border-destructive" : ""}`}
+                className={`pr-10 border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
               />
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors p-0.5"
                 tabIndex={-1}
               >
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -90,14 +84,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           {error && (
-            <p className="text-xs text-destructive font-medium">
-              E-Mail oder Passwort falsch. Bitte erneut versuchen.
-            </p>
+            <p className="text-xs text-red-500 font-medium">{error}</p>
           )}
 
-          <Button type="submit" className="w-full gap-2" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full gap-2 bg-black text-white hover:bg-neutral-800 border-0 rounded-lg"
+            disabled={loading}
+          >
             {loading ? (
-              <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <LogIn size={15} />
             )}
@@ -105,9 +101,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground/60">
-          Nur für autorisierte Nutzer
-        </p>
+        <div className="text-center">
+          <p className="text-sm text-neutral-500">
+            Noch kein Konto?{" "}
+            <button
+              type="button"
+              onClick={onGoToRegister}
+              className="text-black font-medium hover:underline"
+            >
+              Registrieren
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

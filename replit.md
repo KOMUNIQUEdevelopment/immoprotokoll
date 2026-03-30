@@ -1,4 +1,8 @@
-# Workspace
+# ImmoProtokoll
+
+## Project Goal
+
+Full SaaS version of the Übergabeprotokoll app. Multi-tenant, with Stripe billing, multilingual support (DE-CH, DE-DE, EN), and a superadmin dashboard. Strictly black-and-white design.
 
 ## Overview
 
@@ -15,24 +19,40 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend**: React + Vite + Tailwind CSS
+
+## Design System
+
+- **Colors**: Strictly black (#000) and white (#fff), no color accents
+- **Brand**: ImmoProtokoll, house-icon logo (black square, white house)
+- **Font**: System font stack
+
+## Auth
+
+- HTTP-only cookie (`immo_session`), 30-day sessions stored in PostgreSQL
+- bcryptjs password hashing
+- Roles: `owner`, `administrator`, `property_manager`
+- Plans: `free`, `privat`, `agentur`, `custom`
+- Superadmin: `support@immoprotokoll.com` (init on server start via `SUPERADMIN_PASSWORD` env var)
+- Middleware: `requireAuth`, `requireRole`, `requireSuperAdmin` in `artifacts/api-server/src/middleware/auth.ts`
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── artifacts/
+│   ├── api-server/              # Express API server (port via $PORT)
+│   └── uebergabeprotokoll/      # React frontend (ImmoProtokoll)
+├── lib/
+│   ├── db/                      # Drizzle ORM schema + DB connection
+│   │   └── src/schema/          # accounts, users, sessions tables
+│   ├── api-spec/                # OpenAPI spec + Orval codegen config
+│   ├── api-client-react/        # Generated React Query hooks
+│   └── api-zod/                 # Generated Zod schemas from OpenAPI
+├── scripts/                     # Utility scripts
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+└── tsconfig.json
 ```
 
 ## TypeScript & Composite Projects

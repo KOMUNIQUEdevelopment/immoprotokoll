@@ -199,11 +199,13 @@ export const DEFAULT_ZUSATZVEREINBARUNGEN: ZusatzvereinbarungEntry[] = [
 ];
 
 export function createDefaultProtocol(): ProtocolData {
+  const today = new Date();
+  const datum = today.toLocaleDateString("de-CH");
   return {
     id: crypto.randomUUID(),
-    mietobjekt: "EFH, Altbau, Villa",
-    adresse: "Bitzer Steige 75, 79597 Albstadt",
-    datum: "28.03.2026",
+    mietobjekt: "",
+    adresse: "",
+    datum,
     uebergeber: [{ id: crypto.randomUUID(), name: "", gender: "m" }],
     uebernehmer: [{ id: crypto.randomUUID(), name: "", gender: "f" }],
     gesamtZustand: "",
@@ -216,10 +218,10 @@ export function createDefaultProtocol(): ProtocolData {
     kitchenPhotos: [],
     rooms: DEFAULT_ROOMS.map(r => ({ ...r, photos: [] })),
     deletedRoomIds: [],
-    zusatzvereinbarungTitle: "Zusatzvereinbarung – Altbauhinweise & besondere Regelungen",
-    zusatzvereinbarungen: DEFAULT_ZUSATZVEREINBARUNGEN.map(e => ({ ...e })),
+    zusatzvereinbarungTitle: "Zusatzvereinbarungen",
+    zusatzvereinbarungen: [],
     signaturOrt: "",
-    signaturDatum: "28.03.2026",
+    signaturDatum: datum,
     personSignatures: [],
     lastSaved: null,
     syncEnabled: false,
@@ -287,12 +289,12 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     } else {
       const existingScore =
         (existing.photos?.length ?? 0) +
-        (existing.condition ? 1 : 0) +
-        (existing.notes ? 1 : 0);
+        (existing.maengelSchaeden ? 1 : 0) +
+        (existing.notizen ? 1 : 0);
       const newScore =
         (room.photos?.length ?? 0) +
-        (room.condition ? 1 : 0) +
-        (room.notes ? 1 : 0);
+        (room.maengelSchaeden ? 1 : 0) +
+        (room.notizen ? 1 : 0);
       if (newScore > existingScore) {
         byNameFloor.set(key, room);
       }

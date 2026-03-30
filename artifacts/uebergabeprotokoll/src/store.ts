@@ -326,7 +326,7 @@ export function useProtocolsStore() {
       const synced = Object.fromEntries(
         Object.entries(remoteProtocols).map(([id, p]) => [
           id,
-          { ...migrateProtocol(p as Record<string, unknown>), syncEnabled: true },
+          { ...migrateProtocol(p as unknown as Record<string, unknown>), syncEnabled: true },
         ])
       );
 

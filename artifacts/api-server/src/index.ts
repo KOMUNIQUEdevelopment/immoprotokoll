@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initSuperAdmin } from "./lib/init";
 
 const rawPort = process.env["PORT"];
 
@@ -216,4 +217,5 @@ server.listen(port, (err?: Error) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+  initSuperAdmin().catch(err => logger.error({ err }, "initSuperAdmin failed"));
 });

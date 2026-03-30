@@ -504,7 +504,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
               <div className="flex items-center gap-2">
                 <ClipboardList size={16} />
                 <h1 className="font-bold text-sm leading-tight truncate">
-                  {protocol.mietobjekt || "Übergabeprotokoll"}
+                  {protocol.mietobjekt || "Protokoll"}
                 </h1>
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">

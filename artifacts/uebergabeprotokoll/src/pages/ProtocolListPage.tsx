@@ -91,7 +91,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="font-bold text-base leading-tight truncate">
-                {protocol.mietobjekt || "Übergabeprotokoll"}
+                {protocol.mietobjekt || "Protokoll"}
               </h2>
               {protocol.adresse && (
                 <p className="text-primary-foreground/80 text-xs mt-0.5 flex items-center gap-1 truncate">
@@ -548,21 +548,18 @@ export default function ProtocolListPage({
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-40 shadow-sm">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ClipboardList size={18} className="text-primary shrink-0" />
-              <div>
-                <h1 className="font-bold text-sm leading-tight">Protokolle</h1>
-                <p className="text-xs text-muted-foreground">
-                  {sorted.length === 0
-                    ? "Noch keine Protokolle"
-                    : `${sorted.length} Protokoll${sorted.length === 1 ? "" : "e"}`}
-                </p>
-              </div>
+            <div className="flex items-center gap-3">
+              <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-7" />
+              <p className="text-xs text-neutral-500">
+                {sorted.length === 0
+                  ? "Noch keine Protokolle"
+                  : `${sorted.length} Protokoll${sorted.length === 1 ? "" : "e"}`}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <InstallButton />
@@ -571,12 +568,12 @@ export default function ProtocolListPage({
                   type="button"
                   onClick={onLogout}
                   title="Abmelden"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors"
                 >
                   <LogOut size={15} />
                 </button>
               )}
-              <Button size="sm" onClick={onCreate} className="gap-1.5">
+              <Button size="sm" onClick={onCreate} className="gap-1.5 bg-black text-white hover:bg-neutral-800">
                 <Plus size={15} />
                 Neu
               </Button>
@@ -595,7 +592,7 @@ export default function ProtocolListPage({
             <div>
               <p className="font-semibold text-base">Noch kein Protokoll vorhanden</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Erstelle dein erstes Übergabeprotokoll.
+                Erstelle dein erstes Protokoll.
               </p>
             </div>
             <Button onClick={onCreate} className="gap-1.5 mt-2">
