@@ -1,6 +1,15 @@
-import { createServer } from "http";
+import { createServer, type IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
+import { eq, and } from "drizzle-orm";
+import { db } from "@workspace/db";
+import {
+  sessionsTable,
+  usersTable,
+  syncProtocolsTable,
+  syncPhotosTable,
+} from "@workspace/db";
+import { requireAuth, type AuthRequest } from "./middleware/auth";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initSuperAdmin } from "./lib/init";
@@ -17,36 +26,89 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+const SESSION_COOKIE = "immo_session";
+const MAX_PAYLOAD = 50 * 1024 * 1024;
+
+function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+  if (!cookieHeader) return {};
+  return Object.fromEntries(
+    cookieHeader.split(";").map((c) => {
+      const idx = c.indexOf("=");
+      if (idx < 0) return [c.trim(), ""] as [string, string];
+      return [c.slice(0, idx).trim(), c.slice(idx + 1).trim()] as [string, string];
+    })
+  );
+}
+
+async function resolveAccountFromRequest(
+  request: IncomingMessage
+): Promise<string | null> {
+  const cookies = parseCookies(request.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE];
+  if (!sessionId) return null;
+
+  const sessions = await db
+    .select()
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, sessionId))
+    .limit(1);
+
+  const session = sessions[0];
+  if (!session || session.expiresAt < new Date()) return null;
+
+  const users = await db
+    .select({ accountId: usersTable.accountId })
+    .from(usersTable)
+    .where(eq(usersTable.id, session.userId))
+    .limit(1);
+
+  return users[0]?.accountId ?? null;
+}
+
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
-const MAX_PAYLOAD = 50 * 1024 * 1024;
-
-const serverProtocols: Record<string, unknown> = {};
-
-// In-memory photo store for cross-device sync (id → dataUrl)
-const serverPhotos: Map<string, string> = new Map();
-
-server.on("upgrade", (request, socket, head) => {
-  if (request.url === "/api/sync") {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
-    });
-  } else {
+server.on("upgrade", async (request, socket, head) => {
+  if (request.url !== "/api/sync") {
     socket.destroy();
+    return;
   }
+
+  const accountId = await resolveAccountFromRequest(request);
+  if (!accountId) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
+  (request as IncomingMessage & { accountId: string }).accountId = accountId;
+
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit("connection", ws, request);
+  });
 });
 
-wss.on("connection", (ws) => {
-  logger.info({ clients: wss.clients.size }, "WebSocket client connected");
+wss.on("connection", async (ws, request) => {
+  const accountId = (request as IncomingMessage & { accountId: string }).accountId;
+  logger.info({ clients: wss.clients.size, accountId }, "WebSocket client connected");
 
+  // Load all protocols for this account from the DB and send to client
   try {
-    ws.send(JSON.stringify({ type: "init", protocols: serverProtocols }));
+    const rows = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(eq(syncProtocolsTable.accountId, accountId));
+
+    const protocols: Record<string, unknown> = {};
+    for (const row of rows) {
+      protocols[row.id] = row.data;
+    }
+    ws.send(JSON.stringify({ type: "init", protocols }));
   } catch (err) {
-    logger.error({ err }, "Failed to send init to new client");
+    logger.error({ err }, "Failed to load protocols for WS init");
   }
 
-  ws.on("message", (data) => {
+  ws.on("message", async (data) => {
     const payload = data.toString();
     if (payload.length > MAX_PAYLOAD) {
       logger.warn("Payload too large, ignoring");
@@ -65,53 +127,96 @@ wss.on("connection", (ws) => {
         id: string;
         personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
       };
-      const existing = serverProtocols[incoming.id] as typeof incoming | undefined;
 
-      // Preserve non-empty signatures already on the server:
-      // desktop always strips signatures before sending WS updates.
-      if (existing?.personSignatures?.length && incoming.personSignatures) {
-        incoming.personSignatures = incoming.personSignatures.map((sig) => {
-          if (sig.signatureDataUrl) return sig; // incoming already has one
-          const kept = existing.personSignatures!.find(
-            (s) => s.personId === sig.personId && s.signatureDataUrl
-          );
-          return kept ? { ...sig, signatureDataUrl: kept.signatureDataUrl } : sig;
-        });
-        // Also carry over signatures for persons not yet in the incoming list
-        for (const es of existing.personSignatures) {
-          if (
-            es.signatureDataUrl &&
-            !incoming.personSignatures.some((s) => s.personId === es.personId)
-          ) {
-            incoming.personSignatures.push(es);
+      try {
+        const existingRows = await db
+          .select()
+          .from(syncProtocolsTable)
+          .where(
+            and(
+              eq(syncProtocolsTable.id, incoming.id),
+              eq(syncProtocolsTable.accountId, accountId)
+            )
+          )
+          .limit(1);
+
+        const existing = existingRows[0]?.data as typeof incoming | undefined;
+
+        // Preserve non-empty signatures that were already on the server
+        if (existing?.personSignatures?.length && incoming.personSignatures) {
+          incoming.personSignatures = incoming.personSignatures.map((sig) => {
+            if (sig.signatureDataUrl) return sig;
+            const kept = existing.personSignatures!.find(
+              (s) => s.personId === sig.personId && s.signatureDataUrl
+            );
+            return kept ? { ...sig, signatureDataUrl: kept.signatureDataUrl } : sig;
+          });
+          for (const es of existing.personSignatures) {
+            if (
+              es.signatureDataUrl &&
+              !incoming.personSignatures.some((s) => s.personId === es.personId)
+            ) {
+              incoming.personSignatures.push(es);
+            }
           }
         }
+
+        // Upsert to DB
+        await db
+          .insert(syncProtocolsTable)
+          .values({
+            id: incoming.id,
+            accountId,
+            data: incoming as unknown as Record<string, unknown>,
+          })
+          .onConflictDoUpdate({
+            target: syncProtocolsTable.id,
+            set: {
+              data: incoming as unknown as Record<string, unknown>,
+              updatedAt: new Date(),
+            },
+          });
+
+        logger.info({ id: incoming.id, accountId }, "Protocol updated");
+
+        const broadcastPayload = JSON.stringify({ type: "update", protocol: incoming });
+        wss.clients.forEach((client) => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
+            if (clientAccountId === accountId) {
+              client.send(broadcastPayload);
+            }
+          }
+        });
+        (ws as WebSocket & { accountId?: string }).accountId = accountId;
+      } catch (err) {
+        logger.error({ err }, "Failed to update protocol");
       }
-
-      serverProtocols[incoming.id] = incoming;
-      logger.info({ id: incoming.id, total: Object.keys(serverProtocols).length }, "Protocol updated");
-
-      // Broadcast the SERVER's preserved version (with actual signatures), not the
-      // original stripped client payload.  This ensures all other devices always
-      // receive the most up-to-date signature state.
-      const broadcastPayload = JSON.stringify({ type: "update", protocol: serverProtocols[incoming.id] });
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(broadcastPayload);
-        }
-      });
     } else if (msg.type === "delete" && msg.id) {
-      delete serverProtocols[msg.id];
-      logger.info({ id: msg.id, total: Object.keys(serverProtocols).length }, "Protocol deleted");
+      try {
+        await db
+          .delete(syncProtocolsTable)
+          .where(
+            and(
+              eq(syncProtocolsTable.id, msg.id),
+              eq(syncProtocolsTable.accountId, accountId)
+            )
+          );
 
-      const deleteBroadcast = JSON.stringify({ type: "delete", id: msg.id });
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(deleteBroadcast);
-        }
-      });
-    } else {
-      return;
+        logger.info({ id: msg.id, accountId }, "Protocol deleted");
+
+        const deleteBroadcast = JSON.stringify({ type: "delete", id: msg.id });
+        wss.clients.forEach((client) => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
+            if (clientAccountId === accountId) {
+              client.send(deleteBroadcast);
+            }
+          }
+        });
+      } catch (err) {
+        logger.error({ err }, "Failed to delete protocol");
+      }
     }
   });
 
@@ -122,20 +227,34 @@ wss.on("connection", (ws) => {
   ws.on("error", (err) => {
     logger.error({ err }, "WebSocket error");
   });
+
+  (ws as WebSocket & { accountId?: string }).accountId = accountId;
 });
 
-// ── REST: Protokoll lesen (für Mieter-Ansicht) ───────────────────────────────
-app.get("/api/protocol/:id", (req, res) => {
-  const protocol = serverProtocols[req.params.id];
-  if (!protocol) {
-    res.status(404).json({ error: "Protokoll nicht gefunden" });
-    return;
+// ── REST: Protokoll lesen (öffentlich für Mieter-Ansicht via UUID-Link) ───────
+// The protocol ID is a UUID (hard to guess). This endpoint is intentionally
+// public so tenants without an account can view and sign their handover protocol.
+app.get("/api/protocol/:id", async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(eq(syncProtocolsTable.id, req.params.id))
+      .limit(1);
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Protokoll nicht gefunden" });
+      return;
+    }
+    res.json({ protocol: rows[0].data });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch protocol");
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.json({ protocol });
 });
 
-// ── REST: Unterschrift eintragen & an alle WS-Clients senden ─────────────────
-app.post("/api/protocol/:id/sign", (req, res) => {
+// ── REST: Unterschrift eintragen (öffentlich für Mieter) ─────────────────────
+app.post("/api/protocol/:id/sign", async (req, res) => {
   const { id } = req.params;
   const { personId, signatureDataUrl } = req.body as {
     personId?: string;
@@ -147,68 +266,125 @@ app.post("/api/protocol/:id/sign", (req, res) => {
     return;
   }
 
-  const protocol = serverProtocols[id] as Record<string, unknown> & {
-    personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
-  } | undefined;
+  try {
+    const rows = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(eq(syncProtocolsTable.id, id))
+      .limit(1);
 
-  if (!protocol) {
-    res.status(404).json({ error: "Protokoll nicht gefunden" });
-    return;
-  }
-
-  const sigs = Array.isArray(protocol.personSignatures) ? [...protocol.personSignatures] : [];
-  const idx = sigs.findIndex((s) => s.personId === personId);
-  if (idx >= 0) {
-    sigs[idx] = { ...sigs[idx], signatureDataUrl };
-  } else {
-    sigs.push({ personId, signatureDataUrl });
-  }
-  protocol.personSignatures = sigs;
-  serverProtocols[id] = protocol;
-
-  // Also persist signatures in the photo store so they survive protocol re-pushes
-  serverPhotos.set(`sig_${personId}`, signatureDataUrl);
-
-  const payload = JSON.stringify({ type: "update", protocol });
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Protokoll nicht gefunden" });
+      return;
     }
-  });
 
-  logger.info({ id, personId }, "Tenant signature saved and broadcast");
-  res.json({ ok: true });
+    const protocol = rows[0].data as Record<string, unknown> & {
+      personSignatures?: Array<{ personId: string; signatureDataUrl: string | null }>;
+    };
+
+    const sigs = Array.isArray(protocol.personSignatures)
+      ? [...protocol.personSignatures]
+      : [];
+    const idx = sigs.findIndex((s) => s.personId === personId);
+    if (idx >= 0) {
+      sigs[idx] = { ...sigs[idx], signatureDataUrl };
+    } else {
+      sigs.push({ personId, signatureDataUrl });
+    }
+    protocol.personSignatures = sigs;
+
+    await db
+      .update(syncProtocolsTable)
+      .set({ data: protocol, updatedAt: new Date() })
+      .where(eq(syncProtocolsTable.id, id));
+
+    const broadcastPayload = JSON.stringify({ type: "update", protocol });
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
+        if (clientAccountId === rows[0].accountId) {
+          client.send(broadcastPayload);
+        }
+      }
+    });
+
+    logger.info({ id, personId }, "Tenant signature saved and broadcast");
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to save signature");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-// ── REST: Fotos hochladen (cross-device sync) ─────────────────────────────────
-// Eigenes JSON-Limit von 50 MB für Foto-Payloads
-app.post("/api/photos", express.json({ limit: "50mb" }), (req, res) => {
-  const photos = (req.body as { photos?: { id: string; dataUrl: string }[] }).photos;
-  if (!Array.isArray(photos)) {
-    res.status(400).json({ error: "photos array erforderlich" });
-    return;
-  }
-  let stored = 0;
-  for (const p of photos) {
-    if (typeof p.id === "string" && typeof p.dataUrl === "string" && p.dataUrl) {
-      serverPhotos.set(p.id, p.dataUrl);
-      stored++;
+// ── REST: Fotos hochladen (requires auth; account-scoped) ────────────────────
+app.post(
+  "/api/photos",
+  requireAuth,
+  express.json({ limit: "50mb" }),
+  async (req: AuthRequest, res) => {
+    const photos = (req.body as { photos?: { id: string; dataUrl: string }[] }).photos;
+    if (!Array.isArray(photos)) {
+      res.status(400).json({ error: "photos array erforderlich" });
+      return;
     }
-  }
-  logger.info({ stored, total: serverPhotos.size }, "Photos stored");
-  res.json({ ok: true, stored });
-});
 
-// ── REST: Fotos abrufen ───────────────────────────────────────────────────────
-app.get("/api/photos", (req, res) => {
+    const accountId = req.user!.accountId;
+    let stored = 0;
+
+    for (const p of photos) {
+      if (typeof p.id === "string" && typeof p.dataUrl === "string" && p.dataUrl) {
+        try {
+          await db
+            .insert(syncPhotosTable)
+            .values({ id: p.id, accountId, dataUrl: p.dataUrl })
+            .onConflictDoUpdate({
+              target: syncPhotosTable.id,
+              set: { dataUrl: p.dataUrl, updatedAt: new Date() },
+            });
+          stored++;
+        } catch (err) {
+          logger.error({ err, id: p.id }, "Failed to store photo");
+        }
+      }
+    }
+
+    logger.info({ stored, accountId }, "Photos stored");
+    res.json({ ok: true, stored });
+  }
+);
+
+// ── REST: Fotos abrufen (requires auth; returns only account's photos) ────────
+app.get("/api/photos", requireAuth, async (req: AuthRequest, res) => {
   const raw = (req.query.ids as string) || "";
-  const ids = raw.split(",").map(s => s.trim()).filter(Boolean);
-  const result: Record<string, string> = {};
-  for (const id of ids) {
-    const dataUrl = serverPhotos.get(id);
-    if (dataUrl) result[id] = dataUrl;
+  const ids = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    res.json({ photos: {} });
+    return;
   }
-  res.json({ photos: result });
+
+  const accountId = req.user!.accountId;
+
+  try {
+    const rows = await db
+      .select()
+      .from(syncPhotosTable)
+      .where(eq(syncPhotosTable.accountId, accountId));
+
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      if (ids.includes(row.id)) {
+        result[row.id] = row.dataUrl;
+      }
+    }
+    res.json({ photos: result });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch photos");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 server.listen(port, (err?: Error) => {
@@ -217,5 +393,5 @@ server.listen(port, (err?: Error) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
-  initSuperAdmin().catch(err => logger.error({ err }, "initSuperAdmin failed"));
+  initSuperAdmin().catch((err) => logger.error({ err }, "initSuperAdmin failed"));
 });
