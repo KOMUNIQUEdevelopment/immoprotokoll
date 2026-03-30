@@ -25,6 +25,9 @@ interface PropertyListPageProps {
   onLogout?: () => void;
   protocols?: Record<string, ProtocolData>;
   onDeleteProperty?: (propertyId: string) => void;
+  onShowBilling?: () => void;
+  onShowPricing?: () => void;
+  currentPlan?: string;
 }
 
 interface DeleteConfirmProps {
@@ -145,7 +148,15 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
   );
 }
 
-export default function PropertyListPage({ onSelectProperty, onLogout, protocols = {}, onDeleteProperty }: PropertyListPageProps) {
+export default function PropertyListPage({
+  onSelectProperty,
+  onLogout,
+  protocols = {},
+  onDeleteProperty,
+  onShowBilling,
+  onShowPricing,
+  currentPlan = "free",
+}: PropertyListPageProps) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -205,6 +216,16 @@ export default function PropertyListPage({ onSelectProperty, onLogout, protocols
           </div>
           <div className="flex items-center gap-2">
             <InstallButton />
+            {(onShowBilling || onShowPricing) && (
+              <button
+                type="button"
+                onClick={onShowBilling ?? onShowPricing}
+                title="Abonnement & Abrechnung"
+                className="flex items-center gap-1 px-2 py-1 rounded-md border border-neutral-200 text-xs font-medium text-neutral-500 hover:bg-neutral-50 hover:text-black transition-colors"
+              >
+                {currentPlan === "free" ? "Free" : currentPlan === "privat" ? "Privat" : currentPlan === "agentur" ? "Agentur" : "Custom"}
+              </button>
+            )}
             {onLogout && (
               <button
                 type="button"

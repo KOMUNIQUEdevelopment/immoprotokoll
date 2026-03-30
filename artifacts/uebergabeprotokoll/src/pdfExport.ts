@@ -64,7 +64,27 @@ function resolveFloorSafe(floorId: string, floorMap: Record<string, FloorDef>): 
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
-export async function exportToPDF(protocol: ProtocolData): Promise<void> {
+export interface ExportOptions {
+  /** If true, adds ImmoProtokoll branding watermark to each page (Free plan) */
+  watermark?: boolean;
+}
+
+function addWatermark(doc: jsPDF, pageCount: number) {
+  const pageW = 210;
+  const pageH = 297;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    // Footer watermark bar
+    doc.setFillColor(245, 245, 245);
+    doc.rect(0, pageH - 10, pageW, 10, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Erstellt mit ImmoProtokoll · immoprotokoll.com · Free Plan", pageW / 2, pageH - 3.5, { align: "center" });
+  }
+}
+
+export async function exportToPDF(protocol: ProtocolData, options?: ExportOptions): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = 210;
   const pageH = 297;
@@ -371,6 +391,12 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
   const safeAddr = (protocol.adresse || "Objekt").replace(/[\s,\/\\]/g, "_").replace(/__+/g, "_");
   const safeDatum = protocol.datum.replace(/\./g, "-");
   const fileName = `Uebergabeprotokoll_${safeAddr}_${safeDatum}.pdf`;
+
+  // Add watermark to all pages for Free plan accounts
+  if (options?.watermark) {
+    addWatermark(doc, doc.getNumberOfPages());
+  }
+
   doc.save(fileName);
 }
 

@@ -8,6 +8,8 @@ import ProtocolPage from "./pages/ProtocolPage";
 import SignaturePage from "./pages/SignaturePage";
 import PropertyListPage from "./pages/PropertyListPage";
 import PropertyProtocolsPage from "./pages/PropertyProtocolsPage";
+import PricingPage from "./pages/PricingPage";
+import BillingPage from "./pages/BillingPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -15,6 +17,7 @@ import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
+import { useBilling } from "./hooks/useBilling";
 import { InstallButton } from "./components/InstallButton";
 import {
   Save,
@@ -48,7 +51,17 @@ function formatRelative(date: Date | null): string {
 
 type EditorTab = "protokoll" | "unterschriften";
 
-function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: string }) {
+type AppScreen = "protocols" | "pricing" | "billing";
+
+function AppContent({
+  onLogout,
+  accountId,
+  account,
+}: {
+  onLogout: () => void;
+  accountId: string;
+  account: { plan: "free" | "privat" | "agentur" | "custom" } | null;
+}) {
   const {
     protocols,
     trashedProtocols,
@@ -81,7 +94,9 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
   const [isExporting, setIsExporting] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [appScreen, setAppScreen] = useState<AppScreen>("protocols");
   const { toast } = useToast();
+  const billing = useBilling();
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
   const { status: syncStatus } = useSync({
@@ -104,7 +119,8 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     if (!currentProtocol) return;
     setIsExporting(true);
     try {
-      await exportToPDF(currentProtocol);
+      const freePlan = !account || account.plan === "free";
+      await exportToPDF(currentProtocol, { watermark: freePlan });
       toast({ title: "PDF erstellt", description: "Das Protokoll wurde erfolgreich exportiert." });
     } catch (e) {
       console.error(e);
@@ -171,6 +187,32 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     );
 
   if (!isEditing) {
+    if (appScreen === "pricing") {
+      return (
+        <PricingPage
+          onBack={() => setAppScreen("protocols")}
+          onSelectPlan={async (plan, interval, currency) => {
+            await billing.startCheckout({ plan, interval, currency });
+            if (billing.error) {
+              toast({ title: "Zahlung fehlgeschlagen", description: billing.error, variant: "destructive" });
+            }
+          }}
+          currentPlan={account?.plan}
+          isLoggedIn
+        />
+      );
+    }
+
+    if (appScreen === "billing") {
+      return (
+        <BillingPage
+          accountId={accountId}
+          onBack={() => setAppScreen("protocols")}
+          onShowPricing={() => setAppScreen("pricing")}
+        />
+      );
+    }
+
     if (!selectedProperty) {
       return (
         <>
@@ -179,6 +221,9 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
             onLogout={onLogout}
             protocols={protocols}
             onDeleteProperty={deleteProtocolsForProperty}
+            onShowBilling={() => setAppScreen("billing")}
+            onShowPricing={() => setAppScreen("pricing")}
+            currentPlan={account?.plan ?? "free"}
           />
           <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
         </>
@@ -418,14 +463,28 @@ type AuthScreen = "login" | "register";
 export default function App() {
   const hash = window.location.hash;
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
+  const isPricingHash = hash === "#/pricing";
 
-  const { user, loading, login, register, logout } = useAuth();
+  const { user, account, loading, login, register, logout } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
 
   if (viewMatch) {
     return (
       <QueryClientProvider client={queryClient}>
         <TenantViewPage protocolId={viewMatch[1]} />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
+  // Pricing page is public (accessible without login)
+  if (isPricingHash && !user) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <PricingPage
+          onBack={() => { window.location.hash = ""; }}
+          isLoggedIn={false}
+        />
         <Toaster />
       </QueryClientProvider>
     );
@@ -463,7 +522,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent onLogout={logout} accountId={user.accountId} />
+      <AppContent onLogout={logout} accountId={user.accountId} account={account} />
       <Toaster />
     </QueryClientProvider>
   );

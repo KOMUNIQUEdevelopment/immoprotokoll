@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
@@ -42,15 +42,20 @@ if (!allowedOrigins && isProduction) {
 
 app.use(
   cors({
-    // Development: reflect all origins (permissive for local dev/Replit preview).
-    // Production with ALLOWED_ORIGINS: use the explicit allowlist.
-    // Production without ALLOWED_ORIGINS: deny all cross-origin requests (fail-closed).
     origin: allowedOrigins ?? (isProduction ? false : true),
     credentials: true,
   }),
 );
 
 app.use(cookieParser());
+
+// Raw body required for Stripe webhook signature verification — must come before express.json
+app.use(
+  "/api/billing/webhook",
+  express.raw({ type: "application/json" }),
+  (_req: Request, _res: Response, next: NextFunction) => next()
+);
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
