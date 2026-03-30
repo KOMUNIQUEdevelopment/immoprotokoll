@@ -36,9 +36,9 @@ const FLOOR_LABELS: Record<string, string> = {
 };
 
 const CONDITION_STYLE: Record<string, string> = {
-  "sehr gut": "bg-green-500 text-white border-green-500",
-  gut: "bg-yellow-500 text-white border-yellow-500",
-  Mängel: "bg-red-500 text-white border-red-500",
+  "sehr gut": "bg-black text-white border-black",
+  gut: "bg-gray-600 text-white border-gray-600",
+  Mängel: "bg-gray-900 text-white border-gray-900",
 };
 
 // ── Shared UI components ─────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ function RoomCard({ room }: { room: RoomData }) {
           {room.maengelSchaeden?.trim() ? (
             <div>
               <FieldLabel>Mängel / Schäden</FieldLabel>
-              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 whitespace-pre-wrap">
+              <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 whitespace-pre-wrap">
                 {room.maengelSchaeden}
               </div>
             </div>
@@ -444,8 +444,8 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-sm w-full bg-card border border-border rounded-2xl p-6 space-y-4 text-center shadow-md">
-          <div className="p-3 rounded-full bg-amber-50 border border-amber-200 inline-flex">
-            <AlertTriangle size={24} className="text-amber-600" />
+          <div className="p-3 rounded-full bg-gray-100 border border-gray-300 inline-flex">
+            <AlertTriangle size={24} className="text-gray-700" />
           </div>
           <h1 className="font-bold text-base">Protokoll nicht verfügbar</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -539,10 +539,10 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
       </header>
 
       {/* ── Notice bar ──────────────────────────────────────────────────────── */}
-      <div className="bg-blue-50 border-b border-blue-200">
+      <div className="bg-gray-100 border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-start gap-2">
-          <PenLine size={14} className="text-blue-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-700 leading-snug">
+          <PenLine size={14} className="text-gray-700 shrink-0 mt-0.5" />
+          <p className="text-xs text-gray-700 leading-snug">
             <strong>Mieter-Ansicht</strong> – Dieses Protokoll ist schreibgeschützt. Es wird
             automatisch aktualisiert wenn der Vermieter Änderungen vornimmt. Am Ende können
             Sie Ihre Unterschrift leisten.
@@ -613,7 +613,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                         {p.name}
                       </span>
                       {!!getSignature(p.id) && (
-                        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                        <CheckCircle2 size={14} className="text-black shrink-0" />
                       )}
                     </div>
                   ))
@@ -631,13 +631,13 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                   protocol.uebernehmer.filter((p) => p.name).map((p) => (
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-black text-white">
                           {getPersonRole(p, "uebernehmer")}
                         </span>
                         {p.name}
                       </span>
                       {!!getSignature(p.id) && (
-                        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                        <CheckCircle2 size={14} className="text-black shrink-0" />
                       )}
                     </div>
                   ))
@@ -792,7 +792,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                 <PenLine size={16} className="text-primary" />
                 <h2 className="font-bold text-sm text-primary">Unterschriften</h2>
                 {allTenantsSigned && allLandlordsSigned && (
-                  <CheckCircle2 size={15} className="text-green-500" />
+                  <CheckCircle2 size={15} className="text-black" />
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -809,7 +809,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     Übergeber (Vermieter)
                     {allLandlordsSigned && (
-                      <CheckCircle2 size={12} className="text-green-500" />
+                      <CheckCircle2 size={12} className="text-black" />
                     )}
                   </p>
                   {landlords.map((person) => {
@@ -817,24 +817,24 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                     return (
                       <div key={person.id} className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                          <span className="text-xs bg-black text-white px-1.5 py-0.5 rounded font-medium">
                             {getPersonRole(person, "uebergeber")}
                           </span>
                           <span className="font-semibold text-sm">{person.name}</span>
                           {sig && (
-                            <CheckCircle2 size={14} className="text-green-500 ml-auto shrink-0" />
+                            <CheckCircle2 size={14} className="text-black ml-auto shrink-0" />
                           )}
                         </div>
                         {sig ? (
-                          <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-1.5">
-                            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                          <div className="border border-gray-300 rounded-lg p-3 bg-gray-50 space-y-1.5">
+                            <p className="text-xs text-gray-700 font-medium flex items-center gap-1">
                               <CheckCircle2 size={12} />
                               Unterschrieben
                             </p>
                             <img
                               src={sig}
                               alt={`Unterschrift ${person.name}`}
-                              className="max-h-20 border border-green-200 rounded bg-white"
+                              className="max-h-20 border border-gray-200 rounded bg-white"
                             />
                           </div>
                         ) : (
@@ -859,7 +859,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     Übernehmer (Mieter)
                     {allTenantsSigned && (
-                      <CheckCircle2 size={12} className="text-green-500" />
+                      <CheckCircle2 size={12} className="text-black" />
                     )}
                   </p>
                 )}
@@ -878,18 +878,18 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                     return (
                       <div key={person.id} className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                          <span className="text-xs bg-black text-white px-1.5 py-0.5 rounded font-medium">
                             {getPersonRole(person, "uebernehmer")}
                           </span>
                           <span className="font-semibold text-sm">{person.name}</span>
                           {existingSig && (
-                            <CheckCircle2 size={14} className="text-green-500 ml-auto" />
+                            <CheckCircle2 size={14} className="text-black ml-auto" />
                           )}
                         </div>
 
                         {existingSig ? (
-                          <div className="border border-green-200 rounded-lg p-3 bg-green-50 space-y-2">
-                            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                          <div className="border border-gray-300 rounded-lg p-3 bg-gray-50 space-y-2">
+                            <p className="text-xs text-gray-700 font-medium flex items-center gap-1">
                               <CheckCircle2 size={12} />
                               {hasJustSigned
                                 ? "Unterschrift erfolgreich gespeichert!"
@@ -898,7 +898,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
                             <img
                               src={existingSig}
                               alt="Unterschrift"
-                              className="max-h-20 border border-green-200 rounded bg-white"
+                              className="max-h-20 border border-gray-200 rounded bg-white"
                             />
                           </div>
                         ) : isSubmitting ? (
@@ -922,23 +922,23 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
 
               {/* All-signed banner */}
               {allTenantsSigned && allLandlordsSigned && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                  <CheckCircle2 size={20} className="text-green-500 mx-auto mb-1" />
-                  <p className="text-sm font-semibold text-green-700">
+                <div className="bg-black text-white rounded-lg p-3 text-center">
+                  <CheckCircle2 size={20} className="mx-auto mb-1" />
+                  <p className="text-sm font-semibold">
                     Alle Beteiligten haben unterschrieben
                   </p>
-                  <p className="text-xs text-green-600 mt-0.5">
+                  <p className="text-xs mt-0.5 text-white/80">
                     Das Protokoll ist vollständig unterzeichnet.
                   </p>
                 </div>
               )}
               {allTenantsSigned && !allLandlordsSigned && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                  <CheckCircle2 size={20} className="text-blue-500 mx-auto mb-1" />
-                  <p className="text-sm font-semibold text-blue-700">
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 text-center">
+                  <CheckCircle2 size={20} className="text-black mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-gray-900">
                     Ihre Unterschrift wurde gespeichert
                   </p>
-                  <p className="text-xs text-blue-600 mt-0.5">
+                  <p className="text-xs text-gray-600 mt-0.5">
                     Die Unterschriften wurden automatisch synchronisiert.
                   </p>
                 </div>

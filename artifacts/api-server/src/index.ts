@@ -161,7 +161,8 @@ wss.on("connection", async (ws, request) => {
           }
         }
 
-        // Upsert to DB
+        // Upsert to DB — conflict target is composite (account_id, id) so
+        // a different account using the same UUID cannot overwrite this row.
         await db
           .insert(syncProtocolsTable)
           .values({
@@ -170,7 +171,7 @@ wss.on("connection", async (ws, request) => {
             data: incoming as unknown as Record<string, unknown>,
           })
           .onConflictDoUpdate({
-            target: syncProtocolsTable.id,
+            target: [syncProtocolsTable.accountId, syncProtocolsTable.id],
             set: {
               data: incoming as unknown as Record<string, unknown>,
               updatedAt: new Date(),
@@ -338,7 +339,7 @@ app.post(
             .insert(syncPhotosTable)
             .values({ id: p.id, accountId, dataUrl: p.dataUrl })
             .onConflictDoUpdate({
-              target: syncPhotosTable.id,
+              target: [syncPhotosTable.accountId, syncPhotosTable.id],
               set: { dataUrl: p.dataUrl, updatedAt: new Date() },
             });
           stored++;

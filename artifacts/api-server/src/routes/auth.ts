@@ -8,6 +8,7 @@ import {
   type SafeUser,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -181,5 +182,110 @@ router.get("/me", async (req: Request, res: Response) => {
 
   res.json({ user: toSafeUser(user), account: accounts[0] ?? null });
 });
+
+// ── Account info (requires auth) ─────────────────────────────────────────────
+router.get("/account", requireAuth, async (req: AuthRequest, res: Response) => {
+  res.json({ account: req.account ?? null });
+});
+
+// ── List account members (owner or administrator only) ────────────────────────
+router.get(
+  "/users",
+  requireAuth,
+  requireRole("owner", "administrator"),
+  async (req: AuthRequest, res: Response) => {
+    const members = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.accountId, req.user!.accountId));
+
+    const safe: SafeUser[] = members.map(({ passwordHash: _pw, ...u }) => u);
+    res.json({ users: safe });
+  }
+);
+
+// ── Invite a new member to the account (owner or administrator only) ──────────
+router.post(
+  "/users/invite",
+  requireAuth,
+  requireRole("owner", "administrator"),
+  async (req: AuthRequest, res: Response) => {
+    const { email, password, firstName, lastName, role } = req.body as {
+      email?: string;
+      password?: string;
+      firstName?: string;
+      lastName?: string;
+      role?: string;
+    };
+
+    if (!email || !password) {
+      res.status(400).json({ error: "email and password are required" });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
+    const validRoles = ["owner", "administrator", "property_manager"];
+    const assignedRole = validRoles.includes(role ?? "") ? role as "owner" | "administrator" | "property_manager" : "property_manager";
+
+    const existing = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, email.trim().toLowerCase()))
+      .limit(1);
+
+    if (existing.length > 0) {
+      res.status(409).json({ error: "Email already registered" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        accountId: req.user!.accountId,
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        firstName: firstName?.trim() ?? "",
+        lastName: lastName?.trim() ?? "",
+        role: assignedRole,
+      })
+      .returning();
+
+    const { passwordHash: _pw, ...safeUser } = user;
+    res.status(201).json({ user: safeUser });
+  }
+);
+
+// ── Remove an account member (owner only) ─────────────────────────────────────
+router.delete(
+  "/users/:userId",
+  requireAuth,
+  requireRole("owner"),
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.params.userId as string;
+
+    if (userId === req.user!.id) {
+      res.status(400).json({ error: "Cannot remove yourself" });
+      return;
+    }
+
+    const rows = await db
+      .select({ id: usersTable.id, accountId: usersTable.accountId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!rows[0] || rows[0].accountId !== req.user!.accountId) {
+      res.status(404).json({ error: "User not found in your account" });
+      return;
+    }
+
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+    res.json({ ok: true });
+  }
+);
 
 export default router;

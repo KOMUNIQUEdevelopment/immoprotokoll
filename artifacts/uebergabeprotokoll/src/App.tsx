@@ -88,12 +88,6 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     sendRef: wsSendRef,
   });
 
-  const headerTitle = currentProtocol
-    ? [currentProtocol.mietobjekt, currentProtocol.adresse].filter(Boolean).join(", ") ||
-      "Protokoll"
-    : null;
-  void headerTitle;
-
   const handleExport = async () => {
     if (!currentProtocol) return;
     setIsExporting(true);
