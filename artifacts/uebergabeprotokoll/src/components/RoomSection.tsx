@@ -32,11 +32,7 @@ function ConditionButtons({ value, onChange }: { value: Condition; onChange: (c:
           onClick={() => onChange(value === c ? "" : c)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
             value === c
-              ? c === "sehr gut"
-                ? "bg-green-500 text-white border-green-500"
-                : c === "gut"
-                ? "bg-yellow-500 text-white border-yellow-500"
-                : "bg-red-500 text-white border-red-500"
+              ? "bg-foreground text-background border-foreground"
               : "bg-background border-border text-foreground hover:bg-accent"
           }`}
         >
@@ -72,13 +68,7 @@ export default function RoomSection({ room, onChange, floorLabel, onDelete }: Ro
               <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" title="Ausgefüllt" />
             )}
             {room.bodenZustand && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                room.bodenZustand === "sehr gut"
-                  ? "bg-green-100 text-green-700"
-                  : room.bodenZustand === "gut"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-red-100 text-red-700"
-              }`}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-muted text-muted-foreground">
                 {room.bodenZustand}
               </span>
             )}

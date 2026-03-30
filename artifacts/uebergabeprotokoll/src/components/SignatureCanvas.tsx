@@ -185,7 +185,7 @@ export default function SignatureCanvasComponent({ value, onChange }: SignatureC
           />
         </div>
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+          <span className="flex items-center gap-1.5 text-xs text-foreground font-medium">
             <Check size={13} />
             Unterschrift bestätigt
           </span>

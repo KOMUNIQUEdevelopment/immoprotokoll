@@ -52,8 +52,8 @@ export function InstallButton({ className }: { className?: string }) {
           {isIos ? (
             <div className="space-y-2">
               <div className="flex items-start gap-2.5">
-                <div className="p-1.5 rounded-lg bg-blue-50 shrink-0">
-                  <Share size={14} className="text-blue-600" />
+                <div className="p-1.5 rounded-lg bg-muted shrink-0">
+                  <Share size={14} className="text-foreground" />
                 </div>
                 <div>
                   <p className="text-xs font-medium">Safari öffnen</p>
@@ -63,8 +63,8 @@ export function InstallButton({ className }: { className?: string }) {
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
-                <div className="p-1.5 rounded-lg bg-blue-50 shrink-0">
-                  <Smartphone size={14} className="text-blue-600" />
+                <div className="p-1.5 rounded-lg bg-muted shrink-0">
+                  <Smartphone size={14} className="text-foreground" />
                 </div>
                 <div>
                   <p className="text-xs font-medium">Zum Home-Bildschirm</p>

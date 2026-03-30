@@ -118,7 +118,7 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
               placeholder="name@beispiel.de"
               autoComplete="email"
               required
-              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
+              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-neutral-900" : ""}`}
             />
           </div>
 
@@ -133,12 +133,12 @@ export default function RegisterPage({ onRegister, onGoToLogin }: RegisterPagePr
               placeholder="Mindestens 8 Zeichen"
               autoComplete="new-password"
               required
-              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
+              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-neutral-900" : ""}`}
             />
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 font-medium">{error}</p>
+            <p className="text-xs text-foreground font-medium">{error}</p>
           )}
 
           <Button

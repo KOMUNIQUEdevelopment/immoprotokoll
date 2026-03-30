@@ -131,7 +131,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
               ))}
               {protocol.uebernehmer.filter(p => p.name).map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
-                  <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                  <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium shrink-0">
                     {getPersonRole(p, "uebernehmer")}
                   </span>
                   <span className="truncate">{p.name}</span>
@@ -197,11 +197,7 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
                             <span className="truncate font-medium">{room.name}</span>
                             <div className="flex items-center gap-1 shrink-0">
                               {room.bodenZustand && (
-                                <span className={`w-2 h-2 rounded-full ${
-                                  room.bodenZustand === "sehr gut" ? "bg-green-500"
-                                  : room.bodenZustand === "gut" ? "bg-yellow-500"
-                                  : "bg-red-500"
-                                }`} title={room.bodenZustand} />
+                                <span className="w-2 h-2 rounded-full bg-foreground/60" title={room.bodenZustand} />
                               )}
                               {hasPhotos && (
                                 <span className="flex items-center gap-0.5 text-muted-foreground">
@@ -232,11 +228,11 @@ function ProtocolPreviewModal({ protocol, onClose, onEdit }: ProtocolPreviewModa
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">Räume ausgefüllt</p>
             </div>
-            <div className={`rounded-xl p-3 text-center ${allSigned ? "bg-green-50 border border-green-200" : "bg-muted/50"}`}>
-              <p className={`text-lg font-bold ${allSigned ? "text-green-600" : "text-primary"}`}>
+            <div className={`rounded-xl p-3 text-center ${allSigned ? "bg-foreground text-background" : "bg-muted/50"}`}>
+              <p className={`text-lg font-bold ${allSigned ? "text-background" : "text-primary"}`}>
                 {signedCount}/{allPersons.length}
               </p>
-              <p className={`text-[11px] mt-0.5 ${allSigned ? "text-green-600" : "text-muted-foreground"}`}>
+              <p className={`text-[11px] mt-0.5 ${allSigned ? "text-background/80" : "text-muted-foreground"}`}>
                 {allSigned ? "✓ Unterschriften" : "Unterschriften"}
               </p>
             </div>
@@ -327,9 +323,9 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
         </div>
 
         {!protocol.syncEnabled && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-700 leading-snug">
+          <div className="flex items-start gap-2 bg-muted border border-border rounded-xl p-3">
+            <AlertTriangle size={15} className="text-foreground shrink-0 mt-0.5" />
+            <div className="text-xs text-foreground leading-snug">
               <strong>Sync ist nicht aktiviert.</strong> Aktiviere erst Sync für dieses
               Protokoll, damit der Link für die Mieterin funktioniert.
             </div>
@@ -349,7 +345,7 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
               onClick={copyLink}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors shrink-0 ${
                 copied
-                  ? "bg-green-50 border-green-300 text-green-700"
+                  ? "bg-foreground border-foreground text-background"
                   : "bg-background border-border hover:bg-muted"
               }`}
             >
@@ -362,10 +358,10 @@ function ShareLinkModal({ protocol, onClose }: ShareLinkModalProps) {
         <div className="bg-muted/50 rounded-xl p-3 space-y-1.5 text-xs text-muted-foreground">
           <p className="font-medium text-foreground text-xs">Was die Mieterin sehen kann:</p>
           <ul className="space-y-1 list-none">
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Alle Protokollinhalte (schreibgeschützt)</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Alle Fotos und Raumzustände</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Zusatzvereinbarungen</li>
-            <li className="flex items-center gap-1.5"><Check size={11} className="text-green-500" /> Eigene Unterschrift leisten (wird synchronisiert)</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Alle Protokollinhalte (schreibgeschützt)</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Alle Fotos und Raumzustände</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Zusatzvereinbarungen</li>
+            <li className="flex items-center gap-1.5"><Check size={11} className="text-muted-foreground" /> Eigene Unterschrift leisten (wird synchronisiert)</li>
           </ul>
         </div>
 
@@ -632,7 +628,7 @@ export default function ProtocolListPage({
                         <button
                           type="button"
                           onMouseDown={e => { e.preventDefault(); commitRename(); }}
-                          className="p-1 rounded text-emerald-600 hover:bg-emerald-50 shrink-0"
+                          className="p-1 rounded text-foreground hover:bg-muted shrink-0"
                           title="Speichern"
                         >
                           <Check size={14} />
@@ -677,7 +673,7 @@ export default function ProtocolListPage({
                     title={p.syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
                     className={`p-2 rounded-lg transition-colors ${
                       p.syncEnabled
-                        ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+                        ? "text-foreground bg-muted hover:bg-muted/70"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >

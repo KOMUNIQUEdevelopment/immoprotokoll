@@ -73,7 +73,7 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel }: SortablePhotoP
       {/* Delete button – always visible so it works on touch/mobile */}
       <button
         onClick={() => onDelete(photo.id)}
-        className="absolute top-1.5 right-1.5 p-1 bg-red-500/80 rounded-md text-white hover:bg-red-600 active:bg-red-700 shadow"
+        className="absolute top-1.5 right-1.5 p-1 bg-foreground/80 rounded-md text-background hover:bg-foreground active:bg-foreground shadow"
         title="Löschen"
       >
         <Trash2 size={14} />

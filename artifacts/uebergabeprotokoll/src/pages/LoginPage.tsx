@@ -54,7 +54,7 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
               autoComplete="email"
               autoFocus
               required
-              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
+              className={`border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-neutral-900" : ""}`}
             />
           </div>
 
@@ -70,7 +70,7 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
                 placeholder="••••••••"
                 autoComplete="current-password"
                 required
-                className={`pr-10 border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-red-400" : ""}`}
+                className={`pr-10 border-neutral-300 focus-visible:ring-0 focus-visible:border-black ${error ? "border-neutral-900" : ""}`}
               />
               <button
                 type="button"
@@ -84,7 +84,7 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 font-medium">{error}</p>
+            <p className="text-xs text-foreground font-medium">{error}</p>
           )}
 
           <Button

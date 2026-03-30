@@ -153,7 +153,7 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
         <h3 className="font-semibold text-sm flex items-center gap-2">
           Übergeber (Vermieter)
           {allVermieterSigned && protocol.uebergeber.length > 0 && (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Alle unterschrieben</span>
           )}
         </h3>
 
@@ -175,7 +175,7 @@ export default function SignaturePage({ protocol, updateProtocol }: SignaturePag
         <h3 className="font-semibold text-sm flex items-center gap-2">
           Übernehmer (Mieter)
           {allMieterSigned && protocol.uebernehmer.length > 0 && (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Alle unterschrieben</span>
+            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Alle unterschrieben</span>
           )}
         </h3>
 
