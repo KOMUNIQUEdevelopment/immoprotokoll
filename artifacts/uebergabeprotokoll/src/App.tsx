@@ -256,6 +256,48 @@ function AppContent({
       )
     );
 
+  const globalImpersonationBanner = isImpersonating && onEndImpersonation ? (
+    <div
+      style={{
+        background: "hsl(0 0% 8%)",
+        color: "hsl(0 0% 100%)",
+        padding: "6px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        fontSize: "12px",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        gap: "8px",
+      }}
+    >
+      <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ opacity: 0.6, fontSize: "10px" }}>▶</span>
+        Superadmin-Modus: Ansicht als anderes Konto
+      </span>
+      <button
+        onClick={() => { void onEndImpersonation(); }}
+        style={{
+          background: "hsl(0 0% 100%)",
+          color: "hsl(0 0% 8%)",
+          border: "none",
+          borderRadius: "3px",
+          padding: "3px 10px",
+          cursor: "pointer",
+          fontSize: "11px",
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        Beenden
+      </button>
+    </div>
+  ) : null;
+
   if (!isEditing) {
     if (appScreen === "billing-success") {
       return (
@@ -343,6 +385,7 @@ function AppContent({
     if (!selectedProperty) {
       return (
         <>
+          {globalImpersonationBanner}
           <PropertyListPage
             onSelectProperty={setSelectedProperty}
             onLogout={onLogout}
@@ -361,6 +404,7 @@ function AppContent({
     }
     return (
       <>
+        {globalImpersonationBanner}
         <PropertyProtocolsPage
           property={selectedProperty}
           protocols={protocols}
@@ -553,6 +597,7 @@ function AppContent({
       )}
 
       <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+      {globalImpersonationBanner}
     </div>
   );
 }
