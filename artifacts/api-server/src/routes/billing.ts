@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { db } from "@workspace/db";
-import { accountsTable, subscriptionsTable } from "@workspace/db";
+import { accountsTable, subscriptionsTable, propertiesTable, syncProtocolsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
 import { logger } from "../lib/logger";
 
@@ -52,7 +52,7 @@ router.get("/config", async (_req: Request, res: Response) => {
   });
 });
 
-// ── GET /api/billing/subscription — current subscription state ────────────
+// ── GET /api/billing/subscription — current subscription state + usage ─────
 router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response) => {
   const accountId = req.user!.accountId;
   try {
@@ -74,7 +74,34 @@ router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response)
       res.status(404).json({ error: "Account not found" });
       return;
     }
-    res.json(account);
+
+    // Usage counters for the billing summary
+    const [propCount] = await db
+      .select({ value: count() })
+      .from(propertiesTable)
+      .where(eq(propertiesTable.accountId, accountId));
+    const [protCount] = await db
+      .select({ value: count() })
+      .from(syncProtocolsTable)
+      .where(eq(syncProtocolsTable.accountId, accountId));
+
+    // Plan limits
+    const LIMITS: Record<string, { properties: number | null; protocols: number | null }> = {
+      free:    { properties: 1,    protocols: 1 },
+      privat:  { properties: 1,    protocols: 30 },
+      agentur: { properties: 50,   protocols: 30 },
+      custom:  { properties: null, protocols: null },
+    };
+    const limits = LIMITS[account.plan] ?? LIMITS.free;
+
+    res.json({
+      ...account,
+      usage: {
+        properties: propCount?.value ?? 0,
+        protocols: protCount?.value ?? 0,
+        limits,
+      },
+    });
   } catch (err) {
     logger.error({ err }, "Error fetching subscription");
     res.status(500).json({ error: "Internal server error" });

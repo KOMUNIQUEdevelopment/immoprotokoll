@@ -69,18 +69,49 @@ export interface ExportOptions {
   watermark?: boolean;
 }
 
-function addWatermark(doc: jsPDF, pageCount: number) {
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const res = await fetch("/immoprotokoll-logo.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function addWatermark(doc: jsPDF, pageCount: number, logoDataUrl: string | null) {
   const pageW = 210;
   const pageH = 297;
+  const barH = 12;
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     // Footer watermark bar
     doc.setFillColor(245, 245, 245);
-    doc.rect(0, pageH - 10, pageW, 10, "F");
+    doc.rect(0, pageH - barH, pageW, barH, "F");
+    // Logo on the left
+    if (logoDataUrl) {
+      try {
+        const logoH = 6;
+        const logoW = 6;
+        doc.addImage(logoDataUrl, "PNG", 10, pageH - barH + 3, logoW, logoH);
+      } catch { /* skip if logo embed fails */ }
+    }
+    // Text branding on the right
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.text("Erstellt mit ImmoProtokoll · immoprotokoll.com · Free Plan", pageW / 2, pageH - 3.5, { align: "center" });
+    doc.text(
+      "Erstellt mit ImmoProtokoll · immoprotokoll.com · Free Plan",
+      pageW / 2 + 3,
+      pageH - barH + 7.5,
+      { align: "center" }
+    );
   }
 }
 
@@ -394,7 +425,8 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 
   // Add watermark to all pages for Free plan accounts
   if (options?.watermark) {
-    addWatermark(doc, doc.getNumberOfPages());
+    const logoDataUrl = await loadLogoDataUrl();
+    addWatermark(doc, doc.getNumberOfPages(), logoDataUrl);
   }
 
   doc.save(fileName);

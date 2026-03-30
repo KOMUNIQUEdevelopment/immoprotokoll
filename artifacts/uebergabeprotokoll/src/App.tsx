@@ -57,11 +57,13 @@ function AppContent({
   onLogout,
   accountId,
   account,
+  userRole,
   initialScreen = "protocols",
 }: {
   onLogout: () => void;
   accountId: string;
   account: { plan: "free" | "privat" | "agentur" | "custom" } | null;
+  userRole?: "owner" | "administrator" | "property_manager";
   initialScreen?: AppScreen;
 }) {
   const {
@@ -262,6 +264,7 @@ function AppContent({
           accountId={accountId}
           onBack={() => setAppScreen("protocols")}
           onShowPricing={() => setAppScreen("pricing")}
+          userRole={userRole}
         />
       );
     }
@@ -587,6 +590,7 @@ export default function App() {
         onLogout={logout}
         accountId={user.accountId}
         account={account}
+        userRole={user.role}
         initialScreen={hashToInitialScreen(hash)}
       />
       <Toaster />

@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, CreditCard, ExternalLink, Check, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowLeft, CreditCard, ExternalLink, Check, AlertTriangle, RefreshCw, Lock, Building2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface BillingPageProps {
   onBack: () => void;
   onShowPricing: () => void;
   accountId: string;
+  userRole?: "owner" | "administrator" | "property_manager";
+}
+
+interface UsageLimits {
+  properties: number | null;
+  protocols: number | null;
 }
 
 interface SubscriptionInfo {
@@ -16,6 +22,11 @@ interface SubscriptionInfo {
   currentPeriodEnd: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  usage?: {
+    properties: number;
+    protocols: number;
+    limits: UsageLimits;
+  };
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -39,11 +50,13 @@ const INTERVAL_LABELS: Record<string, string> = {
   annual: "Jährlich",
 };
 
-export default function BillingPage({ onBack, onShowPricing, accountId: _accountId }: BillingPageProps) {
+export default function BillingPage({ onBack, onShowPricing, accountId: _accountId, userRole }: BillingPageProps) {
   const [sub, setSub] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const isOwner = !userRole || userRole === "owner";
 
   const loadSubscription = async () => {
     try {
@@ -116,6 +129,21 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
         </div>
       </header>
 
+      {/* Non-owner: read-only view with info notice */}
+      {!isOwner && (
+        <div className="max-w-2xl mx-auto w-full px-4 pt-6">
+          <div className="flex items-start gap-3 bg-neutral-50 border border-neutral-200 rounded-xl p-4">
+            <Lock size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-black">Nur für Kontoinhaber</p>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Nur der Kontoinhaber kann das Abonnement verwalten und ändern.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         {loading && (
           <div className="flex items-center justify-center py-20">
@@ -187,9 +215,62 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
               )}
             </div>
 
-            {/* Actions */}
+            {/* Usage summary */}
+            {sub.usage && (
+              <div className="rounded-2xl border border-neutral-200 p-6 mb-6">
+                <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-4">Nutzung</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Building2 size={14} className="text-neutral-400 shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-neutral-600">Liegenschaften</span>
+                        <span className="text-xs font-medium text-black">
+                          {sub.usage.properties}
+                          {sub.usage.limits.properties !== null
+                            ? ` / ${sub.usage.limits.properties}`
+                            : " / ∞"}
+                        </span>
+                      </div>
+                      {sub.usage.limits.properties !== null && (
+                        <div className="w-full h-1 bg-neutral-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-black rounded-full transition-all"
+                            style={{ width: `${Math.min(100, (sub.usage.properties / sub.usage.limits.properties) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <FileText size={14} className="text-neutral-400 shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-neutral-600">Protokolle (gesamt)</span>
+                        <span className="text-xs font-medium text-black">
+                          {sub.usage.protocols}
+                          {sub.usage.limits.protocols !== null
+                            ? ` / ${sub.usage.limits.protocols}`
+                            : " / ∞"}
+                        </span>
+                      </div>
+                      {sub.usage.limits.protocols !== null && (
+                        <div className="w-full h-1 bg-neutral-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-black rounded-full transition-all"
+                            style={{ width: `${Math.min(100, (sub.usage.protocols / sub.usage.limits.protocols) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Actions — only shown to owners */}
             <div className="space-y-3">
-              {!isPaid && (
+              {isOwner && !isPaid && (
                 <Button
                   className="w-full bg-black text-white hover:bg-neutral-800 gap-2"
                   onClick={onShowPricing}
@@ -198,7 +279,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                 </Button>
               )}
 
-              {isPaid && sub.stripeCustomerId && (
+              {isOwner && isPaid && sub.stripeCustomerId && (
                 <Button
                   variant="outline"
                   className="w-full border-neutral-200 gap-2"
