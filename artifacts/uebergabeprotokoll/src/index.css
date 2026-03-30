@@ -66,7 +66,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE */
+/* Strict black-and-white theme — no color accents */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -74,45 +74,46 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 220 20% 97%;
-  --foreground: 225 25% 12%;
-  --border: 220 15% 88%;
+  /* Neutrals only — 0 saturation throughout */
+  --background: 0 0% 98%;
+  --foreground: 0 0% 7%;
+  --border: 0 0% 88%;
   --card: 0 0% 100%;
-  --card-foreground: 225 25% 12%;
-  --card-border: 220 15% 90%;
-  --sidebar: 220 25% 95%;
-  --sidebar-foreground: 225 25% 15%;
-  --sidebar-border: 220 15% 86%;
-  --sidebar-primary: 240 60% 35%;
+  --card-foreground: 0 0% 7%;
+  --card-border: 0 0% 90%;
+  --sidebar: 0 0% 96%;
+  --sidebar-foreground: 0 0% 10%;
+  --sidebar-border: 0 0% 86%;
+  --sidebar-primary: 0 0% 7%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 20% 90%;
-  --sidebar-accent-foreground: 225 25% 20%;
-  --sidebar-ring: 240 60% 35%;
+  --sidebar-accent: 0 0% 92%;
+  --sidebar-accent-foreground: 0 0% 15%;
+  --sidebar-ring: 0 0% 7%;
   --popover: 0 0% 100%;
-  --popover-foreground: 225 25% 12%;
-  --popover-border: 220 15% 88%;
-  --primary: 240 55% 30%;
+  --popover-foreground: 0 0% 7%;
+  --popover-border: 0 0% 88%;
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 20% 92%;
-  --secondary-foreground: 225 25% 20%;
-  --muted: 220 15% 93%;
-  --muted-foreground: 220 10% 50%;
-  --accent: 220 20% 91%;
-  --accent-foreground: 225 25% 20%;
-  --destructive: 0 70% 50%;
+  --secondary: 0 0% 93%;
+  --secondary-foreground: 0 0% 15%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 0 0% 92%;
+  --accent-foreground: 0 0% 15%;
+  --destructive: 0 0% 20%;
   --destructive-foreground: 0 0% 100%;
-  --input: 220 15% 85%;
-  --ring: 240 55% 30%;
-  --chart-1: 240 60% 45%;
-  --chart-2: 160 60% 40%;
-  --chart-3: 30 80% 55%;
-  --chart-4: 280 65% 50%;
-  --chart-5: 340 75% 55%;
+  --input: 0 0% 86%;
+  --ring: 0 0% 7%;
+  --chart-1: 0 0% 20%;
+  --chart-2: 0 0% 35%;
+  --chart-3: 0 0% 50%;
+  --chart-4: 0 0% 65%;
+  --chart-5: 0 0% 80%;
 
   --app-font-sans: 'Inter', system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.625rem;
+  --radius: 0.375rem;
   --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,.04);
   --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,.06);
   --shadow-sm: 0px 2px 4px 0px rgba(0,0,0,.06);

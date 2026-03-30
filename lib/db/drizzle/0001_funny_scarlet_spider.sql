@@ -1,0 +1,1 @@
+ALTER TABLE "sync_protocols" ADD CONSTRAINT "sync_protocols_id_unique" UNIQUE("id");
