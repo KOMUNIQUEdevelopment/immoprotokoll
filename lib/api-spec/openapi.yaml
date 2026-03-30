@@ -296,6 +296,10 @@ components:
 
     InviteUserRequest:
       type: object
+      description: >
+        Owners may assign any role (owner, administrator, property_manager).
+        Administrators may only assign administrator or property_manager —
+        assigning owner as an administrator returns 403.
       properties:
         email:
           type: string
@@ -309,7 +313,7 @@ components:
           type: string
         role:
           type: string
-          enum: [administrator, property_manager]
+          enum: [owner, administrator, property_manager]
       required:
         - email
         - password

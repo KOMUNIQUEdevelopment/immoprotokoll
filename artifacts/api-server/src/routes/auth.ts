@@ -227,8 +227,25 @@ router.post(
       return;
     }
 
-    const validRoles = ["owner", "administrator", "property_manager"];
-    const assignedRole = validRoles.includes(role ?? "") ? role as "owner" | "administrator" | "property_manager" : "property_manager";
+    // Role assignment rules:
+    // - Owners can invite with any role (owner, administrator, property_manager)
+    // - Administrators can only invite administrator or property_manager — not owner
+    //   (preventing privilege escalation to a higher tier)
+    const callerRole = req.user!.role;
+    const ownerOnly = callerRole === "owner";
+    const validRoles: Array<"owner" | "administrator" | "property_manager"> = ownerOnly
+      ? ["owner", "administrator", "property_manager"]
+      : ["administrator", "property_manager"];
+
+    if (role && !validRoles.includes(role as "owner" | "administrator" | "property_manager")) {
+      res.status(403).json({ error: "You are not allowed to assign that role" });
+      return;
+    }
+
+    const assignedRole: "owner" | "administrator" | "property_manager" =
+      validRoles.includes(role as "owner" | "administrator" | "property_manager")
+        ? (role as "owner" | "administrator" | "property_manager")
+        : "property_manager";
 
     const existing = await db
       .select({ id: usersTable.id })
