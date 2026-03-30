@@ -114,27 +114,13 @@ export default function LandingPage() {
             variants={fadeUp}
             className="container mx-auto max-w-6xl"
           >
-            <div className="aspect-[16/9] w-full bg-black/5 border border-black/10 rounded-2xl overflow-hidden relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3/4 h-3/4 bg-white shadow-2xl border border-black/10 rounded-xl flex flex-col">
-                  <div className="h-12 border-b border-black/10 flex items-center px-4">
-                    <div className="w-32 h-4 bg-black/10"></div>
-                  </div>
-                  <div className="flex-1 flex p-6 gap-6">
-                    <div className="w-1/3 flex flex-col gap-4">
-                      <div className="h-24 bg-black/5"></div>
-                      <div className="h-24 bg-black/5"></div>
-                      <div className="h-24 bg-black/5"></div>
-                    </div>
-                    <div className="w-2/3 border border-black/10 p-6 flex flex-col gap-6">
-                      <div className="w-1/2 h-8 bg-black/10"></div>
-                      <div className="w-full h-32 bg-black/5"></div>
-                      <div className="w-full h-4 bg-black/5"></div>
-                      <div className="w-3/4 h-4 bg-black/5"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden relative shadow-2xl">
+              <img
+                src={`${import.meta.env.BASE_URL}hero-apartment.jpg`}
+                alt={lang === "de" ? "Moderne Wohnung bei der Übergabe" : "Modern apartment at handover"}
+                className="w-full h-full object-cover grayscale"
+              />
+              <div className="absolute inset-0 bg-black/20" />
             </div>
           </motion.div>
         </section>

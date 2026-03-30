@@ -1,0 +1,20 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "eZisqpFSQUy273E2RKLEQ"
+uri = "file://attached_assets/stock_images/property_inspection_1.jpg"
+type = "image"
+title = "person using tablet in modern apartment, real estate inspection"
+
+[[outputs]]
+id = "J9ixqBg0GXD9Erf5AY-a0"
+uri = "file://attached_assets/stock_images/property_inspection_2.jpg"
+type = "image"
+title = "person using tablet in modern apartment, real estate inspection"
+
+[[outputs]]
+id = "q0aTGMU7YPAir2GJZ5tE3"
+uri = "file://attached_assets/stock_images/property_inspection_3.jpg"
+type = "image"
+title = "person using tablet in modern apartment, real estate inspection"
