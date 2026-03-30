@@ -46,7 +46,7 @@ function formatRelative(date: Date | null): string {
 
 type EditorTab = "protokoll" | "unterschriften";
 
-function AppContent({ onLogout }: { onLogout: () => void }) {
+function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: string }) {
   const {
     protocols,
     trashedProtocols,
@@ -73,7 +73,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     isSaving,
     lastSaved,
     wsSendRef,
-  } = useProtocolsStore();
+  } = useProtocolsStore(accountId);
 
   const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
@@ -432,7 +432,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent onLogout={logout} />
+      <AppContent onLogout={logout} accountId={user.accountId} />
       <Toaster />
     </QueryClientProvider>
   );

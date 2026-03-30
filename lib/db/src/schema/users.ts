@@ -29,6 +29,18 @@ export const insertUserSchema = createInsertSchema(usersTable).omit({
   updatedAt: true,
 });
 
+// user_roles: explicit role assignments table (complements the denormalized role on users)
+export const userRolesTable = pgTable("user_roles", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  role: userRoleEnum("role").notNull(),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  assignedBy: text("assigned_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof usersTable.$inferSelect;
 export type SafeUser = Omit<User, "passwordHash">;
+export type UserRole = typeof userRolesTable.$inferSelect;

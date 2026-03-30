@@ -10,9 +10,17 @@ import {
   fetchMissingPhotosFromServer,
 } from "./photoDb";
 
-const PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
-const LEGACY_KEY = "uebergabeprotokoll_data";
-const TRASH_KEY = "uebergabeprotokoll_trash";
+// Legacy keys — only used for one-time migration when accountId is first set
+const LEGACY_PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
+const LEGACY_LEGACY_KEY = "uebergabeprotokoll_data";
+const LEGACY_TRASH_KEY = "uebergabeprotokoll_trash";
+
+function getProtocolsKey(accountId: string): string {
+  return `immo_protocols_${accountId}`;
+}
+function getTrashKey(accountId: string): string {
+  return `immo_trash_${accountId}`;
+}
 
 export interface TrashedEntry {
   protocol: ProtocolData;
@@ -111,9 +119,10 @@ function stripPhotoDataUrls(
   );
 }
 
-function loadLocalProtocols(): Record<string, ProtocolData> {
+function loadLocalProtocols(key: string): Record<string, ProtocolData> {
+  // Try the namespaced key first
   try {
-    const saved = localStorage.getItem(PROTOCOLS_KEY);
+    const saved = localStorage.getItem(key);
     if (saved) {
       const raw = JSON.parse(saved) as Record<string, Record<string, unknown>>;
       return Object.fromEntries(
@@ -124,13 +133,18 @@ function loadLocalProtocols(): Record<string, ProtocolData> {
     console.warn("Failed to load protocols from localStorage", e);
   }
 
+  // One-time migration from the legacy global key
   try {
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      const protocol = migrateProtocol(parsed);
-      const protocols: Record<string, ProtocolData> = { [protocol.id]: protocol };
-      localStorage.setItem(PROTOCOLS_KEY, JSON.stringify(protocols));
+    const legacySaved = localStorage.getItem(LEGACY_PROTOCOLS_KEY);
+    if (legacySaved) {
+      const raw = JSON.parse(legacySaved) as Record<string, Record<string, unknown>>;
+      const protocols = Object.fromEntries(
+        Object.entries(raw).map(([id, p]) => [id, migrateProtocol(p)])
+      );
+      // Write to namespaced key and clear legacy key to prevent cross-account reuse
+      localStorage.setItem(key, JSON.stringify(protocols));
+      localStorage.removeItem(LEGACY_PROTOCOLS_KEY);
+      localStorage.removeItem(LEGACY_LEGACY_KEY);
       return protocols;
     }
   } catch {}
@@ -138,25 +152,36 @@ function loadLocalProtocols(): Record<string, ProtocolData> {
   return {};
 }
 
-function loadLocalTrash(): Record<string, TrashedEntry> {
+function loadLocalTrash(key: string): Record<string, TrashedEntry> {
+  // Try namespaced key first
   try {
-    const saved = localStorage.getItem(TRASH_KEY);
+    const saved = localStorage.getItem(key);
     if (saved) return JSON.parse(saved) as Record<string, TrashedEntry>;
   } catch (e) {
     console.warn("Failed to load trash from localStorage", e);
   }
+  // One-time migration from legacy key
+  try {
+    const legacySaved = localStorage.getItem(LEGACY_TRASH_KEY);
+    if (legacySaved) {
+      const trash = JSON.parse(legacySaved) as Record<string, TrashedEntry>;
+      localStorage.setItem(key, JSON.stringify(trash));
+      localStorage.removeItem(LEGACY_TRASH_KEY);
+      return trash;
+    }
+  } catch {}
   return {};
 }
 
-function persistTrash(trash: Record<string, TrashedEntry>): void {
+function persistTrash(trash: Record<string, TrashedEntry>, key: string): void {
   try {
-    localStorage.setItem(TRASH_KEY, JSON.stringify(trash));
+    localStorage.setItem(key, JSON.stringify(trash));
   } catch (e) {
     console.error("localStorage trash save failed", e);
   }
 }
 
-function persistAll(protocols: Record<string, ProtocolData>): boolean {
+function persistAll(protocols: Record<string, ProtocolData>, key: string): boolean {
   // 1a. Save photo blobs + signatures to IndexedDB (fire-and-forget, large data)
   const photoEntries = collectPhotoEntries(protocols);
   if (photoEntries.length > 0) {
@@ -186,7 +211,7 @@ function persistAll(protocols: Record<string, ProtocolData>): boolean {
 
   // 2. Save stripped metadata to localStorage (small, sync)
   try {
-    localStorage.setItem(PROTOCOLS_KEY, JSON.stringify(stripPhotoDataUrls(protocols)));
+    localStorage.setItem(key, JSON.stringify(stripPhotoDataUrls(protocols)));
     return true;
   } catch (e) {
     console.error("localStorage save failed (quota exceeded?)", e);
@@ -259,14 +284,54 @@ function hydratePhotos(
   );
 }
 
-export function useProtocolsStore() {
-  const [protocols, setProtocols] = useState<Record<string, ProtocolData>>(loadLocalProtocols);
-  const [trashedProtocols, setTrashedProtocols] = useState<Record<string, TrashedEntry>>(loadLocalTrash);
+export function useProtocolsStore(accountId: string | null) {
+  // Namespace localStorage keys per account to prevent cross-tenant data leakage
+  const protocolsKey = accountId ? getProtocolsKey(accountId) : null;
+  const trashKey = accountId ? getTrashKey(accountId) : null;
+
+  // Stable ref so callbacks always read the latest keys without re-capturing
+  const keysRef = useRef({ protocolsKey, trashKey });
+  keysRef.current = { protocolsKey, trashKey };
+
+  // Key-aware wrappers — safe to call inside any setX updater
+  const saveProt = (protocols: Record<string, ProtocolData>) => {
+    const pk = keysRef.current.protocolsKey;
+    if (pk) persistAll(protocols, pk);
+  };
+  const saveTrash = (trash: Record<string, TrashedEntry>) => {
+    const tk = keysRef.current.trashKey;
+    if (tk) persistTrash(trash, tk);
+  };
+
+  const [protocols, setProtocols] = useState<Record<string, ProtocolData>>(() =>
+    protocolsKey ? loadLocalProtocols(protocolsKey) : {}
+  );
+  const [trashedProtocols, setTrashedProtocols] = useState<Record<string, TrashedEntry>>(() =>
+    trashKey ? loadLocalTrash(trashKey) : {}
+  );
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsSendRef = useRef<((msg: SyncMessage) => void) | null>(null);
+
+  // If accountId changes (different user on same device), reinitialize state from
+  // the new account's namespaced storage so no cross-account data is ever visible.
+  const prevAccountIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevAccountIdRef.current === undefined) {
+      // Skip first render — useState lazy initializer already loaded the right data
+      prevAccountIdRef.current = accountId;
+      return;
+    }
+    if (prevAccountIdRef.current === accountId) return;
+    prevAccountIdRef.current = accountId;
+    setCurrentId(null);
+    setProtocols(protocolsKey ? loadLocalProtocols(protocolsKey) : {});
+    setTrashedProtocols(trashKey ? loadLocalTrash(trashKey) : {});
+  // Keys derive deterministically from accountId so no stale-closure risk.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
 
@@ -300,7 +365,8 @@ export function useProtocolsStore() {
             p.rooms.some((r) => r.photos.some((ph) => ph.dataUrl)) ||
             (p.personSignatures ?? []).some((s) => s.signatureDataUrl)
         );
-        if (hasEmbedded) persistAll(prev);
+        const pk = keysRef.current.protocolsKey;
+        if (hasEmbedded && pk) persistAll(prev, pk);
         // After IndexedDB hydration, still-missing IDs must come from server
         missingIds = collectMissingPhotoIds(hydrated);
         return hydrated;
@@ -315,7 +381,9 @@ export function useProtocolsStore() {
   }, []);
 
   const saveAll = useCallback((all: Record<string, ProtocolData>) => {
-    const ok = persistAll(all);
+    const pk = keysRef.current.protocolsKey;
+    if (!pk) return false;
+    const ok = persistAll(all, pk);
     if (ok) setLastSaved(new Date());
     return ok;
   }, []);
@@ -381,7 +449,7 @@ export function useProtocolsStore() {
 
       // Collect IDs still missing dataUrls → need to fetch from server
       missingIds = collectMissingPhotoIds(merged);
-      persistAll(merged);
+      saveProt(merged);
       return merged;
     });
     // Trigger server fetch AFTER state update (outside the updater to avoid side-effect issues)
@@ -418,7 +486,7 @@ export function useProtocolsStore() {
       const merged = { ...remote, rooms, meterPhotos, kitchenPhotos, personSignatures, deletedRoomIds, syncEnabled: true };
       const next = { ...prev, [remote.id]: merged };
       missingIds = collectMissingPhotoIds({ [remote.id]: merged });
-      persistAll(next);
+      saveProt(next);
       return next;
     });
     if (missingIds.length > 0) {
@@ -431,7 +499,7 @@ export function useProtocolsStore() {
       if (!prev[id]) return prev;
       const next = { ...prev };
       delete next[id];
-      persistAll(next);
+      saveProt(next);
       return next;
     });
     setCurrentId(prev => (prev === id ? null : prev));
@@ -444,7 +512,7 @@ export function useProtocolsStore() {
       const enabling = !current.syncEnabled;
       const updated = { ...current, syncEnabled: enabling };
       const next = { ...prev, [id]: updated };
-      persistAll(next);
+      saveProt(next);
       if (enabling) {
         setTimeout(() => wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) }), 0);
       } else {
@@ -461,7 +529,7 @@ export function useProtocolsStore() {
       if (!trimmed) return prev;
       const updated = { ...prev[id], mietobjekt: trimmed, lastSaved: new Date().toISOString() };
       const next = { ...prev, [id]: updated };
-      persistAll(next);
+      saveProt(next);
       if (updated.syncEnabled) {
         wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
       }
@@ -473,7 +541,7 @@ export function useProtocolsStore() {
     const p = createDefaultProtocol();
     setProtocols(prev => {
       const next = { ...prev, [p.id]: p };
-      persistAll(next);
+      saveProt(next);
       return next;
     });
     setCurrentId(p.id);
@@ -513,7 +581,7 @@ export function useProtocolsStore() {
         })),
       };
       const next = { ...prev, [newId]: copy };
-      persistAll(next);
+      saveProt(next);
       return next;
     });
   }, []);
@@ -540,12 +608,12 @@ export function useProtocolsStore() {
       // Add to trash
       setTrashedProtocols(t => {
         const next = { ...t, [id]: { protocol: target, deletedAt: new Date().toISOString() } };
-        persistTrash(next);
+        saveTrash(next);
         return next;
       });
       const next = { ...prev };
       delete next[id];
-      persistAll(next);
+      saveProt(next);
       if (wasSync) {
         // Remove from server so other devices don't see it anymore
         setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
@@ -563,12 +631,12 @@ export function useProtocolsStore() {
       const restored = { ...entry.protocol, syncEnabled: false };
       setProtocols(p => {
         const next = { ...p, [id]: restored };
-        persistAll(next);
+        saveProt(next);
         return next;
       });
       const next = { ...prev };
       delete next[id];
-      persistTrash(next);
+      saveTrash(next);
       return next;
     });
   }, []);
@@ -592,7 +660,7 @@ export function useProtocolsStore() {
       }
       const next = { ...prev };
       delete next[id];
-      persistTrash(next);
+      saveTrash(next);
       return next;
     });
   }, []);
@@ -614,7 +682,7 @@ export function useProtocolsStore() {
           console.warn("Failed to delete photos from IndexedDB", e)
         );
       }
-      persistTrash({});
+      saveTrash({});
       return {};
     });
   }, []);
@@ -626,7 +694,7 @@ export function useProtocolsStore() {
       if (!prev[currentId]) return prev;
       const updated = { ...prev[currentId], lastSaved: new Date().toISOString() };
       const next = { ...prev, [currentId]: updated };
-      persistAll(next);
+      saveProt(next);
       if (updated.syncEnabled) {
         wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
       }
@@ -677,7 +745,7 @@ export function useProtocolsStore() {
       if (!prev[id]) return prev;
       const updated = { ...prev[id], rooms: [...prev[id].rooms, room] };
       const next = { ...prev, [id]: updated };
-      persistAll(next);
+      saveProt(next);
       return next;
     });
     // WS send outside the updater so it always uses the committed state.
@@ -707,7 +775,7 @@ export function useProtocolsStore() {
         deletedRoomIds: [...new Set([...(prev[id].deletedRoomIds ?? []), roomId])],
       };
       const next = { ...prev, [id]: updated };
-      persistAll(next);
+      saveProt(next);
       return next;
     });
     // WS send outside the updater so it always uses the committed state.
