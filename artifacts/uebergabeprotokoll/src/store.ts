@@ -789,6 +789,38 @@ export function useProtocolsStore(accountId: string | null) {
     }, 0);
   }, [currentId]);
 
+  /**
+   * Permanently remove all local protocols (and trash entries) belonging to the given propertyId.
+   * Called after a property is deleted server-side (cascade deletes the server rows).
+   * This keeps the local store consistent with the server without waiting for the next WS reconnect.
+   */
+  const deleteProtocolsForProperty = useCallback((propertyId: string) => {
+    setProtocols(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [id, p] of Object.entries(next)) {
+        if (p.propertyId === propertyId) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      if (changed) saveProt(next);
+      return changed ? next : prev;
+    });
+    setTrashedProtocols(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [id, e] of Object.entries(next)) {
+        if (e.protocol.propertyId === propertyId) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      if (changed) saveTrash(next);
+      return changed ? next : prev;
+    });
+  }, []);
+
   return {
     protocols,
     trashedProtocols,
@@ -800,6 +832,7 @@ export function useProtocolsStore(accountId: string | null) {
     switchTo,
     backToList,
     deleteProtocol,
+    deleteProtocolsForProperty,
     restoreFromTrash,
     permanentlyDelete,
     emptyTrash,

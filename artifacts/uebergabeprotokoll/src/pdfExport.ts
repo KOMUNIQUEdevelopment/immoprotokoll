@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import JSZip from "jszip";
-import { ProtocolData, RoomPhoto, getPersonRole } from "./types";
+import { ProtocolData, RoomPhoto, FloorDef, getPersonRole } from "./types";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,36 @@ export function getFloorLabel(floor: string): string {
 
 export function getFloorSafe(floor: string): string {
   return FLOOR_SAFE[floor] ?? floor.replace(/\s+/g, "_");
+}
+
+/**
+ * Build a map of floorId → FloorDef from protocol.floors (new-style protocols).
+ * For new protocols, room.floor is a FloorDef UUID; for legacy protocols it is
+ * a legacy key like "EG", "OG", etc. This helper lets the export pipeline resolve
+ * either style gracefully.
+ */
+function buildFloorMap(floors: FloorDef[]): Record<string, FloorDef> {
+  const map: Record<string, FloorDef> = {};
+  for (const f of floors ?? []) map[f.id] = f;
+  return map;
+}
+
+/**
+ * Resolve a room.floor value to a human-readable label.
+ * Priority: 1) floorMap (UUID floors from FloorEditor), 2) FLOOR_LABEL (legacy keys).
+ */
+function resolveFloorLabel(floorId: string, floorMap: Record<string, FloorDef>): string {
+  if (floorMap[floorId]) return floorMap[floorId].name;
+  return FLOOR_LABEL[floorId] ?? floorId;
+}
+
+/**
+ * Resolve a room.floor value to a filesystem-safe string.
+ * Priority: 1) floorMap (UUID floors), 2) FLOOR_SAFE (legacy keys).
+ */
+function resolveFloorSafe(floorId: string, floorMap: Record<string, FloorDef>): string {
+  if (floorMap[floorId]) return floorMap[floorId].name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-äöüÄÖÜ]/g, "");
+  return FLOOR_SAFE[floorId] ?? floorId.replace(/\s+/g, "_");
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
@@ -155,23 +185,33 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
   }
 
   // ── Rooms by floor ────────────────────────────────────────────────────────
-  const floors = ["EG", "OG", "DG", "UG", "Aussen"];
-  const floorNames: Record<string, string> = {
-    EG: "Erdgeschoss (EG)",
-    OG: "Obergeschoss (OG)",
-    DG: "Dachgeschoss (DG)",
-    UG: "Untergeschoss / Keller",
-    "Aussen": "Aussenbereiche",
-  };
+  // Build a map from floor UUIDs (new-style FloorEditor protocols) to their names.
+  // For legacy protocols, protocol.floors is empty, so floorMap is also empty —
+  // resolveFloorLabel then falls back to the FLOOR_LABEL static map.
+  const floorMap = buildFloorMap(protocol.floors ?? []);
 
-  const allFloors = [...new Set(protocol.rooms.map(r => r.floor))];
+  // Legacy ordered floors (used when protocol.floors is empty)
+  const legacyFloorOrder = ["EG", "OG", "DG", "UG", "Aussen"];
 
-  for (const floor of [...floors, ...allFloors.filter(f => !floors.includes(f) && f !== "Außen")]) {
-    const rooms = protocol.rooms.filter(r => r.floor === floor || (floor === "Aussen" && r.floor === "Außen"));
+  // Ordered floor IDs to iterate over: prefer protocol.floors order (new), then legacy order
+  const orderedFloorIds: string[] = protocol.floors && protocol.floors.length > 0
+    ? protocol.floors.map(f => f.id)
+    : [
+        ...legacyFloorOrder,
+        // catch any extra legacy floor keys not in the known set
+        ...[...new Set(protocol.rooms.map(r => r.floor))].filter(
+          f => !legacyFloorOrder.includes(f) && f !== "Außen"
+        ),
+      ];
+
+  for (const floorId of orderedFloorIds) {
+    const rooms = protocol.rooms.filter(r =>
+      r.floor === floorId || (floorId === "Aussen" && r.floor === "Außen")
+    );
     if (rooms.length === 0) continue;
 
     addPage();
-    h1(`Raumprotokoll - ${safeText(floorNames[floor] || floor)}`);
+    h1(`Raumprotokoll - ${safeText(resolveFloorLabel(floorId, floorMap))}`);
 
     for (const room of rooms) {
       checkPage(35);
@@ -196,7 +236,7 @@ export async function exportToPDF(protocol: ProtocolData): Promise<void> {
       }
 
       if (room.photos.length > 0) {
-        const roomFloorLabel = FLOOR_LABEL[room.floor] ?? FLOOR_LABEL["Außen"] ?? room.floor;
+        const roomFloorLabel = resolveFloorLabel(room.floor, floorMap);
         await addPhotosBlock(doc, room.photos, room.name, roomFloorLabel, margin, contentW, usableH, () => y, (v) => { y = v; });
       }
 
@@ -471,9 +511,10 @@ export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
     addPhotos(protocol.kitchenPhotos, "", "Küche");
   }
 
+  const zipFloorMap = buildFloorMap(protocol.floors ?? []);
   for (const room of protocol.rooms) {
     if (room.photos.length > 0) {
-      addPhotos(room.photos, FLOOR_SAFE[room.floor] ?? toSafeSegment(room.floor), room.name);
+      addPhotos(room.photos, resolveFloorSafe(room.floor, zipFloorMap), room.name);
     }
   }
 

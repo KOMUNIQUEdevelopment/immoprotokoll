@@ -8,6 +8,7 @@ import {
   usersTable,
   syncProtocolsTable,
   syncPhotosTable,
+  propertiesTable,
 } from "@workspace/db";
 import { getPlanLimits } from "./routes/properties";
 import { requireAuth, type AuthRequest } from "./middleware/auth";
@@ -207,6 +208,38 @@ wss.on("connection", async (ws, request) => {
 
         const existing = existingRows[0]?.data as typeof incoming | undefined;
         const isNew = !existingRows[0];
+
+        // New protocols MUST be associated with a property.
+        // Updates to existing protocols (including legacy ones without propertyId) are still accepted.
+        if (isNew && !incoming.propertyId) {
+          ws.send(JSON.stringify({
+            type: "error",
+            code: "PROPERTY_REQUIRED",
+            message: "New protocols must be associated with a property.",
+          }));
+          return;
+        }
+
+        // Verify the property belongs to the same account before applying limits.
+        // Prevents a malicious client from assigning a foreign propertyId to bypass counts.
+        if (isNew && incoming.propertyId) {
+          const [propRow] = await db
+            .select({ id: propertiesTable.id })
+            .from(propertiesTable)
+            .where(and(
+              eq(propertiesTable.id, incoming.propertyId),
+              eq(propertiesTable.accountId, accountId!)
+            ))
+            .limit(1);
+          if (!propRow) {
+            ws.send(JSON.stringify({
+              type: "error",
+              code: "PROPERTY_NOT_FOUND",
+              message: "The specified property does not belong to your account.",
+            }));
+            return;
+          }
+        }
 
         // Plan limit check for new protocols: count existing protocols for this property
         if (isNew && incoming.propertyId) {

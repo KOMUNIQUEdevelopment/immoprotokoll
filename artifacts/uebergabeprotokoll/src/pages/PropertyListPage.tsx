@@ -24,15 +24,17 @@ interface PropertyListPageProps {
   onSelectProperty: (property: Property) => void;
   onLogout?: () => void;
   protocols?: Record<string, ProtocolData>;
+  onDeleteProperty?: (propertyId: string) => void;
 }
 
 interface DeleteConfirmProps {
   property: Property;
+  protocolCount: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function DeleteConfirm({ property, onConfirm, onCancel }: DeleteConfirmProps) {
+function DeleteConfirm({ property, protocolCount, onConfirm, onCancel }: DeleteConfirmProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
@@ -43,8 +45,12 @@ function DeleteConfirm({ property, onConfirm, onCancel }: DeleteConfirmProps) {
           <div>
             <h2 className="font-semibold text-black text-sm">Liegenschaft löschen?</h2>
             <p className="text-xs text-neutral-500 mt-1">
-              <span className="font-medium text-black">{property.name}</span> wird unwiderruflich gelöscht.
-              Protokolle bleiben erhalten, werden aber keiner Liegenschaft mehr zugeordnet.
+              <span className="font-medium text-black">{property.name}</span> und alle zugehörigen{" "}
+              {protocolCount > 0
+                ? <><span className="font-medium text-black">{protocolCount} Protokoll{protocolCount !== 1 ? "e" : ""}</span> werden</>
+                : "Protokolle werden"
+              }{" "}
+              unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
             </p>
           </div>
         </div>
@@ -139,7 +145,7 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
   );
 }
 
-export default function PropertyListPage({ onSelectProperty, onLogout, protocols = {} }: PropertyListPageProps) {
+export default function PropertyListPage({ onSelectProperty, onLogout, protocols = {}, onDeleteProperty }: PropertyListPageProps) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -183,6 +189,8 @@ export default function PropertyListPage({ onSelectProperty, onLogout, protocols
   const handleDelete = async () => {
     if (!deleteTarget) return;
     await apiFetch(`/properties/${deleteTarget.id}`, { method: "DELETE" });
+    // Cascade delete: remove associated protocols from local store too
+    onDeleteProperty?.(deleteTarget.id);
     setProperties(prev => prev.filter(x => x.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
@@ -336,6 +344,7 @@ export default function PropertyListPage({ onSelectProperty, onLogout, protocols
       {deleteTarget && (
         <DeleteConfirm
           property={deleteTarget}
+          protocolCount={Object.values(protocols).filter(p => p.propertyId === deleteTarget.id).length}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

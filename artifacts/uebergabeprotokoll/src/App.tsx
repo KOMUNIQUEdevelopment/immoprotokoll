@@ -60,6 +60,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
     switchTo,
     backToList,
     deleteProtocol,
+    deleteProtocolsForProperty,
     restoreFromTrash,
     permanentlyDelete,
     emptyTrash,
@@ -177,6 +178,7 @@ function AppContent({ onLogout, accountId }: { onLogout: () => void; accountId: 
             onSelectProperty={setSelectedProperty}
             onLogout={onLogout}
             protocols={protocols}
+            onDeleteProperty={deleteProtocolsForProperty}
           />
           <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
         </>

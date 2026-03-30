@@ -9,10 +9,11 @@ export const syncProtocolsTable = pgTable(
     accountId: text("account_id")
       .notNull()
       .references(() => accountsTable.id, { onDelete: "cascade" }),
-    // onDelete: set null — protocols survive property deletion (become "unassigned");
-    // data is never silently discarded. Cascade delete is intentionally NOT used.
+    // onDelete: cascade — protocols are deleted with their property.
+    // Confirmed intentional: the UI is property-centric; orphaned protocols would be inaccessible.
+    // The property delete dialog warns the user about this before confirming.
     propertyId: text("property_id")
-      .references(() => propertiesTable.id, { onDelete: "set null" }),
+      .references(() => propertiesTable.id, { onDelete: "cascade" }),
     data: jsonb("data").notNull().$type<Record<string, unknown>>(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
