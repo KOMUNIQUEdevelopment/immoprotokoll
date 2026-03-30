@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import i18n from "../i18n";
 
 export interface BillingCheckoutOptions {
   plan: "privat" | "agentur";
@@ -32,12 +33,12 @@ export function useBilling() {
         }
       } else {
         const err = await res.json() as { error: string };
-        const msg = err.error ?? "Checkout fehlgeschlagen.";
+        const msg = err.error ?? i18n.t("billing.checkoutFailed");
         setError(msg);
         return { error: msg };
       }
     } catch {
-      const msg = "Verbindungsfehler beim Erstellen der Zahlungssitzung.";
+      const msg = i18n.t("billing.checkoutError");
       setError(msg);
       return { error: msg };
     } finally {
@@ -59,14 +60,14 @@ export function useBilling() {
         if (data.url) {
           window.location.href = data.url;
         } else {
-          setError("Keine Portal-URL erhalten.");
+          setError(i18n.t("billing.noPortalUrl"));
         }
       } else {
         const err = await res.json() as { error: string };
-        setError(err.error ?? "Portal konnte nicht geöffnet werden.");
+        setError(err.error ?? i18n.t("billing.portalFailed"));
       }
     } catch {
-      setError("Verbindungsfehler beim Öffnen des Portals.");
+      setError(i18n.t("billing.portalError"));
     } finally {
       setLoading(false);
     }

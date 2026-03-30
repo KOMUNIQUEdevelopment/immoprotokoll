@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { ProtocolData, RoomPhoto, createDefaultProtocol, migrateProtocol } from "./types";
+import { ProtocolData, ProtocolSeeds, RoomPhoto, createDefaultProtocol, migrateProtocol } from "./types";
 import { SyncMessage } from "./hooks/useSync";
 import {
   savePhotosToDb,
@@ -537,8 +537,8 @@ export function useProtocolsStore(accountId: string | null) {
     });
   }, []);
 
-  const createNew = useCallback((propertyId: string | null = null) => {
-    const p = createDefaultProtocol(propertyId);
+  const createNew = useCallback((propertyId: string | null = null, seeds?: ProtocolSeeds) => {
+    const p = createDefaultProtocol(propertyId, seeds);
     setProtocols(prev => {
       const next = { ...prev, [p.id]: p };
       saveProt(next);

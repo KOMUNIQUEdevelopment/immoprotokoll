@@ -20,7 +20,7 @@ import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
 import { InstallButton } from "./components/InstallButton";
-import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "./i18n";
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage, getTranslations } from "./i18n";
 import {
   Save,
   FileDown,
@@ -171,6 +171,7 @@ function AppContent({
   });
 
   const propertyLang = (selectedProperty?.language ?? "de-CH") as SupportedLanguage;
+  const tr = getTranslations(propertyLang);
 
   const handleExport = async () => {
     if (!currentProtocol) return;
@@ -178,12 +179,12 @@ function AppContent({
     try {
       const freePlan = !account || account.plan === "free";
       await exportToPDF(currentProtocol, { watermark: freePlan, language: propertyLang });
-      toast({ title: t("protocols.pdfExported"), description: t("protocols.pdfExportSuccess") });
+      toast({ title: tr.protocols.pdfExported, description: tr.protocols.pdfExportSuccess });
     } catch (e) {
       console.error(e);
       toast({
-        title: t("protocols.pdfExportError"),
-        description: t("protocols.pdfExportErrorHint"),
+        title: tr.protocols.pdfExportError,
+        description: tr.protocols.pdfExportErrorHint,
         variant: "destructive",
       });
     } finally {
@@ -198,18 +199,17 @@ function AppContent({
       (currentProtocol.kitchenPhotos?.length ?? 0) +
       currentProtocol.rooms.reduce((s, r) => s + r.photos.length, 0);
     if (totalPhotos === 0) {
-      toast({ title: t("protocols.noPhotos"), description: t("protocols.noPhotosHint") });
+      toast({ title: tr.protocols.noPhotos, description: tr.protocols.noPhotosHint });
       return;
     }
     setIsZipping(true);
     try {
       const freePlan = !account || account.plan === "free";
       await exportPhotosAsZip(currentProtocol, { watermark: freePlan, language: propertyLang });
-      const plural = totalPhotos !== 1 ? "s" : "";
-      toast({ title: t("protocols.zipExported"), description: t("protocols.zipExportedCount", { count: totalPhotos, plural }) });
+      toast({ title: tr.protocols.zipExported, description: tr.protocols.zipExportedCount.replace("{{count}}", String(totalPhotos)).replace("{{plural}}", totalPhotos !== 1 ? "s" : "") });
     } catch (e) {
       console.error(e);
-      toast({ title: t("protocols.pdfExportError"), description: t("protocols.pdfExportErrorHint"), variant: "destructive" });
+      toast({ title: tr.protocols.pdfExportError, description: tr.protocols.pdfExportErrorHint, variant: "destructive" });
     } finally {
       setIsZipping(false);
     }
@@ -217,11 +217,15 @@ function AppContent({
 
   const handleSave = () => {
     manualSave();
-    toast({ title: t("protocols.savedMsg"), description: t("protocols.savedMsgHint") });
+    toast({ title: tr.protocols.savedMsg, description: tr.protocols.savedMsgHint });
   };
 
   const handleCreate = () => {
-    createNew(selectedProperty?.id ?? null);
+    createNew(selectedProperty?.id ?? null, {
+      applianceNames: tr.editor.defaultAppliances as unknown as string[],
+      meterTypes: tr.editor.defaultMeterTypes as unknown as string[],
+      zusatzvereinbarungTitle: "",
+    });
     setActiveTab("protokoll");
   };
 
@@ -368,13 +372,13 @@ function AppContent({
                 type="button"
                 onClick={handleBackToList}
                 className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors shrink-0"
-                title={t("protocols.overview")}
+                title={tr.protocols.overview}
               >
                 <ArrowLeft size={16} />
               </button>
               <div className="min-w-0">
                 <h1 className="font-semibold text-sm leading-tight truncate text-black">
-                  {currentProtocol?.mietobjekt || t("protocols.unnamed")}
+                  {currentProtocol?.mietobjekt || tr.protocols.unnamed}
                 </h1>
                 <p className="text-xs text-neutral-500 truncate">
                   {currentProtocol?.adresse || ""}
@@ -387,7 +391,7 @@ function AppContent({
                 <button
                   type="button"
                   onClick={() => toggleSync(currentProtocol.id)}
-                  title={currentProtocol.syncEnabled ? t("protocols.syncActive") : t("protocols.syncInactive")}
+                  title={currentProtocol.syncEnabled ? tr.protocols.syncActive : tr.protocols.syncInactive}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium transition-colors ${
                     currentProtocol.syncEnabled
                       ? "border-black bg-black text-white"
@@ -399,17 +403,17 @@ function AppContent({
                   ) : (
                     <CloudOff size={13} />
                   )}
-                  <span className="hidden sm:inline">{t("protocols.syncLabel")}</span>
+                  <span className="hidden sm:inline">{tr.protocols.syncLabel}</span>
                 </button>
               )}
 
               <span
                 title={
                   syncStatus === "connected"
-                    ? t("protocols.connected")
+                    ? tr.protocols.connected
                     : syncStatus === "connecting"
-                    ? t("protocols.connecting")
-                    : t("protocols.offline")
+                    ? tr.protocols.connecting
+                    : tr.protocols.offline
                 }
                 className="hidden sm:flex items-center"
               >
@@ -422,7 +426,7 @@ function AppContent({
 
               {lastSaved && (
                 <span className="text-xs text-neutral-400 hidden sm:block whitespace-nowrap">
-                  {isSaving ? t("common.saving") : `${t("common.saved")} ${formatRelative(lastSaved, t)}`}
+                  {isSaving ? tr.common.saving : `${tr.common.saved} ${formatRelative(lastSaved, t)}`}
                 </span>
               )}
 
@@ -433,7 +437,7 @@ function AppContent({
               <button
                 type="button"
                 onClick={onLogout}
-                title={t("auth.logout")}
+                title={tr.auth.logout}
                 className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors hidden sm:flex"
               >
                 <LogOut size={15} />
@@ -451,7 +455,7 @@ function AppContent({
                 ) : (
                   <Save size={14} />
                 )}
-                <span className="hidden sm:inline">{isSaving ? t("common.ok") : t("common.save")}</span>
+                <span className="hidden sm:inline">{isSaving ? tr.common.ok : tr.common.save}</span>
               </Button>
 
               <Button
@@ -460,10 +464,10 @@ function AppContent({
                 onClick={handleZipExport}
                 disabled={isZipping}
                 className="gap-1.5 border-neutral-200 hover:bg-neutral-50"
-                title={t("protocols.photos")}
+                title={tr.protocols.photos}
               >
                 <FolderArchive size={14} />
-                <span className="hidden sm:inline">{isZipping ? "..." : t("protocols.photos")}</span>
+                <span className="hidden sm:inline">{isZipping ? "..." : tr.protocols.photos}</span>
               </Button>
 
               <Button
@@ -493,7 +497,7 @@ function AppContent({
               }`}
             >
               <ClipboardList size={15} />
-              {t("protocols.protocol")}
+              {tr.protocols.protocol}
             </button>
             <button
               type="button"
@@ -505,7 +509,7 @@ function AppContent({
               }`}
             >
               <PenLine size={15} />
-              {t("protocols.signatures")}
+              {tr.protocols.signatures}
               {allSigned && <CheckCircle2 size={13} className="text-black" />}
             </button>
           </div>
@@ -524,7 +528,7 @@ function AppContent({
       {isSaving && (
         <div className="sm:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
           <span className="bg-black text-white text-xs px-3 py-1.5 rounded-full shadow-md">
-            {t("common.autoSaved")}
+            {tr.common.autoSaved}
           </span>
         </div>
       )}

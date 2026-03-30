@@ -121,7 +121,7 @@ export default function SignaturePage({ protocol, updateProtocol, language = "de
       </div>
 
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-        <h3 className="font-semibold text-sm">{tr.pdf.date} &amp; Ort</h3>
+        <h3 className="font-semibold text-sm">{tr.pdf.dateAndLocation}</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">

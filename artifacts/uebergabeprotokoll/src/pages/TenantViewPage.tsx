@@ -462,7 +462,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
               {wsStatus === "connected" ? (
                 <span className="flex items-center gap-1 text-xs text-primary-foreground/80">
                   <Wifi size={12} />
-                  Live
+                  {tr.tenant.live}
                 </span>
               ) : wsStatus === "connecting" ? (
                 <Loader2 size={12} className="animate-spin text-primary-foreground/60" />

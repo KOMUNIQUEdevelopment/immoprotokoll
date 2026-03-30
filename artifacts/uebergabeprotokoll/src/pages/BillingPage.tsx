@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, CreditCard, ExternalLink, Check, AlertTriangle, RefreshCw, Lock, Building2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 interface BillingPageProps {
   onBack: () => void;
@@ -36,21 +37,30 @@ const PLAN_LABELS: Record<string, string> = {
   custom: "Custom",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: "Aktiv",
-  trialing: "Probezeit",
-  past_due: "Zahlung überfällig",
-  canceled: "Gekündigt",
-  unpaid: "Unbezahlt",
-  incomplete: "Unvollständig",
-};
-
-const INTERVAL_LABELS: Record<string, string> = {
-  monthly: "Monatlich",
-  annual: "Jährlich",
-};
 
 export default function BillingPage({ onBack, onShowPricing, accountId: _accountId, userRole }: BillingPageProps) {
+  const { t } = useTranslation();
+
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      active: t("billing.statusActive"),
+      trialing: t("billing.statusTrialing"),
+      past_due: t("billing.statusPastDue"),
+      canceled: t("billing.statusCanceled"),
+      unpaid: t("billing.statusUnpaid"),
+      incomplete: t("billing.statusIncomplete"),
+    };
+    return map[status] ?? status;
+  };
+
+  const getIntervalLabel = (interval: string) => {
+    const map: Record<string, string> = {
+      monthly: t("billing.intervalMonthly"),
+      annual: t("billing.intervalAnnual"),
+    };
+    return map[interval] ?? interval;
+  };
+
   const [sub, setSub] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -66,10 +76,10 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
         const data = await res.json() as SubscriptionInfo;
         setSub(data);
       } else {
-        setError("Abonnement-Informationen konnten nicht geladen werden.");
+        setError(t("billing.loadError"));
       }
     } catch {
-      setError("Verbindungsfehler.");
+      setError(t("billing.connectionError"));
     } finally {
       setLoading(false);
     }
@@ -92,10 +102,10 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
         window.location.href = data.url;
       } else {
         const err = await res.json() as { error: string };
-        setError(err.error ?? "Fehler beim Öffnen des Kundenportals.");
+        setError(err.error ?? t("billing.portalFailed"));
       }
     } catch {
-      setError("Verbindungsfehler.");
+      setError(t("billing.connectionError"));
     } finally {
       setPortalLoading(false);
     }
@@ -180,7 +190,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                         : "bg-neutral-100 text-neutral-600"
                     }`}>
                       <Check size={10} />
-                      {STATUS_LABELS[sub.subscriptionStatus] ?? sub.subscriptionStatus}
+                      {getStatusLabel(sub.subscriptionStatus)}
                     </span>
                   )}
                 </div>
@@ -190,11 +200,11 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
               {isPaid && (
                 <div className="mt-4 pt-4 border-t border-neutral-100 grid grid-cols-2 gap-4 text-xs text-neutral-600">
                   <div>
-                    <p className="text-neutral-400 mb-0.5">Abrechnungsintervall</p>
-                    <p className="font-medium text-black">{INTERVAL_LABELS[sub.billingInterval] ?? sub.billingInterval}</p>
+                    <p className="text-neutral-400 mb-0.5">{t("billing.billingInterval")}</p>
+                    <p className="font-medium text-black">{getIntervalLabel(sub.billingInterval)}</p>
                   </div>
                   <div>
-                    <p className="text-neutral-400 mb-0.5">Währung</p>
+                    <p className="text-neutral-400 mb-0.5">{t("billing.currency")}</p>
                     <p className="font-medium text-black">{sub.currency.toUpperCase()}</p>
                   </div>
                   {sub.currentPeriodEnd && (
@@ -287,7 +297,7 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                   disabled={portalLoading}
                 >
                   <ExternalLink size={14} />
-                  {portalLoading ? "Öffnet..." : "Abonnement verwalten (Stripe)"}
+                  {portalLoading ? t("billing.portalOpening") : t("billing.manageSubscription")}
                 </Button>
               )}
 

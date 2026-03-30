@@ -242,7 +242,13 @@ export const DEFAULT_ZUSATZVEREINBARUNGEN: ZusatzvereinbarungEntry[] = [
  * Create a fresh protocol, optionally linked to a property.
  * New protocols start with no floors/rooms — users build them freely.
  */
-export function createDefaultProtocol(propertyId: string | null = null): ProtocolData {
+export interface ProtocolSeeds {
+  applianceNames?: string[];
+  meterTypes?: string[];
+  zusatzvereinbarungTitle?: string;
+}
+
+export function createDefaultProtocol(propertyId: string | null = null, seeds?: ProtocolSeeds): ProtocolData {
   const today = new Date();
   const datum = today.toLocaleDateString("de-CH");
   return {
@@ -256,15 +262,19 @@ export function createDefaultProtocol(propertyId: string | null = null): Protoco
     gesamtZustand: "",
     schluessel: "",
     schluesselDetails: "",
-    meterReadings: DEFAULT_METER_READINGS.map(r => ({ ...r })),
+    meterReadings: seeds?.meterTypes
+      ? seeds.meterTypes.map((type, i) => ({ type, stand: "", einheit: DEFAULT_METER_READINGS[i]?.einheit ?? "kWh" }))
+      : DEFAULT_METER_READINGS.map(r => ({ ...r })),
     meterPhotos: [],
-    appliances: DEFAULT_APPLIANCES.map(a => ({ ...a })),
+    appliances: seeds?.applianceNames
+      ? seeds.applianceNames.map(name => ({ name, zustand: "OK", notizen: "" }))
+      : DEFAULT_APPLIANCES.map(a => ({ ...a })),
     allgemeinerZustandKueche: "",
     kitchenPhotos: [],
     floors: [],
     rooms: [],
     deletedRoomIds: [],
-    zusatzvereinbarungTitle: "Zusatzvereinbarungen",
+    zusatzvereinbarungTitle: seeds?.zusatzvereinbarungTitle ?? "",
     zusatzvereinbarungen: [],
     signaturOrt: "",
     signaturDatum: datum,

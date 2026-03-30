@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { setLanguage } from "../i18n";
+import i18n, { setLanguage } from "../i18n";
 
 export interface AuthUser {
   id: string;
@@ -74,10 +74,10 @@ export function useAuth() {
         return {};
       } else {
         const err = await res.json() as { error: string };
-        return { error: err.error ?? "Anmeldung fehlgeschlagen" };
+        return { error: err.error ?? i18n.t("auth.loginFailed") };
       }
     } catch {
-      return { error: "Verbindungsfehler. Bitte erneut versuchen." };
+      return { error: i18n.t("auth.connectionError") };
     }
   }, []);
 
@@ -99,10 +99,10 @@ export function useAuth() {
         return {};
       } else {
         const err = await res.json() as { error: string };
-        return { error: err.error ?? "Registrierung fehlgeschlagen" };
+        return { error: err.error ?? i18n.t("auth.registerFailed") };
       }
     } catch {
-      return { error: "Verbindungsfehler. Bitte erneut versuchen." };
+      return { error: i18n.t("auth.connectionError") };
     }
   }, []);
 

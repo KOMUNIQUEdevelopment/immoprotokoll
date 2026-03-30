@@ -193,10 +193,12 @@ export default function PropertyProtocolsPage({
             <ArrowLeft size={16} />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="font-semibold text-sm leading-tight truncate text-black">{property.name}</h1>
+            <h1 className="font-semibold text-sm leading-tight truncate text-black">
+              {isUnassignedView ? t("properties.unassigned") : property.name}
+            </h1>
             {property.adresse && (
               <p className="text-xs text-neutral-500 flex items-center gap-1 truncate">
-                <MapPin size={10} />{property.adresse}
+                <MapPin size={10} />{isUnassignedView ? t("properties.unassignedHint") : property.adresse}
               </p>
             )}
           </div>

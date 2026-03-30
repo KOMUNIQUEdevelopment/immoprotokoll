@@ -382,11 +382,13 @@ export default function PropertyListPage({
                       <Building2 size={17} className="text-neutral-500" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-black truncate">{property.name}</p>
+                      <p className="font-semibold text-sm text-black truncate">
+                        {property.id === UNASSIGNED_PROPERTY.id ? t("properties.unassigned") : property.name}
+                      </p>
                       {property.adresse && (
                         <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1 truncate">
                           <MapPin size={11} />
-                          {property.adresse}
+                          {property.id === UNASSIGNED_PROPERTY.id ? t("properties.unassignedHint") : property.adresse}
                         </p>
                       )}
                     </div>

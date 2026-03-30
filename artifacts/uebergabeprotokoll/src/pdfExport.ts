@@ -279,7 +279,9 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
       checkPage(35);
       h2(safeText(room.name));
 
-      field(pdf.floor, room.bodenZustand || "-");
+      const condMap = tr.editor.condition as Record<string, string>;
+      const xlCond = (v: string) => condMap[v] ?? v;
+      field(pdf.floor, room.bodenZustand ? xlCond(room.bodenZustand) : "-");
       field(pdf.walls, room.waendeDecken || "-");
       field(pdf.windows, room.fensterTueren || "-");
       field(pdf.electric, room.elektrik || pdf.ok);
@@ -290,7 +292,7 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
       if (room.id === "ug-waschraum" && room.waschmaschineVorhanden !== undefined) {
         field(pdf.washingMachine, room.waschmaschineVorhanden ? pdf.present : pdf.notPresent);
         if (room.waschmaschineVorhanden && room.waschmaschinenZustand) {
-          field(pdf.washingMachineCondition, room.waschmaschinenZustand);
+          field(pdf.washingMachineCondition, xlCond(room.waschmaschinenZustand));
         }
         if (room.waschmaschineVorhanden && room.waschmaschinenNotizen) {
           field(pdf.washingMachineNotes, room.waschmaschinenNotizen);
