@@ -22,7 +22,7 @@ export const translations = {
         { title: "Digitale Fotodokumentation", desc: "Zustand lückenlos mit hochauflösenden Fotos festhalten." },
         { title: "Digitale Signaturen", desc: "Rechtsgültige Unterschriften direkt auf dem Gerät erfassen." },
         { title: "Automatischer PDF-Export", desc: "Professionelles, sauberes PDF sofort nach Abschluss generieren." },
-        { title: "Teilbarer Link", desc: "Mieter können das Protokoll jederzeit online einsehen." },
+        { title: "Teilbarer Link", desc: "Mieter können das Protokoll jederzeit online einsehen und unterzeichnen." },
         { title: "Geräteübergreifend", desc: "Beginnen Sie auf dem Tablet, schliessen Sie auf dem Desktop ab." },
         { title: "Team-Kollaboration", desc: "Verwalten Sie grosse Portfolios mit mehreren Mitarbeitern." }
       ]
@@ -63,9 +63,9 @@ export const translations = {
       },
       custom: {
         name: "Custom",
-        price: "Kontakt",
+        price: "Auf Anfrage",
         limits: "Individuelle Limits und Volumen",
-        cta: "Kontaktieren Sie uns"
+        cta: "Auf Anfrage"
       }
     },
     faq: {
@@ -109,7 +109,7 @@ export const translations = {
         { title: "Digital photo documentation", desc: "Capture conditions seamlessly with high-resolution photos." },
         { title: "Digital signatures", desc: "Collect legally binding signatures directly on the device." },
         { title: "Automatic PDF export", desc: "Generate a professional, clean PDF immediately upon completion." },
-        { title: "Shareable link", desc: "Tenants can view the protocol online at any time." },
+        { title: "Shareable link", desc: "Tenants can view and sign the protocol online at any time." },
         { title: "Cross-device", desc: "Start on a tablet, finish on your desktop." },
         { title: "Team collaboration", desc: "Manage large portfolios with multiple team members." }
       ]
@@ -150,9 +150,9 @@ export const translations = {
       },
       custom: {
         name: "Custom",
-        price: "Contact",
+        price: "On request",
         limits: "Custom limits and volume",
-        cta: "Contact us"
+        cta: "On request"
       }
     },
     faq: {
