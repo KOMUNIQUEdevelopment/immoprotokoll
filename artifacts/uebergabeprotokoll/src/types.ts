@@ -275,15 +275,15 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
   // Remove any rooms that were explicitly deleted.
   rooms = rooms.filter(r => !deletedSet.has(r.id));
 
-  // De-duplicate: if multiple rooms share the same name keep the one with
-  // the most data (photos + non-empty fields). This repairs protocols that
-  // were corrupted by the old auto-add migration logic.
-  const byName = new Map<string, RoomData>();
+  // De-duplicate: if multiple rooms share the same name AND floor, keep the
+  // one with the most data (photos + non-empty fields). Rooms with the same
+  // name on different floors (e.g. "WC" in EG, OG, DG) are kept separately.
+  const byNameFloor = new Map<string, RoomData>();
   for (const room of rooms) {
-    const key = room.name.trim().toLowerCase();
-    const existing = byName.get(key);
+    const key = `${room.name.trim().toLowerCase()}|${(room.floor ?? "").toLowerCase()}`;
+    const existing = byNameFloor.get(key);
     if (!existing) {
-      byName.set(key, room);
+      byNameFloor.set(key, room);
     } else {
       const existingScore =
         (existing.photos?.length ?? 0) +
@@ -294,11 +294,11 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
         (room.condition ? 1 : 0) +
         (room.notes ? 1 : 0);
       if (newScore > existingScore) {
-        byName.set(key, room);
+        byNameFloor.set(key, room);
       }
     }
   }
-  rooms = Array.from(byName.values());
+  rooms = Array.from(byNameFloor.values());
 
   data.deletedRoomIds = deletedRoomIds;
 
