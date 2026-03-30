@@ -183,7 +183,7 @@ router.get("/me", async (req: Request, res: Response) => {
     const impersonatedAccount = impersonatedAccounts[0];
     if (impersonatedAccount) {
       res.json({
-        user: toSafeUser(user),
+        user: { ...toSafeUser(user), accountId: impersonatedAccount.id },
         account: impersonatedAccount,
         isImpersonating: true,
         impersonatedAccountId: session.impersonatedAccountId,

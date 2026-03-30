@@ -6,6 +6,7 @@ import { db } from "@workspace/db";
 import {
   sessionsTable,
   usersTable,
+  accountsTable,
   syncProtocolsTable,
   syncPhotosTable,
   propertiesTable,
@@ -64,13 +65,18 @@ async function resolveSessionFromRequest(
   if (!session || session.expiresAt < new Date()) return null;
 
   const users = await db
-    .select({ accountId: usersTable.accountId, role: usersTable.role })
+    .select({ accountId: usersTable.accountId, role: usersTable.role, isSuperAdmin: usersTable.isSuperAdmin })
     .from(usersTable)
     .where(eq(usersTable.id, session.userId))
     .limit(1);
 
   const u = users[0];
   if (!u) return null;
+
+  if (session.impersonatedAccountId && u.isSuperAdmin) {
+    return { accountId: session.impersonatedAccountId, role: u.role };
+  }
+
   return { accountId: u.accountId, role: u.role };
 }
 
