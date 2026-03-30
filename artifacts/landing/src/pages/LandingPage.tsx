@@ -78,7 +78,7 @@ export default function LandingPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveSlide(i => (i + 1) % slides.length);
-    }, 3500);
+    }, 6000);
     return () => clearInterval(interval);
   }, [slides.length]);
 
