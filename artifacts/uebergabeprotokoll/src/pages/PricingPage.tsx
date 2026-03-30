@@ -13,8 +13,8 @@ type Currency = "CHF" | "EUR" | "USD";
 type Interval = "monthly" | "annual";
 
 const PRICES = {
-  privat:  { monthly: 9,  annual: 9  * 12 * 0.8 },
-  agentur: { monthly: 49, annual: 49 * 12 * 0.8 },
+  privat:  { monthly: 9,  annual: 86.40 },
+  agentur: { monthly: 49, annual: 470.40 },
 } as const;
 
 const CURRENCY_SYMBOL: Record<Currency, string> = { CHF: "CHF", EUR: "€", USD: "$" };

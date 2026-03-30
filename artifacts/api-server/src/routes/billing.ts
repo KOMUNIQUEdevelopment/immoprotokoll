@@ -21,8 +21,8 @@ function getStripe(): Stripe {
 // Prices are per plan × interval × currency. Stored as monthly amounts.
 // Annual = monthly × 12 × 0.8 (20% discount).
 export const PLAN_PRICES = {
-  privat: { monthly: 9, annual: 9 * 12 * 0.8 },
-  agentur: { monthly: 49, annual: 49 * 12 * 0.8 },
+  privat:  { monthly: 9,  annual: 86.40 },
+  agentur: { monthly: 49, annual: 470.40 },
 } as const;
 
 // Stripe Price IDs come from env — one per plan × interval × currency combo
