@@ -5,7 +5,7 @@ import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export default function LandingPage() {
   const { t, lang } = useLanguage();
@@ -223,11 +223,23 @@ export default function LandingPage() {
               variants={staggerContainer}
               className="flex flex-col gap-4"
             >
-              {t.faq.questions.map((q, i) => (
-                <motion.div key={i} variants={fadeUp}>
-                  <FaqItem question={q.q} answer={q.a} />
-                </motion.div>
-              ))}
+              {t.faq.questions.map((q, i) => {
+                const privacyHref = lang === "de" ? `/${lang}/datenschutz` : `/${lang}/privacy`;
+                const privacyLinkText = lang === "de" ? "Datenschutzerklärung" : "Privacy Policy";
+                const answer = i === 1 ? (
+                  <span>
+                    {q.a}{" "}
+                    <a href={privacyHref} className="underline font-semibold hover:opacity-70 transition-opacity">
+                      → {privacyLinkText}
+                    </a>
+                  </span>
+                ) : q.a;
+                return (
+                  <motion.div key={i} variants={fadeUp}>
+                    <FaqItem question={q.q} answer={answer} />
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </div>
         </section>
@@ -265,7 +277,7 @@ export default function LandingPage() {
   );
 }
 
-function FaqItem({ question, answer }: { question: string, answer: string }) {
+function FaqItem({ question, answer }: { question: string, answer: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-black/10 bg-white rounded-2xl overflow-hidden shadow-xs">
