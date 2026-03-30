@@ -133,6 +133,13 @@ router.patch("/accounts/:id", async (req: AuthRequest, res: Response) => {
     return;
   }
 
+  const isValidLimit = (v: unknown): boolean =>
+    v === null || v === undefined || (typeof v === "number" && Number.isInteger(v) && v >= 0);
+  if (!isValidLimit(customMaxProperties) || !isValidLimit(customMaxProtocols) || !isValidLimit(customMaxUsers)) {
+    res.status(400).json({ error: "Custom limits must be non-negative integers or null" });
+    return;
+  }
+
   try {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (plan !== undefined) updates.plan = plan;
