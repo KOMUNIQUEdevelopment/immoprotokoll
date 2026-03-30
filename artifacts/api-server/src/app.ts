@@ -31,18 +31,21 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : undefined;
 
-if (!allowedOrigins && process.env.NODE_ENV === "production") {
+const isProduction = process.env.NODE_ENV === "production";
+
+if (!allowedOrigins && isProduction) {
   logger.warn(
-    "ALLOWED_ORIGINS is not set — CORS will reflect all origins with credentials. " +
-      "Set ALLOWED_ORIGINS=https://your-domain.com in production."
+    "ALLOWED_ORIGINS is not set in production. Cross-origin requests will be denied. " +
+      "Set ALLOWED_ORIGINS=https://your-domain.com to enable cross-origin access."
   );
 }
 
 app.use(
   cors({
-    // In production with no ALLOWED_ORIGINS configured, reflect origin (dev-only fallback).
-    // Set ALLOWED_ORIGINS env var to a comma-separated list for production deployments.
-    origin: allowedOrigins ?? true,
+    // Development: reflect all origins (permissive for local dev/Replit preview).
+    // Production with ALLOWED_ORIGINS: use the explicit allowlist.
+    // Production without ALLOWED_ORIGINS: deny all cross-origin requests (fail-closed).
+    origin: allowedOrigins ?? (isProduction ? false : true),
     credentials: true,
   }),
 );
