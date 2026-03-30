@@ -39,6 +39,30 @@ function stripSingleProtocol(p: ProtocolData): ProtocolData {
   };
 }
 
+// Merge room lists: start from LOCAL rooms (preserving local deletions/additions)
+// and only add rooms from the server that are genuinely new (added on another device).
+// This means a locally deleted room is NEVER restored by an incoming server sync.
+type RoomData = ProtocolData["rooms"][number];
+function mergeRooms(localRooms: RoomData[], remoteRooms: RoomData[]): RoomData[] {
+  const localRoomIds = new Set(localRooms.map(r => r.id));
+  const merged = localRooms.map(localRoom => {
+    const remoteRoom = remoteRooms.find(r => r.id === localRoom.id);
+    if (!remoteRoom) return localRoom; // not on server, keep local as-is
+    // Merge photos: prefer local with dataUrl, fall back to remote stub
+    const photos = localRoom.photos.map(localPh => {
+      if (localPh.dataUrl) return localPh;
+      return remoteRoom.photos.find(rp => rp.id === localPh.id) ?? localPh;
+    });
+    // Add photo stubs from server not yet known locally (uploaded on another device)
+    const localPhIds = new Set(localRoom.photos.map(p => p.id));
+    const newRemotePhotos = remoteRoom.photos.filter(rp => !localPhIds.has(rp.id));
+    return { ...remoteRoom, photos: [...photos, ...newRemotePhotos] };
+  });
+  // Add rooms only the server knows about (added on another device, never seen locally)
+  const newServerRooms = remoteRooms.filter(r => !localRoomIds.has(r.id));
+  return [...merged, ...newServerRooms];
+}
+
 // Merge two personSignature arrays: prefer non-null values over null ones.
 // "local" wins when remote is stripped/null; remote wins when it has the
 // actual signature (e.g. from the sign endpoint broadcast).
@@ -308,21 +332,9 @@ export function useProtocolsStore() {
           // New protocol on this device — use remote stubs (photo IDs, no dataUrls)
           merged[id] = remoteP;
         } else {
-          // Prefer local photos (already hydrated from IndexedDB);
-          // fall back to remote stubs so the IDs are preserved for server fetch
-          const rooms = remoteP.rooms.map(remoteRoom => {
-            const prevRoom = localP.rooms.find(r => r.id === remoteRoom.id);
-            // Use local photos if they have data; otherwise keep remote stubs (IDs intact)
-            const photos = (prevRoom?.photos ?? []).map(localPh => {
-              if (localPh.dataUrl) return localPh;
-              const remotePh = (remoteRoom.photos ?? []).find(rp => rp.id === localPh.id);
-              return remotePh ?? localPh;
-            });
-            // If remote room has new photos not yet in local, add their stubs too
-            const localIds = new Set((prevRoom?.photos ?? []).map(p => p.id));
-            const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
-            return { ...remoteRoom, photos: [...photos, ...newRemote] };
-          });
+          // Merge rooms: local list is authoritative (preserves local deletions).
+          // mergeRooms only adds rooms from server that are genuinely new.
+          const rooms = mergeRooms(localP.rooms, remoteP.rooms);
           const mergeFlatPhotos = (local: typeof localP.kitchenPhotos, remote: typeof remoteP.kitchenPhotos) => {
             const loc = local ?? [];
             const rem = remote ?? [];
@@ -357,17 +369,9 @@ export function useProtocolsStore() {
     let missingIds: string[] = [];
     setProtocols(prev => {
       const existing = prev[remote.id];
-      // Prefer local photos (with dataUrls); keep remote stubs for IDs not yet local
-      const rooms = remote.rooms.map(remoteRoom => {
-        const prevRoom = existing?.rooms.find(r => r.id === remoteRoom.id);
-        const photos = (prevRoom?.photos ?? []).map(localPh => {
-          if (localPh.dataUrl) return localPh;
-          return (remoteRoom.photos ?? []).find(rp => rp.id === localPh.id) ?? localPh;
-        });
-        const localIds = new Set((prevRoom?.photos ?? []).map(p => p.id));
-        const newRemote = (remoteRoom.photos ?? []).filter(rp => !localIds.has(rp.id));
-        return { ...remoteRoom, photos: [...photos, ...newRemote] };
-      });
+      // Merge rooms: local list is authoritative (preserves local deletions).
+      // mergeRooms only adds rooms from server that are genuinely new.
+      const rooms = mergeRooms(existing?.rooms ?? [], remote.rooms);
       const mergeFlatPhotos2 = (local: RoomPhoto[], remoteArr: RoomPhoto[]) => {
         const merged2 = local.map(localPh => {
           if (localPh.dataUrl) return localPh;
