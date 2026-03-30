@@ -266,7 +266,8 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
 
       if (missingIds.length > 0) {
         try {
-          const url = `/api/photos?ids=${missingIds.join(",")}`;
+          // Use protocol-scoped public photo endpoint (no auth required for tenant view)
+          const url = `/api/protocol/${protocolId}/photos?ids=${missingIds.join(",")}`;
           const res = await fetch(url);
           if (res.ok) {
             const data = (await res.json()) as { photos?: Record<string, string> };
@@ -310,7 +311,8 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${proto}//${window.location.host}/api/sync`;
+    // Include protocolId so the server grants unauthenticated tenant read-only access
+    const url = `${proto}//${window.location.host}/api/sync?protocolId=${encodeURIComponent(protocolId)}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
     setWsStatus("connecting");

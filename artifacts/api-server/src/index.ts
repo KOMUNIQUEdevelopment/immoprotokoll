@@ -40,9 +40,14 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
   );
 }
 
-async function resolveAccountFromRequest(
+interface ResolvedSession {
+  accountId: string;
+  role: "owner" | "administrator" | "property_manager";
+}
+
+async function resolveSessionFromRequest(
   request: IncomingMessage
-): Promise<string | null> {
+): Promise<ResolvedSession | null> {
   const cookies = parseCookies(request.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
   if (!sessionId) return null;
@@ -57,58 +62,116 @@ async function resolveAccountFromRequest(
   if (!session || session.expiresAt < new Date()) return null;
 
   const users = await db
-    .select({ accountId: usersTable.accountId })
+    .select({ accountId: usersTable.accountId, role: usersTable.role })
     .from(usersTable)
     .where(eq(usersTable.id, session.userId))
     .limit(1);
 
-  return users[0]?.accountId ?? null;
+  const u = users[0];
+  if (!u) return null;
+  return { accountId: u.accountId, role: u.role };
 }
 
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
+// Extended request type for WS connection metadata
+type AugmentedRequest = IncomingMessage & {
+  accountId?: string;
+  userRole?: "owner" | "administrator" | "property_manager";
+  tenantProtocolId?: string; // set for unauthenticated tenant observers
+};
+
 server.on("upgrade", async (request, socket, head) => {
-  if (request.url !== "/api/sync") {
+  // Strip query string to check path only
+  const parsedUrl = new URL(request.url ?? "", "http://localhost");
+  if (parsedUrl.pathname !== "/api/sync") {
     socket.destroy();
     return;
   }
 
-  const accountId = await resolveAccountFromRequest(request);
-  if (!accountId) {
-    socket.write("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
-    socket.destroy();
-    return;
-  }
+  const session = await resolveSessionFromRequest(request);
+  const ext = request as AugmentedRequest;
 
-  (request as IncomingMessage & { accountId: string }).accountId = accountId;
+  if (session) {
+    // Authenticated user — attach account + role
+    ext.accountId = session.accountId;
+    ext.userRole = session.role;
+  } else {
+    // No session — check for tenant observer mode (read-only per protocolId)
+    const protocolId = parsedUrl.searchParams.get("protocolId");
+    if (!protocolId) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    ext.tenantProtocolId = protocolId;
+  }
 
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit("connection", ws, request);
   });
 });
 
+// Extended WS type with connection metadata
+type AugmentedWs = WebSocket & {
+  accountId?: string;
+  userRole?: "owner" | "administrator" | "property_manager";
+  tenantProtocolId?: string;
+};
+
 wss.on("connection", async (ws, request) => {
-  const accountId = (request as IncomingMessage & { accountId: string }).accountId;
-  logger.info({ clients: wss.clients.size, accountId }, "WebSocket client connected");
+  const ext = request as AugmentedRequest;
+  const accountId = ext.accountId;
+  const userRole = ext.userRole;
+  const tenantProtocolId = ext.tenantProtocolId;
+  const isTenant = !accountId && !!tenantProtocolId;
 
-  // Load all protocols for this account from the DB and send to client
-  try {
-    const rows = await db
-      .select()
-      .from(syncProtocolsTable)
-      .where(eq(syncProtocolsTable.accountId, accountId));
+  // Attach metadata to the WS socket for broadcast filtering
+  const augWs = ws as AugmentedWs;
+  augWs.accountId = accountId;
+  augWs.userRole = userRole;
+  augWs.tenantProtocolId = tenantProtocolId;
 
-    const protocols: Record<string, unknown> = {};
-    for (const row of rows) {
-      protocols[row.id] = row.data;
+  logger.info({ clients: wss.clients.size, accountId, tenantProtocolId, isTenant }, "WebSocket client connected");
+
+  if (isTenant) {
+    // Tenant observer — send only the one protocol they requested
+    try {
+      const rows = await db
+        .select()
+        .from(syncProtocolsTable)
+        .where(eq(syncProtocolsTable.id, tenantProtocolId!))
+        .limit(1);
+
+      if (rows.length > 0) {
+        ws.send(JSON.stringify({ type: "init", protocols: { [tenantProtocolId!]: rows[0].data } }));
+      }
+    } catch (err) {
+      logger.error({ err }, "Failed to load protocol for tenant WS init");
     }
-    ws.send(JSON.stringify({ type: "init", protocols }));
-  } catch (err) {
-    logger.error({ err }, "Failed to load protocols for WS init");
+  } else {
+    // Authenticated user — send all protocols for their account
+    try {
+      const rows = await db
+        .select()
+        .from(syncProtocolsTable)
+        .where(eq(syncProtocolsTable.accountId, accountId!));
+
+      const protocols: Record<string, unknown> = {};
+      for (const row of rows) {
+        protocols[row.id] = row.data;
+      }
+      ws.send(JSON.stringify({ type: "init", protocols }));
+    } catch (err) {
+      logger.error({ err }, "Failed to load protocols for WS init");
+    }
   }
 
   ws.on("message", async (data) => {
+    // Tenant observers are read-only — ignore all messages they send
+    if (isTenant) return;
+
     const payload = data.toString();
     if (payload.length > MAX_PAYLOAD) {
       logger.warn("Payload too large, ignoring");
@@ -135,7 +198,7 @@ wss.on("connection", async (ws, request) => {
           .where(
             and(
               eq(syncProtocolsTable.id, incoming.id),
-              eq(syncProtocolsTable.accountId, accountId)
+              eq(syncProtocolsTable.accountId, accountId!)
             )
           )
           .limit(1);
@@ -167,7 +230,7 @@ wss.on("connection", async (ws, request) => {
           .insert(syncProtocolsTable)
           .values({
             id: incoming.id,
-            accountId,
+            accountId: accountId!,
             data: incoming as unknown as Record<string, unknown>,
           })
           .onConflictDoUpdate({
@@ -183,24 +246,30 @@ wss.on("connection", async (ws, request) => {
         const broadcastPayload = JSON.stringify({ type: "update", protocol: incoming });
         wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
-            const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
-            if (clientAccountId === accountId) {
-              client.send(broadcastPayload);
-            }
+            const c = client as AugmentedWs;
+            // Broadcast to other authenticated clients in the same account
+            if (c.accountId === accountId) client.send(broadcastPayload);
+            // Also broadcast to tenant observers watching this specific protocol
+            if (c.tenantProtocolId === incoming.id) client.send(broadcastPayload);
           }
         });
-        (ws as WebSocket & { accountId?: string }).accountId = accountId;
       } catch (err) {
         logger.error({ err }, "Failed to update protocol");
       }
     } else if (msg.type === "delete" && msg.id) {
+      // Only Owner or Administrator may delete protocols — property managers cannot
+      if (userRole === "property_manager") {
+        logger.warn({ userRole }, "Property manager attempted to delete protocol — denied");
+        return;
+      }
+
       try {
         await db
           .delete(syncProtocolsTable)
           .where(
             and(
               eq(syncProtocolsTable.id, msg.id),
-              eq(syncProtocolsTable.accountId, accountId)
+              eq(syncProtocolsTable.accountId, accountId!)
             )
           );
 
@@ -209,10 +278,8 @@ wss.on("connection", async (ws, request) => {
         const deleteBroadcast = JSON.stringify({ type: "delete", id: msg.id });
         wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
-            const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
-            if (clientAccountId === accountId) {
-              client.send(deleteBroadcast);
-            }
+            const c = client as AugmentedWs;
+            if (c.accountId === accountId) client.send(deleteBroadcast);
           }
         });
       } catch (err) {
@@ -310,10 +377,11 @@ app.post("/api/protocol/:id/sign", async (req, res) => {
     const broadcastPayload = JSON.stringify({ type: "update", protocol });
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        const clientAccountId = (client as WebSocket & { accountId?: string }).accountId;
-        if (clientAccountId === rows[0].accountId) {
-          client.send(broadcastPayload);
-        }
+        const c = client as AugmentedWs;
+        // Broadcast to authenticated users in the same account
+        if (c.accountId === rows[0].accountId) client.send(broadcastPayload);
+        // Also broadcast to tenant observers watching this protocol
+        if (c.tenantProtocolId === id) client.send(broadcastPayload);
       }
     });
 
@@ -321,6 +389,80 @@ app.post("/api/protocol/:id/sign", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, "Failed to save signature");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── REST: Fotos abrufen für Mieter-Ansicht (öffentlich, scoped auf Protokoll) ─
+// Returns only photos that are referenced in the given protocol's rooms/meterPhotos.
+// This prevents tenants from using this endpoint to fish for arbitrary photo IDs.
+app.get("/api/protocol/:id/photos", async (req, res) => {
+  const { id } = req.params;
+  const raw = (req.query.ids as string) || "";
+  const requestedIds = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (requestedIds.length === 0) {
+    res.json({ photos: {} });
+    return;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(eq(syncProtocolsTable.id, id))
+      .limit(1);
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Protokoll nicht gefunden" });
+      return;
+    }
+
+    const protocol = rows[0].data as Record<string, unknown>;
+    const accountId = rows[0].accountId;
+
+    // Collect all photo IDs referenced in the protocol (rooms + meter/kitchen photos)
+    const allowedIds = new Set<string>();
+    const addPhotos = (arr: unknown) => {
+      if (Array.isArray(arr)) {
+        for (const photo of arr as Array<{ id?: string }>) {
+          if (photo.id) allowedIds.add(photo.id);
+        }
+      }
+    };
+    addPhotos(protocol.meterPhotos);
+    addPhotos(protocol.kitchenPhotos);
+    if (Array.isArray(protocol.rooms)) {
+      for (const room of protocol.rooms as Array<{ photos?: unknown }>) {
+        addPhotos(room.photos);
+      }
+    }
+
+    // Only serve photos that are both requested AND referenced in this protocol
+    const idsToFetch = requestedIds.filter((photoId) => allowedIds.has(photoId));
+    if (idsToFetch.length === 0) {
+      res.json({ photos: {} });
+      return;
+    }
+
+    const photoRows = await db
+      .select()
+      .from(syncPhotosTable)
+      .where(eq(syncPhotosTable.accountId, accountId));
+
+    const result: Record<string, string> = {};
+    for (const row of photoRows) {
+      if (idsToFetch.includes(row.id)) {
+        result[row.id] = row.dataUrl;
+      }
+    }
+
+    res.json({ photos: result });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch protocol photos for tenant");
     res.status(500).json({ error: "Internal server error" });
   }
 });
