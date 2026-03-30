@@ -94,11 +94,11 @@ paths:
       summary: Get currently authenticated user
       responses:
         "200":
-          description: Current user
+          description: Current user and account
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthUser"
+                $ref: "#/components/schemas/AuthResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -109,11 +109,18 @@ paths:
       summary: Get the current user's account details
       responses:
         "200":
-          description: Account details
+          description: Account details (nullable if account not found)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Account"
+                type: object
+                properties:
+                  account:
+                    oneOf:
+                      - $ref: "#/components/schemas/Account"
+                      - type: "null"
+                required:
+                  - account
         "401":
           $ref: "#/components/responses/Unauthorized"
 
