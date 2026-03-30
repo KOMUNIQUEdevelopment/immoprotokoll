@@ -176,26 +176,29 @@ export default function LandingPage() {
               {t.walkthrough.title}
             </motion.h2>
             
-            <div className="space-y-12 relative before:absolute before:inset-0 before:ml-[27px] md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-black/10">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={staggerContainer}
+              className="grid grid-cols-2 md:grid-cols-5 gap-6"
+            >
               {t.walkthrough.steps.map((step, i) => (
-                <motion.div 
+                <motion.div
                   key={i}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-100px" }}
                   variants={fadeUp}
-                  className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+                  className="flex flex-col items-center text-center gap-4"
                 >
-                  <div className="flex items-center justify-center w-14 h-14 rounded-full bg-black text-white font-bold text-xl border-4 border-white z-10 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-black text-white font-bold text-lg shrink-0">
                     {i + 1}
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] p-6 border border-black/8 bg-white rounded-2xl shadow-sm">
-                    <h3 className="font-bold text-xl mb-2">{step.title}</h3>
-                    <p className="text-black/60 font-medium">{step.desc}</p>
+                  <div>
+                    <h3 className="font-bold text-lg mb-1">{step.title}</h3>
+                    <p className="text-black/60 text-sm leading-relaxed">{step.desc}</p>
                   </div>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
