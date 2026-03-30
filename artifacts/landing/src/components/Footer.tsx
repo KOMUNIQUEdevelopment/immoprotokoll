@@ -18,7 +18,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <Link href={`/${lang}`} className="flex items-center mb-2">
-              <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-8" />
+              <img src={`${import.meta.env.BASE_URL}immoprotokoll-logo-black.png`} alt="ImmoProtokoll" className="h-8 rounded-lg" />
             </Link>
             <p className="text-sm mt-2 text-black/60 max-w-xs">
               {lang === "de" 
