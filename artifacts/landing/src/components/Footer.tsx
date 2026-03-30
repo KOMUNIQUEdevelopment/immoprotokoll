@@ -41,7 +41,7 @@ export default function Footer() {
         </div>
         
         <div className="mt-12 pt-6 border-t border-black/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-black/60">
-          <p>{t.footer.copyright}</p>
+          <p>© {new Date().getFullYear()} KOMUNIQUE by Philipp Roth</p>
           <button onClick={toggleLang} className="hover:text-black transition-colors font-bold uppercase">
             {lang === "de" ? "DE / en" : "de / EN"}
           </button>
