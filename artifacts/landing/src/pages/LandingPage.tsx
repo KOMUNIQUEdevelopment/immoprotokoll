@@ -5,7 +5,7 @@ import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 export default function LandingPage() {
   const { t, lang } = useLanguage();
