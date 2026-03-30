@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { db } from "@workspace/db";
-import { accountsTable } from "@workspace/db";
+import { accountsTable, subscriptionsTable } from "@workspace/db";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
 import { logger } from "../lib/logger";
 
@@ -11,6 +11,9 @@ const router = Router();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
+
+// Hardcoded base URL — prevents open-redirect via crafted Origin/Referer headers
+const APP_BASE_URL = process.env.APP_BASE_URL ?? "https://immoprotokoll.com";
 
 function getStripe(): Stripe {
   if (!STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not configured");
@@ -148,15 +151,14 @@ router.post(
           .where(eq(accountsTable.id, accountId));
       }
 
-      const origin = req.headers.origin ?? req.headers.referer ?? "https://immoprotokoll.com";
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         currency: cur,
-        success_url: `${origin}/#/billing/success`,
-        cancel_url: `${origin}/#/billing/cancel`,
+        success_url: `${APP_BASE_URL}/#/billing/success`,
+        cancel_url: `${APP_BASE_URL}/#/billing/cancel`,
         metadata: { accountId, plan, interval: interval, currency: cur },
         subscription_data: {
           metadata: { accountId, plan, interval: interval, currency: cur },
@@ -196,10 +198,9 @@ router.post(
         return;
       }
 
-      const origin = req.headers.origin ?? req.headers.referer ?? "https://immoprotokoll.com";
       const session = await stripe.billingPortal.sessions.create({
         customer: account.stripeCustomerId,
-        return_url: `${origin}/#/billing`,
+        return_url: `${APP_BASE_URL}/#/billing`,
       });
 
       res.json({ url: session.url });
@@ -252,9 +253,9 @@ async function handleWebhookEvent(event: Stripe.Event) {
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
-      // Downgrade to free on subscription deletion
       const accountId = sub.metadata?.accountId;
       if (accountId) {
+        // Downgrade accounts table to free
         await db
           .update(accountsTable)
           .set({
@@ -265,6 +266,11 @@ async function handleWebhookEvent(event: Stripe.Event) {
             updatedAt: new Date(),
           })
           .where(eq(accountsTable.id, accountId));
+        // Mark subscription as canceled (keep record for audit trail)
+        await db
+          .update(subscriptionsTable)
+          .set({ status: "canceled", canceledAt: new Date(), updatedAt: new Date() })
+          .where(eq(subscriptionsTable.accountId, accountId));
         logger.info({ accountId }, "Subscription canceled — downgraded to free");
       }
       break;
@@ -277,6 +283,10 @@ async function handleWebhookEvent(event: Stripe.Event) {
           .update(accountsTable)
           .set({ subscriptionStatus: "past_due", updatedAt: new Date() })
           .where(eq(accountsTable.stripeCustomerId, customerId));
+        await db
+          .update(subscriptionsTable)
+          .set({ status: "past_due", updatedAt: new Date() })
+          .where(eq(subscriptionsTable.stripeCustomerId, customerId));
         logger.warn({ customerId }, "Invoice payment failed — marked past_due");
       }
       break;
@@ -296,19 +306,59 @@ async function syncSubscription(sub: Stripe.Subscription) {
   const plan = (sub.metadata?.plan as "privat" | "agentur") ?? "free";
   const interval = (sub.metadata?.interval as "monthly" | "annual") ?? "monthly";
   const currency = sub.metadata?.currency ?? "chf";
+  const stripeStatus = sub.status as "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "incomplete";
+  const periodEnd = new Date((sub as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000);
+  const periodStart = new Date((sub as Stripe.Subscription & { current_period_start: number }).current_period_start * 1000);
 
+  // Update denormalized columns on accounts table (fast plan lookups)
   await db
     .update(accountsTable)
     .set({
       plan,
       stripeSubscriptionId: sub.id,
-      subscriptionStatus: sub.status as "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "incomplete",
-      currentPeriodEnd: new Date((sub as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000),
+      subscriptionStatus: stripeStatus,
+      currentPeriodEnd: periodEnd,
       billingInterval: interval,
       currency,
       updatedAt: new Date(),
     })
     .where(eq(accountsTable.id, accountId));
+
+  // Upsert dedicated subscriptions table (canonical subscription record)
+  const existing = await db
+    .select({ id: subscriptionsTable.id })
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.accountId, accountId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(subscriptionsTable)
+      .set({
+        stripeSubscriptionId: sub.id,
+        stripeCustomerId: sub.customer as string,
+        plan,
+        billingInterval: interval,
+        currency,
+        status: stripeStatus,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionsTable.accountId, accountId));
+  } else {
+    await db.insert(subscriptionsTable).values({
+      accountId,
+      stripeSubscriptionId: sub.id,
+      stripeCustomerId: sub.customer as string,
+      plan,
+      billingInterval: interval,
+      currency,
+      status: stripeStatus,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+    });
+  }
 
   logger.info({ accountId, plan, status: sub.status }, "Subscription synced");
 }

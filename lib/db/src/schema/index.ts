@@ -3,3 +3,4 @@ export * from "./users";
 export * from "./sessions";
 export * from "./properties";
 export * from "./sync";
+export * from "./subscriptions";

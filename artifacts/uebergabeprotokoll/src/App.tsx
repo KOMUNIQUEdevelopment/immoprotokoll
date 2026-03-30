@@ -51,16 +51,18 @@ function formatRelative(date: Date | null): string {
 
 type EditorTab = "protokoll" | "unterschriften";
 
-type AppScreen = "protocols" | "pricing" | "billing";
+type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel";
 
 function AppContent({
   onLogout,
   accountId,
   account,
+  initialScreen = "protocols",
 }: {
   onLogout: () => void;
   accountId: string;
   account: { plan: "free" | "privat" | "agentur" | "custom" } | null;
+  initialScreen?: AppScreen;
 }) {
   const {
     protocols,
@@ -94,7 +96,7 @@ function AppContent({
   const [isExporting, setIsExporting] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [appScreen, setAppScreen] = useState<AppScreen>("protocols");
+  const [appScreen, setAppScreen] = useState<AppScreen>(initialScreen);
   const { toast } = useToast();
   const billing = useBilling();
 
@@ -146,7 +148,8 @@ function AppContent({
     }
     setIsZipping(true);
     try {
-      await exportPhotosAsZip(currentProtocol);
+      const freePlan = !account || account.plan === "free";
+      await exportPhotosAsZip(currentProtocol, { watermark: freePlan });
       toast({ title: "ZIP erstellt", description: `${totalPhotos} Foto${totalPhotos !== 1 ? "s" : ""} exportiert.` });
     } catch (e) {
       console.error(e);
@@ -187,6 +190,56 @@ function AppContent({
     );
 
   if (!isEditing) {
+    if (appScreen === "billing-success") {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="max-w-md w-full mx-auto px-6 py-12 text-center space-y-6">
+            <div className="w-16 h-16 rounded-full border-2 border-black flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-black" />
+            </div>
+            <h1 className="text-2xl font-semibold text-black">Abonnement aktiviert</h1>
+            <p className="text-sm text-neutral-600">
+              Ihr Abonnement wurde erfolgreich aktiviert. Die Änderungen sind sofort wirksam.
+            </p>
+            <button
+              className="inline-flex items-center gap-2 px-6 py-2 border border-black rounded-md text-sm font-medium hover:bg-neutral-50 transition-colors"
+              onClick={() => {
+                window.location.hash = "";
+                setAppScreen("billing");
+              }}
+            >
+              Zum Abonnement
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (appScreen === "billing-cancel") {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="max-w-md w-full mx-auto px-6 py-12 text-center space-y-6">
+            <div className="w-16 h-16 rounded-full border-2 border-neutral-300 flex items-center justify-center mx-auto">
+              <X className="w-8 h-8 text-neutral-400" />
+            </div>
+            <h1 className="text-2xl font-semibold text-black">Zahlung abgebrochen</h1>
+            <p className="text-sm text-neutral-600">
+              Der Zahlungsvorgang wurde abgebrochen. Ihr aktueller Plan bleibt unverändert.
+            </p>
+            <button
+              className="inline-flex items-center gap-2 px-6 py-2 border border-black rounded-md text-sm font-medium hover:bg-neutral-50 transition-colors"
+              onClick={() => {
+                window.location.hash = "";
+                setAppScreen("pricing");
+              }}
+            >
+              Zur Preisübersicht
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (appScreen === "pricing") {
       return (
         <PricingPage
@@ -460,6 +513,14 @@ function SwUpdatePopup({
 
 type AuthScreen = "login" | "register";
 
+function hashToInitialScreen(hash: string): AppScreen {
+  if (hash === "#/pricing") return "pricing";
+  if (hash === "#/billing") return "billing";
+  if (hash === "#/billing/success") return "billing-success";
+  if (hash === "#/billing/cancel") return "billing-cancel";
+  return "protocols";
+}
+
 export default function App() {
   const hash = window.location.hash;
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
@@ -522,7 +583,12 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent onLogout={logout} accountId={user.accountId} account={account} />
+      <AppContent
+        onLogout={logout}
+        accountId={user.accountId}
+        account={account}
+        initialScreen={hashToInitialScreen(hash)}
+      />
       <Toaster />
     </QueryClientProvider>
   );

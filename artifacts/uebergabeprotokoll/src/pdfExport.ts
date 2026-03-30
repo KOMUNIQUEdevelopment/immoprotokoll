@@ -492,10 +492,20 @@ async function addPhotosBlock(
 
 // ─── ZIP export (all photos) ──────────────────────────────────────────────────
 
-export async function exportPhotosAsZip(protocol: ProtocolData): Promise<void> {
+export async function exportPhotosAsZip(protocol: ProtocolData, options?: ExportOptions): Promise<void> {
   const zip = new JSZip();
   const folder = zip.folder("Fotos");
   if (!folder) return;
+
+  // Free plan branding: add a README.txt at the root of the ZIP
+  if (options?.watermark) {
+    zip.file(
+      "README.txt",
+      "Diese Fotodokumentation wurde mit ImmoProtokoll erstellt.\n" +
+      "Mehr Informationen: https://immoprotokoll.com\n\n" +
+      "Upgrade auf einen bezahlten Plan, um diesen Hinweis zu entfernen.\n"
+    );
+  }
 
   const usedNames = new Map<string, number>();
 
