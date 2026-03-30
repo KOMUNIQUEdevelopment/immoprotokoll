@@ -12,6 +12,8 @@ import { ChevronDown, ChevronUp, Plus, X, Pencil, Trash2, Check } from "lucide-r
 interface ProtocolPageProps {
   protocol: ProtocolData;
   updateProtocol: (fn: (p: ProtocolData) => ProtocolData) => void;
+  addRoom: (room: RoomData) => void;
+  deleteRoom: (roomId: string) => void;
 }
 
 function CollapsibleSection({ title, children, defaultOpen = false }: {
@@ -43,7 +45,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageProps) {
+export default function ProtocolPage({ protocol, updateProtocol, addRoom, deleteRoom }: ProtocolPageProps) {
   const setField = (field: keyof ProtocolData, value: unknown) => {
     updateProtocol(p => ({ ...p, [field]: value }));
   };
@@ -98,14 +100,14 @@ export default function ProtocolPage({ protocol, updateProtocol }: ProtocolPageP
       notizen: "",
       photos: [],
     };
-    updateProtocol(p => ({ ...p, rooms: [...p.rooms, newRoom] }), { immediate: true });
+    addRoom(newRoom);
     setAddingFloor(null);
     setNewRoomName("");
   };
 
   const confirmDeleteRoom = () => {
     if (!deleteRoomTarget) return;
-    updateProtocol(p => ({ ...p, rooms: p.rooms.filter(r => r.id !== deleteRoomTarget.id) }), { immediate: true });
+    deleteRoom(deleteRoomTarget.id);
     setDeleteRoomTarget(null);
   };
 

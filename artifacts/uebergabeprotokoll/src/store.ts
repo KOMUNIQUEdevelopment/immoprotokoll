@@ -606,42 +606,84 @@ export function useProtocolsStore() {
   }, [currentId]);
 
   const updateProtocol = useCallback(
-    (updater: (prev: ProtocolData) => ProtocolData, { immediate = false } = {}) => {
+    (updater: (prev: ProtocolData) => ProtocolData) => {
       if (!currentId) return;
-      // Capture the id in a local variable so it's stable in the closure below
       const id = currentId;
       setProtocols(prev => {
         if (!prev[id]) return prev;
         const updated = updater(prev[id]);
         const next = { ...prev, [id]: updated };
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        if (immediate) {
-          // Structural changes (add/delete room) must be persisted right away so
-          // a concurrent WS sync from the server cannot restore the old state.
-          saveAll(next);
-          if (updated.syncEnabled) {
-            wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
-          }
-        } else {
-          autoSaveTimer.current = setTimeout(() => {
-            // Re-read from the ref so we always save the latest known state,
-            // not a stale snapshot captured at timer-creation time.
-            setProtocols(latest => {
-              if (latest[id]) {
-                saveAll(latest);
-                if (latest[id].syncEnabled) {
-                  wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
-                }
+        autoSaveTimer.current = setTimeout(() => {
+          // Re-read latest state so we never save a stale snapshot.
+          setProtocols(latest => {
+            if (latest[id]) {
+              saveAll(latest);
+              if (latest[id].syncEnabled) {
+                wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
               }
-              return latest; // no state change, purely a side-effect read
-            });
-          }, 1500);
-        }
+            }
+            return latest;
+          });
+        }, 1500);
         return next;
       });
     },
     [currentId, saveAll]
   );
+
+  // Dedicated structural mutations: bypass the debounce timer entirely.
+  // persistAll is called synchronously (localStorage write) then, after React
+  // commits the state, the WS update is sent so the server stays in sync.
+  const addRoom = useCallback((room: ProtocolData["rooms"][number]) => {
+    if (!currentId) return;
+    const id = currentId;
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    setProtocols(prev => {
+      if (!prev[id]) return prev;
+      const updated = { ...prev[id], rooms: [...prev[id].rooms, room] };
+      const next = { ...prev, [id]: updated };
+      persistAll(next);
+      return next;
+    });
+    // WS send outside the updater so it always uses the committed state.
+    setTimeout(() => {
+      setProtocols(latest => {
+        if (latest[id]?.syncEnabled) {
+          wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
+        }
+        return latest;
+      });
+    }, 0);
+  }, [currentId]);
+
+  const deleteRoom = useCallback((roomId: string) => {
+    if (!currentId) return;
+    const id = currentId;
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    setProtocols(prev => {
+      if (!prev[id]) return prev;
+      const updated = { ...prev[id], rooms: prev[id].rooms.filter(r => r.id !== roomId) };
+      const next = { ...prev, [id]: updated };
+      persistAll(next);
+      return next;
+    });
+    // WS send outside the updater so it always uses the committed state.
+    setTimeout(() => {
+      setProtocols(latest => {
+        if (latest[id]?.syncEnabled) {
+          wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
+        }
+        return latest;
+      });
+    }, 0);
+  }, [currentId]);
 
   return {
     protocols,
@@ -659,6 +701,8 @@ export function useProtocolsStore() {
     emptyTrash,
     renameProtocol,
     updateProtocol,
+    addRoom,
+    deleteRoom,
     toggleSync,
     receiveInit,
     receiveRemote,
