@@ -8,6 +8,8 @@ const SESSION_COOKIE = "immo_session";
 export interface AuthRequest extends Request {
   user?: SafeUser;
   account?: Account;
+  isImpersonating?: boolean;
+  realSuperAdminId?: string;
 }
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
@@ -42,15 +44,35 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     return;
   }
 
+  const { passwordHash: _pw, ...safeUser } = user;
+
+  if (session.impersonatedAccountId && user.isSuperAdmin) {
+    const impersonatedAccounts = await db
+      .select()
+      .from(accountsTable)
+      .where(eq(accountsTable.id, session.impersonatedAccountId))
+      .limit(1);
+
+    const impersonatedAccount = impersonatedAccounts[0];
+    if (impersonatedAccount) {
+      req.user = { ...safeUser, accountId: session.impersonatedAccountId };
+      req.account = impersonatedAccount;
+      req.isImpersonating = true;
+      req.realSuperAdminId = user.id;
+      next();
+      return;
+    }
+  }
+
   const accounts = await db
     .select()
     .from(accountsTable)
     .where(eq(accountsTable.id, user.accountId))
     .limit(1);
 
-  const { passwordHash: _pw, ...safeUser } = user;
   req.user = safeUser;
   req.account = accounts[0];
+  req.isImpersonating = false;
   next();
 }
 
@@ -73,9 +95,9 @@ export function requireRole(...roles: string[]) {
 }
 
 export function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user?.isSuperAdmin) {
-    res.status(403).json({ error: "Superadmin access required" });
+  if (req.user?.isSuperAdmin) {
+    next();
     return;
   }
-  next();
+  res.status(403).json({ error: "Superadmin access required" });
 }

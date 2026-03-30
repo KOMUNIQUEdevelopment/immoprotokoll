@@ -34,12 +34,22 @@ export type Plan = keyof typeof PLAN_LIMITS;
 
 export async function getPlanLimits(accountId: string) {
   const rows = await db
-    .select({ plan: accountsTable.plan })
+    .select({
+      plan: accountsTable.plan,
+      customMaxProperties: accountsTable.customMaxProperties,
+      customMaxProtocols: accountsTable.customMaxProtocols,
+    })
     .from(accountsTable)
     .where(eq(accountsTable.id, accountId))
     .limit(1);
-  const plan = (rows[0]?.plan ?? "free") as Plan;
-  return { plan, limits: PLAN_LIMITS[plan] };
+  const row = rows[0];
+  const plan = (row?.plan ?? "free") as Plan;
+  const baseLimits = PLAN_LIMITS[plan];
+  const limits = plan === "custom" ? {
+    properties: row?.customMaxProperties ?? Infinity,
+    protocolsPerProperty: row?.customMaxProtocols ?? Infinity,
+  } : baseLimits;
+  return { plan, limits };
 }
 
 // ── GET /api/properties/plan-limits — return current plan & limits ───────────

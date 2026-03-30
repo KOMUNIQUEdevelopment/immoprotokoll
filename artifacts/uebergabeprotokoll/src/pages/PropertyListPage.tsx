@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
-import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive, Globe } from "lucide-react";
+import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive, Globe, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstallButton } from "../components/InstallButton";
@@ -29,6 +29,7 @@ interface PropertyListPageProps {
   onDeleteProperty?: (propertyId: string) => void;
   onShowBilling?: () => void;
   onShowPricing?: () => void;
+  onShowSuperadmin?: () => void;
   currentPlan?: string;
   userLang?: string;
   onChangeLang?: (lang: SupportedLanguage) => void;
@@ -228,6 +229,7 @@ export default function PropertyListPage({
   onDeleteProperty,
   onShowBilling,
   onShowPricing,
+  onShowSuperadmin,
   currentPlan = "free",
   userLang = "de-CH",
   onChangeLang,
@@ -303,6 +305,16 @@ export default function PropertyListPage({
             )}
             {onChangeLang && (
               <LanguageDropdown currentLang={userLang} onChangeLang={onChangeLang} />
+            )}
+            {onShowSuperadmin && (
+              <button
+                type="button"
+                onClick={onShowSuperadmin}
+                className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
+                title="Superadmin Dashboard"
+              >
+                <ShieldCheck size={16} />
+              </button>
             )}
             {onLogout && (
               <button

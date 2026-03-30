@@ -22,6 +22,8 @@ export interface AuthState {
   user: AuthUser | null;
   account: AuthAccount | null;
   loading: boolean;
+  isImpersonating: boolean;
+  impersonatedAccountId: string | null;
 }
 
 const API_BASE = "/api";
@@ -40,20 +42,28 @@ export function useAuth() {
     user: null,
     account: null,
     loading: true,
+    isImpersonating: false,
+    impersonatedAccountId: null,
   });
 
   const checkSession = useCallback(async () => {
     try {
       const res = await apiFetch("/auth/me");
       if (res.ok) {
-        const data = await res.json() as { user: AuthUser; account: AuthAccount };
+        const data = await res.json() as { user: AuthUser; account: AuthAccount; isImpersonating?: boolean; impersonatedAccountId?: string };
         setLanguage(data.user.preferredLanguage ?? "de-CH");
-        setState({ user: data.user, account: data.account, loading: false });
+        setState({
+          user: data.user,
+          account: data.account,
+          loading: false,
+          isImpersonating: data.isImpersonating ?? false,
+          impersonatedAccountId: data.impersonatedAccountId ?? null,
+        });
       } else {
-        setState({ user: null, account: null, loading: false });
+        setState({ user: null, account: null, loading: false, isImpersonating: false, impersonatedAccountId: null });
       }
     } catch {
-      setState({ user: null, account: null, loading: false });
+      setState({ user: null, account: null, loading: false, isImpersonating: false, impersonatedAccountId: null });
     }
   }, []);
 
@@ -70,7 +80,7 @@ export function useAuth() {
       if (res.ok) {
         const data = await res.json() as { user: AuthUser; account: AuthAccount };
         setLanguage(data.user.preferredLanguage ?? "de-CH");
-        setState({ user: data.user, account: data.account, loading: false });
+        setState({ user: data.user, account: data.account, loading: false, isImpersonating: false, impersonatedAccountId: null });
         return {};
       } else {
         const err = await res.json() as { error: string };
@@ -95,7 +105,7 @@ export function useAuth() {
       });
       if (res.ok) {
         const data = await res.json() as { user: AuthUser; account: AuthAccount };
-        setState({ user: data.user, account: data.account, loading: false });
+        setState({ user: data.user, account: data.account, loading: false, isImpersonating: false, impersonatedAccountId: null });
         return {};
       } else {
         const err = await res.json() as { error: string };
@@ -110,8 +120,17 @@ export function useAuth() {
     try {
       await apiFetch("/auth/logout", { method: "POST" });
     } catch {}
-    setState({ user: null, account: null, loading: false });
+    setState({ user: null, account: null, loading: false, isImpersonating: false, impersonatedAccountId: null });
   }, []);
+
+  const endImpersonation = useCallback(async (): Promise<void> => {
+    try {
+      await apiFetch("/superadmin/impersonate", { method: "DELETE" });
+      await checkSession();
+    } catch {
+      // ignore
+    }
+  }, [checkSession]);
 
   const updateLanguage = useCallback(async (lang: string): Promise<void> => {
     try {
@@ -137,5 +156,6 @@ export function useAuth() {
     logout,
     checkSession,
     updateLanguage,
+    endImpersonation,
   };
 }

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, pgEnum, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,6 +18,10 @@ export const accountsTable = pgTable("accounts", {
   billingInterval: billingIntervalEnum("billing_interval").notNull().default("monthly"),
   subscriptionStatus: subscriptionStatusEnum("subscription_status"),
   currentPeriodEnd: timestamp("current_period_end"),
+  customMaxProperties: integer("custom_max_properties"),
+  customMaxProtocols: integer("custom_max_protocols"),
+  customMaxUsers: integer("custom_max_users"),
+  customPricingNotes: text("custom_pricing_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

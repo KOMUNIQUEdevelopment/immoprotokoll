@@ -11,6 +11,7 @@ import PropertyListPage from "./pages/PropertyListPage";
 import PropertyProtocolsPage from "./pages/PropertyProtocolsPage";
 import PricingPage from "./pages/PricingPage";
 import BillingPage from "./pages/BillingPage";
+import SuperadminPage from "./pages/SuperadminPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -55,7 +56,7 @@ function formatRelative(date: Date | null, t: (key: string, opts?: Record<string
 
 type EditorTab = "protokoll" | "unterschriften";
 
-type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel";
+type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel" | "superadmin";
 
 function LanguageSelector({
   currentLang,
@@ -109,6 +110,9 @@ function AppContent({
   userLang,
   initialScreen = "protocols",
   onChangeLang,
+  isSuperAdmin,
+  isImpersonating,
+  onEndImpersonation,
 }: {
   onLogout: () => void;
   accountId: string;
@@ -117,6 +121,9 @@ function AppContent({
   userLang: string;
   initialScreen?: AppScreen;
   onChangeLang: (lang: SupportedLanguage) => void;
+  isSuperAdmin?: boolean;
+  isImpersonating?: boolean;
+  onEndImpersonation?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const {
@@ -323,6 +330,16 @@ function AppContent({
       );
     }
 
+    if (appScreen === "superadmin" && isSuperAdmin) {
+      return (
+        <SuperadminPage
+          onBack={() => setAppScreen("protocols")}
+          isImpersonating={isImpersonating ?? false}
+          onEndImpersonation={onEndImpersonation ?? (async () => {})}
+        />
+      );
+    }
+
     if (!selectedProperty) {
       return (
         <>
@@ -333,6 +350,7 @@ function AppContent({
             onDeleteProperty={deleteProtocolsForProperty}
             onShowBilling={() => setAppScreen("billing")}
             onShowPricing={() => setAppScreen("pricing")}
+            onShowSuperadmin={isSuperAdmin ? () => setAppScreen("superadmin") : undefined}
             currentPlan={account?.plan ?? "free"}
             userLang={userLang}
             onChangeLang={onChangeLang}
@@ -580,6 +598,7 @@ function hashToInitialScreen(hash: string, pathname: string): AppScreen {
   if (hash === "#/billing") return "billing";
   if (hash === "#/billing/success") return "billing-success";
   if (hash === "#/billing/cancel") return "billing-cancel";
+  if (hash === "#/superadmin") return "superadmin";
   return "protocols";
 }
 
@@ -589,7 +608,7 @@ export default function App() {
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
   const isPricingPage = pathname.endsWith("/pricing") || hash === "#/pricing";
 
-  const { user, account, loading, login, register, logout, updateLanguage } = useAuth();
+  const { user, account, loading, login, register, logout, updateLanguage, isImpersonating, endImpersonation } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const { t } = useTranslation();
 
@@ -664,6 +683,9 @@ export default function App() {
         userLang={user.preferredLanguage ?? "de-CH"}
         initialScreen={hashToInitialScreen(hash, pathname)}
         onChangeLang={handleChangeLang}
+        isSuperAdmin={user.isSuperAdmin}
+        isImpersonating={isImpersonating}
+        onEndImpersonation={endImpersonation}
       />
       <Toaster />
     </QueryClientProvider>

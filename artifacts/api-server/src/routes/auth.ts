@@ -174,13 +174,31 @@ router.get("/me", async (req: Request, res: Response) => {
     return;
   }
 
+  if (session.impersonatedAccountId && user.isSuperAdmin) {
+    const impersonatedAccounts = await db
+      .select()
+      .from(accountsTable)
+      .where(eq(accountsTable.id, session.impersonatedAccountId))
+      .limit(1);
+    const impersonatedAccount = impersonatedAccounts[0];
+    if (impersonatedAccount) {
+      res.json({
+        user: toSafeUser(user),
+        account: impersonatedAccount,
+        isImpersonating: true,
+        impersonatedAccountId: session.impersonatedAccountId,
+      });
+      return;
+    }
+  }
+
   const accounts = await db
     .select()
     .from(accountsTable)
     .where(eq(accountsTable.id, user.accountId))
     .limit(1);
 
-  res.json({ user: toSafeUser(user), account: accounts[0] ?? null });
+  res.json({ user: toSafeUser(user), account: accounts[0] ?? null, isImpersonating: false });
 });
 
 // ── Update current user's preferred language ──────────────────────────────────
