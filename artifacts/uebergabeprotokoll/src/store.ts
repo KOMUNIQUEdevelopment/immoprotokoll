@@ -64,10 +64,20 @@ function mergeRooms(
     const newRemotePhotos = remoteRoom.photos.filter(rp => !localPhIds.has(rp.id));
     return { ...remoteRoom, photos: [...photos, ...newRemotePhotos] };
   });
-  // Add rooms only the server knows about (added on another device, never seen locally)
-  // BUT never restore rooms the user explicitly deleted.
+  // Add rooms only the server knows about (added on another device, never seen locally).
+  // Guard against:
+  // 1. rooms the user explicitly deleted (deletedSet)
+  // 2. rooms whose NAME already exists locally (different ID but same logical room —
+  //    prevents duplicates caused by old migration that re-added fixed-ID rooms for
+  //    protocols whose rooms had UUID-based IDs).
+  const localRoomNames = new Set(
+    localRooms.map(r => r.name.trim().toLowerCase())
+  );
   const newServerRooms = remoteRooms.filter(
-    r => !localRoomIds.has(r.id) && !deletedSet.has(r.id)
+    r =>
+      !localRoomIds.has(r.id) &&
+      !deletedSet.has(r.id) &&
+      !localRoomNames.has(r.name.trim().toLowerCase())
   );
   return [...merged, ...newServerRooms];
 }

@@ -272,13 +272,34 @@ export function migrateProtocol(data: Record<string, unknown>): ProtocolData {
     : [];
   const deletedSet = new Set(deletedRoomIds);
 
-  const existingRoomIds = new Set(rooms.map(r => r.id));
-  const missingRooms = DEFAULT_ROOMS
-    .filter(r => !existingRoomIds.has(r.id) && !deletedSet.has(r.id))
-    .map(r => ({ ...r, photos: [] }));
-  if (missingRooms.length > 0) {
-    rooms.push(...missingRooms);
+  // Remove any rooms that were explicitly deleted.
+  rooms = rooms.filter(r => !deletedSet.has(r.id));
+
+  // De-duplicate: if multiple rooms share the same name keep the one with
+  // the most data (photos + non-empty fields). This repairs protocols that
+  // were corrupted by the old auto-add migration logic.
+  const byName = new Map<string, RoomData>();
+  for (const room of rooms) {
+    const key = room.name.trim().toLowerCase();
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, room);
+    } else {
+      const existingScore =
+        (existing.photos?.length ?? 0) +
+        (existing.condition ? 1 : 0) +
+        (existing.notes ? 1 : 0);
+      const newScore =
+        (room.photos?.length ?? 0) +
+        (room.condition ? 1 : 0) +
+        (room.notes ? 1 : 0);
+      if (newScore > existingScore) {
+        byName.set(key, room);
+      }
+    }
   }
+  rooms = Array.from(byName.values());
+
   data.deletedRoomIds = deletedRoomIds;
 
   const defaultOrder = DEFAULT_ROOMS.map(r => r.id);
