@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
 import { accountsTable } from "./accounts";
 
 export const syncProtocolsTable = pgTable(
@@ -11,7 +11,9 @@ export const syncProtocolsTable = pgTable(
     data: jsonb("data").notNull().$type<Record<string, unknown>>(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.accountId, t.id] })]
+  // Composite PK scopes data to account; unique("id") makes the protocol UUID
+  // globally addressable so tenant-view public routes can safely query by id alone.
+  (t) => [primaryKey({ columns: [t.accountId, t.id] }), unique("sync_protocols_id_unique").on(t.id)]
 );
 
 export const syncPhotosTable = pgTable(

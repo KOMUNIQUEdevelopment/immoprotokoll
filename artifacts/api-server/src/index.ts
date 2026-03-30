@@ -233,8 +233,8 @@ wss.on("connection", async (ws, request) => {
 });
 
 // ── REST: Protokoll lesen (öffentlich für Mieter-Ansicht via UUID-Link) ───────
-// The protocol ID is a UUID (hard to guess). This endpoint is intentionally
-// public so tenants without an account can view and sign their handover protocol.
+// Protocol IDs are UUIDs and are enforced globally unique in the DB schema
+// (sync_protocols_id_unique constraint), so querying by id alone is safe.
 app.get("/api/protocol/:id", async (req, res) => {
   try {
     const rows = await db
@@ -294,10 +294,18 @@ app.post("/api/protocol/:id/sign", async (req, res) => {
     }
     protocol.personSignatures = sigs;
 
+    // Use the full composite PK (accountId + id) for the update to guarantee
+    // exactly one row is targeted — even though id is globally unique in the schema,
+    // this makes the intent explicit and safe against future schema changes.
     await db
       .update(syncProtocolsTable)
       .set({ data: protocol, updatedAt: new Date() })
-      .where(eq(syncProtocolsTable.id, id));
+      .where(
+        and(
+          eq(syncProtocolsTable.accountId, rows[0].accountId),
+          eq(syncProtocolsTable.id, id)
+        )
+      );
 
     const broadcastPayload = JSON.stringify({ type: "update", protocol });
     wss.clients.forEach((client) => {
