@@ -5,7 +5,7 @@ import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 
 export default function LandingPage() {
   const { t, lang } = useLanguage();
@@ -58,14 +58,21 @@ export default function LandingPage() {
   };
 
   const base = import.meta.env.BASE_URL;
-  const slides = [
-    { src: `${base}slides/slide-1.jpg`, alt: lang === "de" ? "Vermieter mit Hausmodell" : "Landlord with house model" },
-    { src: `${base}slides/slide-2.jpg`, alt: lang === "de" ? "Nachdenklicher Vermieter" : "Thoughtful property owner" },
-    { src: `${base}slides/slide-3.jpg`, alt: lang === "de" ? "Lächelnder Mann mit Hausmodell" : "Smiling man with house model" },
-    { src: `${base}slides/slide-4.jpg`, alt: lang === "de" ? "Frau mit Hausmodell" : "Woman with house model" },
-    { src: `${base}slides/slide-5.jpg`, alt: lang === "de" ? "Junge Frau mit Hausmodell" : "Young woman with house model" },
-    { src: `${base}slides/slide-6.jpg`, alt: lang === "de" ? "Elegant gekleidete Frau mit Hausmodell" : "Elegantly dressed woman with house model" },
-  ];
+  const slides = useMemo(() => {
+    const all = [
+      { src: `${base}slides/slide-1.jpg`, alt: lang === "de" ? "Vermieter mit Hausmodell" : "Landlord with house model" },
+      { src: `${base}slides/slide-2.jpg`, alt: lang === "de" ? "Nachdenklicher Vermieter" : "Thoughtful property owner" },
+      { src: `${base}slides/slide-3.jpg`, alt: lang === "de" ? "Lächelnder Mann mit Hausmodell" : "Smiling man with house model" },
+      { src: `${base}slides/slide-4.jpg`, alt: lang === "de" ? "Frau mit Hausmodell" : "Woman with house model" },
+      { src: `${base}slides/slide-5.jpg`, alt: lang === "de" ? "Junge Frau mit Hausmodell" : "Young woman with house model" },
+      { src: `${base}slides/slide-6.jpg`, alt: lang === "de" ? "Elegant gekleidete Frau mit Hausmodell" : "Elegantly dressed woman with house model" },
+    ];
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    return all;
+  }, []);
 
   const [activeSlide, setActiveSlide] = useState(0);
   useEffect(() => {
