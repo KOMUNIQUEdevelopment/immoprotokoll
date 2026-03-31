@@ -2,73 +2,110 @@ import { Router, type Request, type Response } from "express";
 import { count, eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { db } from "@workspace/db";
-import { accountsTable, subscriptionsTable, propertiesTable, syncProtocolsTable } from "@workspace/db";
+import {
+  accountsTable,
+  subscriptionsTable,
+  propertiesTable,
+  syncProtocolsTable,
+  stripeSettingsTable,
+} from "@workspace/db";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
 import { logger } from "../lib/logger";
 
 const router = Router();
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
-
-// Hardcoded base URL — prevents open-redirect via crafted Origin/Referer headers
 const APP_BASE_URL = process.env.APP_BASE_URL ?? "https://immoprotokoll.com";
 
-function getStripe(): Stripe {
-  if (!STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not configured");
-  return new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
+// ── Mode helpers ──────────────────────────────────────────────────────────────
+export async function getStripeMode(): Promise<"live" | "test"> {
+  try {
+    const [row] = await db
+      .select({ value: stripeSettingsTable.value })
+      .from(stripeSettingsTable)
+      .where(eq(stripeSettingsTable.key, "mode"))
+      .limit(1);
+    return row?.value === "test" ? "test" : "live";
+  } catch {
+    return "live";
+  }
 }
 
-// ── Plan price definitions ─────────────────────────────────────────────────
-// Prices are per plan × interval × currency. Stored as monthly amounts.
-// Annual = monthly × 12 × 0.8 (20% discount).
+function getStripeSecretKey(mode: "live" | "test"): string | undefined {
+  return mode === "test"
+    ? process.env.STRIPE_SECRET_KEY_TEST
+    : process.env.STRIPE_SECRET_KEY;
+}
+
+function getStripePublishableKey(mode: "live" | "test"): string | undefined {
+  return mode === "test"
+    ? process.env.STRIPE_PUBLISHABLE_KEY_TEST
+    : process.env.STRIPE_PUBLISHABLE_KEY;
+}
+
+function getStripeWebhookSecret(mode: "live" | "test"): string | undefined {
+  return mode === "test"
+    ? process.env.STRIPE_WEBHOOK_SECRET_TEST
+    : process.env.STRIPE_WEBHOOK_SECRET;
+}
+
+function makeStripe(mode: "live" | "test"): Stripe {
+  const key = getStripeSecretKey(mode);
+  if (!key) throw new Error(`Stripe ${mode} secret key not configured`);
+  return new Stripe(key, { apiVersion: "2026-03-25.dahlia" });
+}
+
+// ── Plan price definitions ────────────────────────────────────────────────────
 export const PLAN_PRICES = {
   privat:  { monthly: 9,  annual: 86.40 },
   agentur: { monthly: 49, annual: 470.40 },
 } as const;
 
-// Stripe Price IDs come from env — one per plan × interval × currency combo
-// Format: STRIPE_PRICE_{PLAN}_{INTERVAL}_{CURRENCY} (uppercase)
-// e.g. STRIPE_PRICE_PRIVAT_MONTHLY_CHF
-function getStripePriceId(
+// Live price IDs come from env; test price IDs from DB (written by setup-test endpoint)
+async function getStripePriceId(
   plan: "privat" | "agentur",
   interval: "monthly" | "annual",
-  currency: string
-): string | undefined {
-  const key = `STRIPE_PRICE_${plan.toUpperCase()}_${interval.toUpperCase()}_${currency.toUpperCase()}`;
-  return process.env[key];
+  currency: string,
+  mode: "live" | "test"
+): Promise<string | undefined> {
+  const suffix = `${plan.toUpperCase()}_${interval.toUpperCase()}_${currency.toUpperCase()}`;
+  if (mode === "live") {
+    return process.env[`STRIPE_PRICE_${suffix}`];
+  }
+  const [row] = await db
+    .select({ value: stripeSettingsTable.value })
+    .from(stripeSettingsTable)
+    .where(eq(stripeSettingsTable.key, `test_price_${suffix.toLowerCase()}`))
+    .limit(1);
+  return row?.value;
 }
 
 type PlanInfo = { plan: "privat" | "agentur"; interval: "monthly" | "annual"; currency: string };
 
-/** Reverse lookup: Stripe priceId → { plan, interval, currency } derived from env vars */
-function buildPriceIdLookup(): Map<string, PlanInfo> {
+async function buildPriceIdLookup(mode: "live" | "test"): Promise<Map<string, PlanInfo>> {
   const lookup = new Map<string, PlanInfo>();
   const plans = ["privat", "agentur"] as const;
   const intervals = ["monthly", "annual"] as const;
-  const currencies = ["CHF", "EUR", "USD"] as const;
-  for (const plan of plans) {
-    for (const interval of intervals) {
-      for (const currency of currencies) {
-        const key = `STRIPE_PRICE_${plan.toUpperCase()}_${interval.toUpperCase()}_${currency}`;
-        const priceId = process.env[key];
-        if (priceId) {
-          lookup.set(priceId, { plan, interval, currency: currency.toLowerCase() });
-        }
-      }
-    }
-  }
+  const currencies = ["chf", "eur", "usd"] as const;
+  await Promise.all(
+    plans.flatMap((plan) =>
+      intervals.flatMap((interval) =>
+        currencies.map(async (currency) => {
+          const priceId = await getStripePriceId(plan, interval, currency, mode);
+          if (priceId) lookup.set(priceId, { plan, interval, currency });
+        })
+      )
+    )
+  );
   return lookup;
 }
 
-const PRICE_ID_LOOKUP = buildPriceIdLookup();
-
-// ── GET /api/billing/config — return publishable key + plan prices ─────────
+// ── GET /api/billing/config ───────────────────────────────────────────────────
 router.get("/config", async (_req: Request, res: Response) => {
+  const mode = await getStripeMode();
   res.json({
-    publishableKey: STRIPE_PUBLISHABLE_KEY ?? null,
-    stripeEnabled: !!STRIPE_SECRET_KEY,
+    publishableKey: getStripePublishableKey(mode) ?? null,
+    stripeEnabled: !!getStripeSecretKey(mode),
+    stripeMode: mode,
     plans: {
       privat: PLAN_PRICES.privat,
       agentur: PLAN_PRICES.agentur,
@@ -76,7 +113,7 @@ router.get("/config", async (_req: Request, res: Response) => {
   });
 });
 
-// ── GET /api/billing/subscription — current subscription state + usage ─────
+// ── GET /api/billing/subscription ────────────────────────────────────────────
 router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response) => {
   const accountId = req.user!.accountId;
   try {
@@ -99,7 +136,6 @@ router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response)
       return;
     }
 
-    // Usage counters for the billing summary
     const [propCount] = await db
       .select({ value: count() })
       .from(propertiesTable)
@@ -109,7 +145,6 @@ router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response)
       .from(syncProtocolsTable)
       .where(eq(syncProtocolsTable.accountId, accountId));
 
-    // Plan limits
     const LIMITS: Record<string, { properties: number | null; protocols: number | null }> = {
       free:    { properties: 1,    protocols: 1 },
       privat:  { properties: 1,    protocols: 30 },
@@ -132,13 +167,14 @@ router.get("/subscription", requireAuth, async (req: AuthRequest, res: Response)
   }
 });
 
-// ── POST /api/billing/checkout — create Stripe Checkout session ───────────
+// ── POST /api/billing/checkout ────────────────────────────────────────────────
 router.post(
   "/checkout",
   requireAuth,
   requireRole("owner"),
   async (req: AuthRequest, res: Response) => {
-    if (!STRIPE_SECRET_KEY) {
+    const mode = await getStripeMode();
+    if (!getStripeSecretKey(mode)) {
       res.status(503).json({ error: "Stripe not configured" });
       return;
     }
@@ -164,18 +200,21 @@ router.post(
       return;
     }
 
-    const priceId = getStripePriceId(
+    const priceId = await getStripePriceId(
       plan as "privat" | "agentur",
       interval as "monthly" | "annual",
-      cur
+      cur,
+      mode
     );
     if (!priceId) {
-      res.status(422).json({ error: `No Stripe price configured for ${plan}/${interval}/${cur}` });
+      res.status(422).json({
+        error: `No Stripe price configured for ${plan}/${interval}/${cur} (mode: ${mode})`,
+      });
       return;
     }
 
     try {
-      const stripe = getStripe();
+      const stripe = makeStripe(mode);
       const [account] = await db
         .select({ name: accountsTable.name, stripeCustomerId: accountsTable.stripeCustomerId })
         .from(accountsTable)
@@ -187,7 +226,6 @@ router.post(
         return;
       }
 
-      // Find or create Stripe customer
       let customerId = account.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
@@ -208,11 +246,11 @@ router.post(
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         currency: cur,
-        success_url: `${APP_BASE_URL}/#/billing/success`,
-        cancel_url: `${APP_BASE_URL}/#/billing/cancel`,
-        metadata: { accountId, plan, interval: interval, currency: cur },
+        success_url: `${APP_BASE_URL}/app/#/billing/success`,
+        cancel_url: `${APP_BASE_URL}/app/#/billing/cancel`,
+        metadata: { accountId, plan, interval, currency: cur },
         subscription_data: {
-          metadata: { accountId, plan, interval: interval, currency: cur },
+          metadata: { accountId, plan, interval, currency: cur },
         },
       });
 
@@ -224,20 +262,21 @@ router.post(
   }
 );
 
-// ── POST /api/billing/portal — create Stripe Customer Portal session ──────
+// ── POST /api/billing/portal ──────────────────────────────────────────────────
 router.post(
   "/portal",
   requireAuth,
   requireRole("owner"),
   async (req: AuthRequest, res: Response) => {
-    if (!STRIPE_SECRET_KEY) {
+    const mode = await getStripeMode();
+    if (!getStripeSecretKey(mode)) {
       res.status(503).json({ error: "Stripe not configured" });
       return;
     }
 
     const accountId = req.user!.accountId;
     try {
-      const stripe = getStripe();
+      const stripe = makeStripe(mode);
       const [account] = await db
         .select({ stripeCustomerId: accountsTable.stripeCustomerId })
         .from(accountsTable)
@@ -251,7 +290,7 @@ router.post(
 
       const session = await stripe.billingPortal.sessions.create({
         customer: account.stripeCustomerId,
-        return_url: `${APP_BASE_URL}/#/billing`,
+        return_url: `${APP_BASE_URL}/app/#/billing`,
       });
 
       res.json({ url: session.url });
@@ -262,10 +301,13 @@ router.post(
   }
 );
 
-// ── POST /api/billing/webhook — Stripe webhook handler ────────────────────
-// Must be registered with raw body parser (before express.json middleware).
+// ── POST /api/billing/webhook ─────────────────────────────────────────────────
 router.post("/webhook", async (req: Request, res: Response) => {
-  if (!STRIPE_WEBHOOK_SECRET || !STRIPE_SECRET_KEY) {
+  const mode = await getStripeMode();
+  const webhookSecret = getStripeWebhookSecret(mode);
+  const secretKey = getStripeSecretKey(mode);
+
+  if (!webhookSecret || !secretKey) {
     res.status(503).json({ error: "Stripe not configured" });
     return;
   }
@@ -274,9 +316,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
   let event: Stripe.Event;
 
   try {
-    const stripe = getStripe();
-    // req.body is a Buffer when raw body parser is used
-    event = stripe.webhooks.constructEvent(req.body as Buffer, sig, STRIPE_WEBHOOK_SECRET);
+    const stripe = makeStripe(mode);
+    event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({ message }, "Webhook signature verification failed");
@@ -285,7 +326,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 
   try {
-    await handleWebhookEvent(event);
+    const priceIdLookup = await buildPriceIdLookup(mode);
+    await handleWebhookEvent(event, priceIdLookup);
     res.json({ received: true });
   } catch (err) {
     logger.error({ err, type: event.type }, "Webhook handler error");
@@ -293,20 +335,19 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
-// ── Webhook event handler ─────────────────────────────────────────────────
-async function handleWebhookEvent(event: Stripe.Event) {
+// ── Webhook event handler ─────────────────────────────────────────────────────
+async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string, PlanInfo>) {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
-      await syncSubscription(sub);
+      await syncSubscription(sub, priceIdLookup);
       break;
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
       const accountId = sub.metadata?.accountId;
       if (accountId) {
-        // Downgrade accounts table to free
         await db
           .update(accountsTable)
           .set({
@@ -317,7 +358,6 @@ async function handleWebhookEvent(event: Stripe.Event) {
             updatedAt: new Date(),
           })
           .where(eq(accountsTable.id, accountId));
-        // Mark subscription as canceled (keep record for audit trail)
         await db
           .update(subscriptionsTable)
           .set({ status: "canceled", canceledAt: new Date(), updatedAt: new Date() })
@@ -347,17 +387,15 @@ async function handleWebhookEvent(event: Stripe.Event) {
   }
 }
 
-async function syncSubscription(sub: Stripe.Subscription) {
+async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<string, PlanInfo>) {
   const accountId = sub.metadata?.accountId;
   if (!accountId) {
     logger.warn({ subId: sub.id }, "Subscription missing accountId metadata");
     return;
   }
 
-  // Derive plan/interval/currency from actual Stripe price IDs (source of truth)
-  // Fallback to subscription metadata if price ID is not in our lookup (e.g. portal changes)
   const firstPriceId = sub.items?.data?.[0]?.price?.id;
-  const fromPriceId = firstPriceId ? PRICE_ID_LOOKUP.get(firstPriceId) : undefined;
+  const fromPriceId = firstPriceId ? priceIdLookup.get(firstPriceId) : undefined;
 
   const plan = (fromPriceId?.plan
     ?? sub.metadata?.plan as "privat" | "agentur" | undefined
@@ -365,20 +403,12 @@ async function syncSubscription(sub: Stripe.Subscription) {
   const interval = (fromPriceId?.interval
     ?? sub.metadata?.interval as "monthly" | "annual" | undefined
     ?? "monthly");
-  const currency = fromPriceId?.currency
-    ?? sub.metadata?.currency
-    ?? "chf";
+  const currency = fromPriceId?.currency ?? sub.metadata?.currency ?? "chf";
 
-  if (fromPriceId) {
-    logger.debug({ priceId: firstPriceId, plan, interval, currency }, "Plan derived from price ID");
-  } else {
-    logger.debug({ priceId: firstPriceId, plan, interval, currency }, "Plan derived from metadata fallback");
-  }
   const stripeStatus = sub.status as "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "incomplete";
   const periodEnd = new Date((sub as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000);
   const periodStart = new Date((sub as Stripe.Subscription & { current_period_start: number }).current_period_start * 1000);
 
-  // Update denormalized columns on accounts table (fast plan lookups)
   await db
     .update(accountsTable)
     .set({
@@ -392,7 +422,6 @@ async function syncSubscription(sub: Stripe.Subscription) {
     })
     .where(eq(accountsTable.id, accountId));
 
-  // Upsert dedicated subscriptions table (canonical subscription record)
   const existing = await db
     .select({ id: subscriptionsTable.id })
     .from(subscriptionsTable)

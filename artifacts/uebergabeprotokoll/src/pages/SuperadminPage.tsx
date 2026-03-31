@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, ChevronLeft, ChevronRight, Users, FileText, Building2,
   Settings, LogOut, Shield, ArrowLeft, Check, X, ExternalLink,
-  RefreshCw, Eye,
+  RefreshCw, Eye, CreditCard, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,161 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
     <div className="bg-[hsl(0,0%,97%)] border border-[hsl(0,0%,88%)] rounded-lg p-4">
       <p className="text-xs font-medium text-[hsl(0,0%,50%)] uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-bold text-[hsl(0,0%,8%)] mt-1">{value}</p>
+    </div>
+  );
+}
+
+interface StripeStatus {
+  mode: "live" | "test";
+  live: { keyConfigured: boolean };
+  test: {
+    keyConfigured: boolean;
+    publishableKeyConfigured: boolean;
+    webhookSecretConfigured: boolean;
+    pricesConfigured: number;
+    pricesExpected: number;
+  };
+}
+
+function StripePanel() {
+  const [status, setStatus] = useState<StripeStatus | null>(null);
+  const [switchingMode, setSwitchingMode] = useState(false);
+  const [settingUp, setSettingUp] = useState(false);
+  const [setupMsg, setSetupMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await apiFetch("/superadmin/stripe");
+      if (r.ok) setStatus(await r.json() as StripeStatus);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const switchMode = async (mode: "live" | "test") => {
+    setSwitchingMode(true);
+    setSetupMsg(null);
+    try {
+      await apiFetch("/superadmin/stripe/mode", {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+      await load();
+    } finally {
+      setSwitchingMode(false);
+    }
+  };
+
+  const setupTest = async () => {
+    setSettingUp(true);
+    setSetupMsg(null);
+    try {
+      const r = await apiFetch("/superadmin/stripe/setup-test", { method: "POST" });
+      const d = await r.json() as { ok?: boolean; count?: number; error?: string };
+      if (r.ok) {
+        setSetupMsg(`${d.count} Preise angelegt/bestätigt.`);
+        await load();
+      } else {
+        setSetupMsg(`Fehler: ${d.error}`);
+      }
+    } finally {
+      setSettingUp(false);
+    }
+  };
+
+  if (!status) return null;
+
+  const isTest = status.mode === "test";
+  const testReady = status.test.keyConfigured && status.test.publishableKeyConfigured;
+  const pricesReady = status.test.pricesConfigured >= status.test.pricesExpected;
+
+  return (
+    <div className="p-4 border-b border-[hsl(0,0%,90%)] bg-white">
+      <div className="flex items-center gap-2 mb-3">
+        <CreditCard size={14} className="text-[hsl(0,0%,40%)]" />
+        <span className="text-xs font-semibold text-[hsl(0,0%,30%)] uppercase tracking-wide">Stripe Modus</span>
+        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded ${isTest ? "bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)]" : "bg-[hsl(0,0%,8%)] text-white"}`}>
+          {isTest ? "TEST" : "LIVE"}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={() => switchMode("live")}
+          disabled={switchingMode || !isTest}
+          className={`flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors ${!isTest ? "bg-[hsl(0,0%,8%)] text-white border-[hsl(0,0%,8%)]" : "bg-white text-[hsl(0,0%,40%)] border-[hsl(0,0%,80%)] hover:border-[hsl(0,0%,50%)]"}`}
+        >
+          Live
+        </button>
+        <button
+          onClick={() => switchMode("test")}
+          disabled={switchingMode || isTest}
+          className={`flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors ${isTest ? "bg-[hsl(0,0%,8%)] text-white border-[hsl(0,0%,8%)]" : "bg-white text-[hsl(0,0%,40%)] border-[hsl(0,0%,80%)] hover:border-[hsl(0,0%,50%)]"}`}
+        >
+          Sandbox (Test)
+        </button>
+      </div>
+
+      {isTest && (
+        <div className="space-y-1.5 mb-3">
+          <StatusRow label="STRIPE_SECRET_KEY_TEST" ok={status.test.keyConfigured} />
+          <StatusRow label="STRIPE_PUBLISHABLE_KEY_TEST" ok={status.test.publishableKeyConfigured} />
+          <StatusRow label="STRIPE_WEBHOOK_SECRET_TEST" ok={status.test.webhookSecretConfigured} />
+          <StatusRow
+            label={`Testpreise (${status.test.pricesConfigured}/${status.test.pricesExpected})`}
+            ok={pricesReady}
+          />
+        </div>
+      )}
+
+      {isTest && testReady && !pricesReady && (
+        <Button
+          size="sm"
+          className="w-full h-7 text-xs bg-[hsl(0,0%,8%)] text-white hover:bg-[hsl(0,0%,20%)]"
+          onClick={setupTest}
+          disabled={settingUp}
+        >
+          {settingUp ? <RefreshCw size={11} className="animate-spin mr-1" /> : null}
+          Testprodukte in Stripe anlegen
+        </Button>
+      )}
+
+      {isTest && pricesReady && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full h-7 text-xs border-[hsl(0,0%,80%)]"
+          onClick={setupTest}
+          disabled={settingUp}
+        >
+          {settingUp ? <RefreshCw size={11} className="animate-spin mr-1" /> : <RefreshCw size={11} className="mr-1" />}
+          Preise aktualisieren
+        </Button>
+      )}
+
+      {setupMsg && (
+        <p className="mt-2 text-xs text-[hsl(0,0%,40%)]">{setupMsg}</p>
+      )}
+
+      {isTest && !testReady && (
+        <div className="mt-2 flex items-start gap-1.5 bg-[hsl(0,0%,96%)] rounded-md p-2">
+          <AlertTriangle size={12} className="text-[hsl(0,0%,40%)] shrink-0 mt-0.5" />
+          <p className="text-xs text-[hsl(0,0%,40%)] leading-snug">
+            Bitte <strong>STRIPE_SECRET_KEY_TEST</strong> und <strong>STRIPE_PUBLISHABLE_KEY_TEST</strong> in den Replit-Secrets eintragen.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {ok
+        ? <CheckCircle2 size={12} className="text-[hsl(0,0%,30%)] shrink-0" />
+        : <X size={12} className="text-[hsl(0,0%,60%)] shrink-0" />}
+      <span className="text-xs font-mono text-[hsl(0,0%,40%)]">{label}</span>
     </div>
   );
 }
@@ -491,6 +646,8 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
               </div>
             </div>
           )}
+
+          <StripePanel />
 
           <div className="p-4 border-b border-[hsl(0,0%,90%)] flex gap-2">
             <Input

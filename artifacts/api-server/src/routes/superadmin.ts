@@ -6,9 +6,12 @@ import {
   sessionsTable,
   syncProtocolsTable,
   propertiesTable,
+  stripeSettingsTable,
 } from "@workspace/db";
 import { eq, ilike, count } from "drizzle-orm";
+import Stripe from "stripe";
 import { requireAuth, requireSuperAdmin, type AuthRequest } from "../middleware/auth";
+import { getStripeMode, PLAN_PRICES } from "./billing";
 
 const router = Router();
 const SESSION_COOKIE = "immo_session";
@@ -223,6 +226,161 @@ router.get("/stats", async (_req: AuthRequest, res: Response) => {
     });
   } catch {
     res.status(500).json({ error: "Failed to load stats" });
+  }
+});
+
+// ── GET /api/superadmin/stripe — current mode + key/price status ──────────────
+router.get("/stripe", async (_req: AuthRequest, res: Response) => {
+  const mode = await getStripeMode();
+
+  const testKeyConfigured = !!process.env.STRIPE_SECRET_KEY_TEST;
+  const testPublishableConfigured = !!process.env.STRIPE_PUBLISHABLE_KEY_TEST;
+  const testWebhookConfigured = !!process.env.STRIPE_WEBHOOK_SECRET_TEST;
+  const liveKeyConfigured = !!process.env.STRIPE_SECRET_KEY;
+
+  // Check which test price IDs are stored in DB
+  const testPrices: Record<string, string> = {};
+  const plans = ["privat", "agentur"] as const;
+  const intervals = ["monthly", "annual"] as const;
+  const currencies = ["chf", "eur", "usd"] as const;
+  const priceRows = await db.select().from(stripeSettingsTable);
+  for (const row of priceRows) {
+    if (row.key.startsWith("test_price_")) {
+      testPrices[row.key.replace("test_price_", "")] = row.value;
+    }
+  }
+
+  const expectedPriceCount = plans.length * intervals.length * currencies.length;
+  const configuredPriceCount = Object.keys(testPrices).length;
+
+  res.json({
+    mode,
+    live: { keyConfigured: liveKeyConfigured },
+    test: {
+      keyConfigured: testKeyConfigured,
+      publishableKeyConfigured: testPublishableConfigured,
+      webhookSecretConfigured: testWebhookConfigured,
+      pricesConfigured: configuredPriceCount,
+      pricesExpected: expectedPriceCount,
+      prices: testPrices,
+    },
+  });
+});
+
+// ── POST /api/superadmin/stripe/mode — switch live/test ───────────────────────
+router.post("/stripe/mode", async (req: AuthRequest, res: Response) => {
+  const { mode } = req.body as { mode?: string };
+  if (mode !== "live" && mode !== "test") {
+    res.status(400).json({ error: "mode must be 'live' or 'test'" });
+    return;
+  }
+
+  const existing = await db
+    .select({ key: stripeSettingsTable.key })
+    .from(stripeSettingsTable)
+    .where(eq(stripeSettingsTable.key, "mode"))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(stripeSettingsTable)
+      .set({ value: mode, updatedAt: new Date() })
+      .where(eq(stripeSettingsTable.key, "mode"));
+  } else {
+    await db.insert(stripeSettingsTable).values({ key: "mode", value: mode });
+  }
+
+  res.json({ ok: true, mode });
+});
+
+// ── POST /api/superadmin/stripe/setup-test — create test products + prices ────
+router.post("/stripe/setup-test", async (_req: AuthRequest, res: Response) => {
+  const testKey = process.env.STRIPE_SECRET_KEY_TEST;
+  if (!testKey) {
+    res.status(503).json({ error: "STRIPE_SECRET_KEY_TEST not configured" });
+    return;
+  }
+
+  try {
+    const stripe = new Stripe(testKey, { apiVersion: "2026-03-25.dahlia" });
+    const currencies = ["chf", "eur", "usd"] as const;
+
+    const created: Record<string, string> = {};
+
+    for (const [planName, prices] of Object.entries(PLAN_PRICES) as [keyof typeof PLAN_PRICES, typeof PLAN_PRICES[keyof typeof PLAN_PRICES]][]) {
+      // Create or reuse product
+      const existingProducts = await stripe.products.search({
+        query: `name:"ImmoProtokoll ${planName.charAt(0).toUpperCase() + planName.slice(1)} (Test)"`,
+      });
+      let product: Stripe.Product;
+      if (existingProducts.data.length > 0) {
+        product = existingProducts.data[0];
+      } else {
+        product = await stripe.products.create({
+          name: `ImmoProtokoll ${planName.charAt(0).toUpperCase() + planName.slice(1)} (Test)`,
+          metadata: { plan: planName, env: "test" },
+        });
+      }
+
+      for (const currency of currencies) {
+        for (const [intervalKey, amount] of [
+          ["monthly", prices.monthly] as const,
+          ["annual", prices.annual] as const,
+        ]) {
+          const dbKey = `test_price_${planName}_${intervalKey}_${currency}`;
+          const stripeInterval = intervalKey === "monthly" ? "month" : "year";
+
+          // Check if we already have a valid price in DB
+          const [existing] = await db
+            .select({ value: stripeSettingsTable.value })
+            .from(stripeSettingsTable)
+            .where(eq(stripeSettingsTable.key, dbKey))
+            .limit(1);
+
+          let priceId: string;
+          if (existing?.value) {
+            // Verify price still exists in Stripe
+            try {
+              const existingPrice = await stripe.prices.retrieve(existing.value);
+              priceId = existingPrice.id;
+            } catch {
+              // Price gone — create new one
+              priceId = "";
+            }
+          } else {
+            priceId = "";
+          }
+
+          if (!priceId) {
+            const unitAmount = Math.round(amount * 100);
+            const newPrice = await stripe.prices.create({
+              product: product.id,
+              unit_amount: unitAmount,
+              currency,
+              recurring: { interval: stripeInterval },
+              metadata: { plan: planName, interval: intervalKey, currency },
+            });
+            priceId = newPrice.id;
+          }
+
+          // Save to DB
+          if (existing?.value) {
+            await db
+              .update(stripeSettingsTable)
+              .set({ value: priceId, updatedAt: new Date() })
+              .where(eq(stripeSettingsTable.key, dbKey));
+          } else {
+            await db.insert(stripeSettingsTable).values({ key: dbKey, value: priceId });
+          }
+          created[dbKey] = priceId;
+        }
+      }
+    }
+
+    res.json({ ok: true, created, count: Object.keys(created).length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `Stripe error: ${message}` });
   }
 });
 
