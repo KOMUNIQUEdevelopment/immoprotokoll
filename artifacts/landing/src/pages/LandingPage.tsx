@@ -1,6 +1,7 @@
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import PricingSection from "../components/PricingSection";
+import RoadmapSection from "../components/RoadmapSection";
 import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
@@ -275,6 +276,9 @@ export default function LandingPage() {
             </motion.div>
           </div>
         </section>
+
+        {/* ROADMAP */}
+        <RoadmapSection lang={lang} />
 
         {/* SUPPORT / CONTACT */}
         <ContactSection lang={lang} />

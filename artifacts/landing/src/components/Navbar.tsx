@@ -48,6 +48,9 @@ export default function Navbar() {
           <button onClick={() => scrollToSection('faq')} className="hover:opacity-60 transition-opacity">
             {t.nav.faq}
           </button>
+          <button onClick={() => scrollToSection('roadmap')} className="hover:opacity-60 transition-opacity">
+            {t.nav.roadmap}
+          </button>
           <button onClick={() => scrollToSection('contact')} className="hover:opacity-60 transition-opacity">
             {t.nav.contact}
           </button>
@@ -85,6 +88,9 @@ export default function Navbar() {
           </button>
           <button onClick={() => scrollToSection('faq')} className="text-left font-medium text-lg py-2 border-b border-black/5">
             {t.nav.faq}
+          </button>
+          <button onClick={() => scrollToSection('roadmap')} className="text-left font-medium text-lg py-2 border-b border-black/5">
+            {t.nav.roadmap}
           </button>
           <button onClick={() => scrollToSection('contact')} className="text-left font-medium text-lg py-2 border-b border-black/5">
             {t.nav.contact}

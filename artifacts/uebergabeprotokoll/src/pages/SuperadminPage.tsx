@@ -3,11 +3,12 @@ import {
   Search, ChevronLeft, ChevronRight, Users, FileText, Building2,
   Settings, LogOut, Shield, ArrowLeft, Check, X,
   RefreshCw, Eye, CreditCard, AlertTriangle, CheckCircle2,
-  MessageSquare,
+  MessageSquare, Map,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import SuperadminSupportTab from "./SuperadminSupportTab";
+import SuperadminRoadmapTab from "./SuperadminRoadmapTab";
 
 const API = "/api";
 
@@ -513,7 +514,7 @@ interface Props {
   onEndImpersonation: () => Promise<void>;
 }
 
-type AdminTab = "accounts" | "support";
+type AdminTab = "accounts" | "support" | "roadmap";
 
 export default function SuperadminPage({ onBack, isImpersonating, onEndImpersonation }: Props) {
   const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
@@ -651,12 +652,24 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
           >
             <MessageSquare size={13} /> Support
           </button>
+          <button
+            onClick={() => setActiveTab("roadmap")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "roadmap"
+                ? "bg-[hsl(0,0%,8%)] text-white"
+                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
+            }`}
+          >
+            <Map size={13} /> Roadmap
+          </button>
         </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
         {activeTab === "support" ? (
           <SuperadminSupportTab />
+        ) : activeTab === "roadmap" ? (
+          <SuperadminRoadmapTab />
         ) : (
         <>
         <div className={`flex flex-col ${selectedAccountId ? "w-1/2 border-r border-[hsl(0,0%,88%)]" : "w-full"}`}>
