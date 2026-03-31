@@ -78,8 +78,10 @@ export async function deletePhotosFromDb(ids: string[]): Promise<void> {
 // ─── Server-Sync (cross-device) ───────────────────────────────────────────────
 
 function getApiBase(): string {
-  // API is proxied under the same host
-  return `${window.location.protocol}//${window.location.host}/api`;
+  // Use a root-relative path so the request goes through the same Vite / Replit
+  // proxy as all other API calls in the app.  An absolute URL would bypass the
+  // dev-server proxy and could hit the wrong host in proxied environments.
+  return "/api";
 }
 
 const UPLOAD_BATCH = 3; // photos per HTTP request
@@ -94,6 +96,7 @@ export async function uploadPhotosToServer(
     try {
       await fetch(`${getApiBase()}/photos`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photos: batch }),
       });
@@ -109,7 +112,7 @@ export async function fetchMissingPhotosFromServer(
   if (ids.length === 0) return {};
   try {
     const url = `${getApiBase()}/photos?ids=${ids.join(",")}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: "include" });
     if (!res.ok) return {};
     const data = await res.json() as { photos?: Record<string, string> };
     return data.photos ?? {};

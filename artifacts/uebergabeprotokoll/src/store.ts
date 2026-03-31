@@ -592,9 +592,17 @@ export function useProtocolsStore(accountId: string | null) {
   }, []);
 
   const backToList = useCallback(() => {
+    // Flush any pending debounced save so that photos (and other unsaved changes)
+    // taken within the 1500ms window are persisted before leaving the protocol.
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = null;
+      // Immediately persist latest state to IndexedDB + server
+      setProtocols(latest => {
+        const pk = keysRef.current.protocolsKey;
+        if (pk) persistAll(latest, pk);
+        return latest;
+      });
     }
     setCurrentId(null);
   }, []);

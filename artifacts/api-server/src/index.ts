@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   sessionsTable,
@@ -566,13 +566,14 @@ app.get("/api/protocol/:id/photos", async (req, res) => {
     const photoRows = await db
       .select()
       .from(syncPhotosTable)
-      .where(eq(syncPhotosTable.accountId, accountId));
+      .where(and(
+        eq(syncPhotosTable.accountId, accountId),
+        inArray(syncPhotosTable.id, idsToFetch)
+      ));
 
     const result: Record<string, string> = {};
     for (const row of photoRows) {
-      if (idsToFetch.includes(row.id)) {
-        result[row.id] = row.dataUrl;
-      }
+      result[row.id] = row.dataUrl;
     }
 
     res.json({ photos: result });
@@ -638,13 +639,14 @@ app.get("/api/photos", requireAuth, async (req: AuthRequest, res) => {
     const rows = await db
       .select()
       .from(syncPhotosTable)
-      .where(eq(syncPhotosTable.accountId, accountId));
+      .where(and(
+        eq(syncPhotosTable.accountId, accountId),
+        inArray(syncPhotosTable.id, ids)
+      ));
 
     const result: Record<string, string> = {};
     for (const row of rows) {
-      if (ids.includes(row.id)) {
-        result[row.id] = row.dataUrl;
-      }
+      result[row.id] = row.dataUrl;
     }
     res.json({ photos: result });
   } catch (err) {
