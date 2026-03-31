@@ -107,8 +107,11 @@ export function useSwUpdate() {
   }, [setNeedsUpdate]);
 
   const applyUpdate = () => {
-    // Tell the waiting SW to skip waiting and reload
-    updateServiceWorker(true).catch(() => window.location.reload());
+    // Tell the waiting SW to skip waiting and reload.
+    // Always schedule a hard reload as fallback in case updateServiceWorker
+    // resolves without actually reloading (e.g. no SW waiting state).
+    updateServiceWorker(true).catch(() => {});
+    setTimeout(() => window.location.reload(), 1500);
   };
 
   const dismiss = () => setNeedsUpdate(false);

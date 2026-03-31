@@ -29,18 +29,33 @@ if (!basePath) {
 
 /**
  * Emits `_version.json` into the build output with a unique build timestamp.
+ * Also serves it from the Vite dev server so version-polling works in dev too.
  * The app polls this file (with a cache-busting query param) to detect deploys
  * independently of the Service Worker update mechanism.
  */
 function versionFilePlugin(): Plugin {
   const buildId = Date.now().toString();
+  const payload = JSON.stringify({ buildId });
   return {
     name: "version-file",
     generateBundle() {
       this.emitFile({
         type: "asset",
         fileName: "_version.json",
-        source: JSON.stringify({ buildId }),
+        source: payload,
+      });
+    },
+    configureServer(server) {
+      // Serve _version.json in dev mode so Layer-2 polling works during development.
+      // Match by URL string to handle any base-path prefix or query params.
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.includes("_version.json")) {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(payload);
+          return;
+        }
+        next();
       });
     },
   };
