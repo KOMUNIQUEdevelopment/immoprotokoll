@@ -11,6 +11,7 @@ export const propertiesTable = pgTable("properties", {
   name: text("name").notNull(),
   adresse: text("adresse").notNull().default(""),
   language: text("language").notNull().default("de-CH"),
+  photoDataUrl: text("photo_data_url").default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

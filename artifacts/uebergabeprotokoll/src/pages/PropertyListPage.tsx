@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
-import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive, ShieldCheck } from "lucide-react";
+import {
+  Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
+  AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n";
@@ -19,6 +22,29 @@ async function apiFetch(path: string, options?: RequestInit) {
     throw new Error(msg || res.statusText);
   }
   return res.json();
+}
+
+function resizeImageToBase64(file: File, maxSize = 240): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas")); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.80));
+      };
+      img.onerror = reject;
+      img.src = e.target!.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 interface PropertyListPageProps {
@@ -177,6 +203,18 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
   );
 }
 
+type SortKey = "name-asc" | "name-desc" | "newest" | "oldest";
+
+function sortProperties(list: Property[], sortKey: SortKey): Property[] {
+  return [...list].sort((a, b) => {
+    if (sortKey === "name-asc") return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    if (sortKey === "name-desc") return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+    if (sortKey === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (sortKey === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return 0;
+  });
+}
+
 export default function PropertyListPage({
   onSelectProperty,
   onLogout,
@@ -196,6 +234,12 @@ export default function PropertyListPage({
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Property | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Property | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name-asc");
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetRef = useRef<string | null>(null);
 
   const loadProperties = useCallback(async () => {
     setLoading(true);
@@ -237,6 +281,43 @@ export default function PropertyListPage({
     setProperties(prev => prev.filter(x => x.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
+
+  const handlePhotoClick = (propertyId: string) => {
+    photoTargetRef.current = propertyId;
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const id = photoTargetRef.current;
+    if (!file || !id) return;
+    e.target.value = "";
+    setUploadingPhotoId(id);
+    try {
+      const dataUrl = await resizeImageToBase64(file, 240);
+      const updated = await apiFetch(`/properties/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ photoDataUrl: dataUrl }),
+      });
+      setProperties(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch {
+      // silently ignore upload error
+    } finally {
+      setUploadingPhotoId(null);
+      photoTargetRef.current = null;
+    }
+  };
+
+  const displayedProperties = sortProperties(
+    properties.filter(p =>
+      !searchQuery.trim() ||
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.adresse.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    sortKey
+  );
+
+  const showSearchSort = properties.length > 0;
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -282,7 +363,7 @@ export default function PropertyListPage({
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-lg font-bold text-black">{t("properties.properties")}</h1>
             <p className="text-xs text-neutral-500 mt-0.5">{t("properties.selectPropertyHint")}</p>
@@ -297,6 +378,31 @@ export default function PropertyListPage({
             <span className="sm:hidden">{t("properties.newPropertyShort")}</span>
           </Button>
         </div>
+
+        {showSearchSort && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t("common.search")}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value as SortKey)}
+              className="text-sm border border-neutral-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-black text-neutral-700 shrink-0"
+            >
+              <option value="name-asc">{t("common.sortAZ")}</option>
+              <option value="name-desc">{t("common.sortZA")}</option>
+              <option value="newest">{t("common.sortNewest")}</option>
+              <option value="oldest">{t("common.sortOldest")}</option>
+            </select>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center py-16">
@@ -331,18 +437,49 @@ export default function PropertyListPage({
           </div>
         )}
 
-        {!loading && !error && properties.length > 0 && (
+        {!loading && !error && properties.length > 0 && displayedProperties.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Search size={24} className="text-neutral-300 mb-3" />
+            <p className="text-sm text-neutral-500">{t("common.noResults")}</p>
+          </div>
+        )}
+
+        {!loading && !error && displayedProperties.length > 0 && (
           <ul className="space-y-2">
-            {properties.map(property => (
+            {displayedProperties.map(property => (
               <li key={property.id}>
-                <div className="group flex items-center gap-3 rounded-xl border border-neutral-200 bg-white hover:border-neutral-400 transition-colors cursor-pointer">
+                <div className="group flex items-center rounded-xl border border-neutral-200 bg-white hover:border-neutral-400 transition-colors cursor-pointer">
                   <button
                     type="button"
-                    className="flex-1 flex items-center gap-3 p-4 text-left min-w-0"
+                    className="flex-1 flex items-center gap-3 p-3 text-left min-w-0"
                     onClick={() => onSelectProperty(property)}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
-                      <Building2 size={17} className="text-neutral-500" />
+                    <div
+                      className="relative w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer group/photo"
+                      onClick={e => { e.stopPropagation(); handlePhotoClick(property.id); }}
+                      title={t("properties.uploadPhoto")}
+                    >
+                      {uploadingPhotoId === property.id ? (
+                        <div className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+                      ) : property.photoDataUrl ? (
+                        <>
+                          <img
+                            src={property.photoDataUrl}
+                            alt={property.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover/photo:bg-black/25 transition-colors flex items-center justify-center">
+                            <Camera size={14} className="text-white opacity-0 group-hover/photo:opacity-100 transition-opacity" />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Building2 size={18} className="text-neutral-400 group-hover/photo:opacity-0 transition-opacity" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity">
+                            <Camera size={14} className="text-neutral-500" />
+                          </div>
+                        </>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm text-black truncate">
@@ -397,10 +534,10 @@ export default function PropertyListPage({
               <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-2">{t("properties.unassigned")}</p>
               <button
                 type="button"
-                className="w-full flex items-center gap-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-white transition-colors p-4 text-left"
+                className="w-full flex items-center gap-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-white transition-colors p-3 text-left"
                 onClick={() => onSelectProperty(UNASSIGNED_PROPERTY)}
               >
-                <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
                   <Archive size={17} className="text-neutral-400" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -416,6 +553,14 @@ export default function PropertyListPage({
           );
         })()}
       </main>
+
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoFileChange}
+      />
 
       {showForm && (
         <PropertyFormModal

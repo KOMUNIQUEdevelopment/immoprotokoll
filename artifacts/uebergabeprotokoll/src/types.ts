@@ -13,6 +13,7 @@ export interface Property {
   name: string;
   adresse: string;
   language: string;
+  photoDataUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -5,10 +5,12 @@ import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
   ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
-  Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp
+  Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+type SortKey = "name-asc" | "name-desc" | "newest" | "oldest";
 
 interface PlanLimits {
   plan: string;
@@ -146,6 +148,8 @@ export default function PropertyProtocolsPage({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("newest");
 
   useEffect(() => {
     fetch("/api/properties/plan-limits", { credentials: "include" })
@@ -156,9 +160,27 @@ export default function PropertyProtocolsPage({
 
   const isUnassignedView = property.id === UNASSIGNED_PROPERTY.id;
 
-  const propertyProtocols = Object.values(protocols)
-    .filter(p => isUnassignedView ? !p.propertyId : p.propertyId === property.id)
+  const allPropertyProtocols = Object.values(protocols)
+    .filter(p => isUnassignedView ? !p.propertyId : p.propertyId === property.id);
+
+  const propertyProtocols = allPropertyProtocols
+    .filter(p => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const name = (p.mietobjekt || "").toLowerCase();
+      const parties = [...(p.uebergeber ?? []), ...(p.uebernehmer ?? [])]
+        .map(x => (x.name || "").toLowerCase()).join(" ");
+      return name.includes(q) || parties.includes(q);
+    })
     .sort((a, b) => {
+      if (sortKey === "name-asc") return (a.mietobjekt || "").localeCompare(b.mietobjekt || "", undefined, { sensitivity: "base" });
+      if (sortKey === "name-desc") return (b.mietobjekt || "").localeCompare(a.mietobjekt || "", undefined, { sensitivity: "base" });
+      if (sortKey === "oldest") {
+        const aTime = a.lastSaved ? new Date(a.lastSaved).getTime() : 0;
+        const bTime = b.lastSaved ? new Date(b.lastSaved).getTime() : 0;
+        return aTime - bTime;
+      }
+      // newest (default)
       const aTime = a.lastSaved ? new Date(a.lastSaved).getTime() : 0;
       const bTime = b.lastSaved ? new Date(b.lastSaved).getTime() : 0;
       return bTime - aTime;
@@ -238,7 +260,33 @@ export default function PropertyProtocolsPage({
             </button>
           </div>
         )}
-        {propertyProtocols.length === 0 && propertyTrashed.length === 0 && (
+
+        {allPropertyProtocols.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t("common.search")}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-black transition-colors"
+              />
+            </div>
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value as SortKey)}
+              className="text-sm border border-neutral-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-black text-neutral-700 shrink-0"
+            >
+              <option value="newest">{t("common.sortNewest")}</option>
+              <option value="oldest">{t("common.sortOldest")}</option>
+              <option value="name-asc">{t("common.sortAZ")}</option>
+              <option value="name-desc">{t("common.sortZA")}</option>
+            </select>
+          </div>
+        )}
+
+        {allPropertyProtocols.length === 0 && propertyTrashed.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
               <ClipboardList size={24} className="text-neutral-400" />
@@ -257,6 +305,13 @@ export default function PropertyProtocolsPage({
                 {t("protocols.createFirst")}
               </Button>
             )}
+          </div>
+        )}
+
+        {allPropertyProtocols.length > 0 && propertyProtocols.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Search size={24} className="text-neutral-300 mb-3" />
+            <p className="text-sm text-neutral-500">{t("common.noResults")}</p>
           </div>
         )}
 

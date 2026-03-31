@@ -124,12 +124,19 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── PATCH /api/properties/:id — update property name/address ─────────────────
+// ── PATCH /api/properties/:id — update property fields (name, address, photo) ─
 const updatePropertyHandler = async (req: AuthRequest, res: Response): Promise<void> => {
   const id = String(req.params.id);
-  const { name, adresse, language } = req.body as { name?: string; adresse?: string; language?: string };
+  const { name, adresse, language, photoDataUrl } = req.body as {
+    name?: string;
+    adresse?: string;
+    language?: string;
+    photoDataUrl?: string;
+  };
 
-  if (!name?.trim()) {
+  // name is required only when not doing a photo-only update
+  const isPhotoOnlyUpdate = photoDataUrl !== undefined && !name;
+  if (!isPhotoOnlyUpdate && !name?.trim()) {
     res.status(400).json({ error: "name is required" });
     return;
   }
@@ -138,15 +145,23 @@ const updatePropertyHandler = async (req: AuthRequest, res: Response): Promise<v
   const validLangs = ["de-CH", "de-DE", "en"];
   const resolvedLanguage = language && validLangs.includes(language) ? language : undefined;
 
+  type PropertyUpdate = {
+    name?: string;
+    adresse?: string;
+    language?: string;
+    photoDataUrl?: string;
+    updatedAt: Date;
+  };
+  const setFields: PropertyUpdate = { updatedAt: new Date() };
+  if (name?.trim()) setFields.name = name.trim();
+  if (adresse !== undefined) setFields.adresse = adresse.trim();
+  if (resolvedLanguage) setFields.language = resolvedLanguage;
+  if (photoDataUrl !== undefined) setFields.photoDataUrl = photoDataUrl;
+
   try {
     const [updated] = await db
       .update(propertiesTable)
-      .set({
-        name: name.trim(),
-        adresse: adresse?.trim() ?? "",
-        ...(resolvedLanguage ? { language: resolvedLanguage } : {}),
-        updatedAt: new Date(),
-      })
+      .set(setFields)
       .where(and(eq(propertiesTable.id, id), eq(propertiesTable.accountId, accountId)))
       .returning();
 
