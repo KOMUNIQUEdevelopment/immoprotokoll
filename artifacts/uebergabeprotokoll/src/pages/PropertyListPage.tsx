@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
-import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive, Globe, ShieldCheck } from "lucide-react";
+import { Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check, AlertTriangle, ClipboardList, Archive, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { InstallButton } from "../components/InstallButton";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n";
 
 const API_BASE = "/api";
@@ -178,50 +177,6 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
   );
 }
 
-function LanguageDropdown({
-  currentLang,
-  onChangeLang,
-}: {
-  currentLang: string;
-  onChangeLang: (lang: SupportedLanguage) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        title={LANGUAGE_LABELS[currentLang as SupportedLanguage] ?? currentLang}
-        className="flex items-center gap-1 p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
-      >
-        <Globe size={16} />
-        <span className="text-xs font-medium hidden sm:inline">
-          {currentLang === "de-CH" ? "DE-CH" : currentLang === "de-DE" ? "DE-DE" : "EN"}
-        </span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-9 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden">
-            {SUPPORTED_LANGUAGES.map(lang => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => { onChangeLang(lang); setOpen(false); }}
-                className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
-                  currentLang === lang ? "font-semibold text-black" : "text-neutral-700"
-                }`}
-              >
-                {LANGUAGE_LABELS[lang]}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 export default function PropertyListPage({
   onSelectProperty,
   onLogout,
@@ -292,7 +247,6 @@ export default function PropertyListPage({
             <span className="font-semibold text-sm text-black">ImmoProtokoll</span>
           </div>
           <div className="flex items-center gap-2">
-            <InstallButton />
             {(onShowBilling || onShowPricing) && (
               <button
                 type="button"
@@ -302,9 +256,6 @@ export default function PropertyListPage({
               >
                 {currentPlan === "free" ? "Free" : currentPlan === "privat" ? "Privat" : currentPlan === "agentur" ? "Agentur" : "Custom"}
               </button>
-            )}
-            {onChangeLang && (
-              <LanguageDropdown currentLang={userLang} onChangeLang={onChangeLang} />
             )}
             {onShowSuperadmin && (
               <button
