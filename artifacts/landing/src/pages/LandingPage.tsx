@@ -92,14 +92,14 @@ export default function LandingPage() {
             >
               <a 
                 href="https://app.immoprotokoll.com" 
-                className="bg-black text-white px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-lg hover:bg-black/80 transition-colors flex items-center justify-center gap-2 shadow-md"
+                className="bg-black text-white px-7 py-3 text-sm font-semibold w-full sm:w-auto rounded-lg hover:bg-black/80 transition-colors flex items-center justify-center gap-2 tracking-wide"
               >
                 {t.hero.cta_primary}
-                <ArrowRight size={20} />
+                <ArrowRight size={15} />
               </a>
               <a 
                 href="#features" 
-                className="bg-white text-black border-2 border-black px-8 py-4 text-lg font-bold w-full sm:w-auto rounded-lg hover:bg-black/5 transition-colors shadow-sm"
+                className="bg-white text-black border border-black px-7 py-3 text-sm font-semibold w-full sm:w-auto rounded-lg hover:bg-black/5 transition-colors tracking-wide"
               >
                 {t.hero.cta_secondary}
               </a>
