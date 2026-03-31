@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -27,21 +27,50 @@ if (!basePath) {
   );
 }
 
+/**
+ * Emits `_version.json` into the build output with a unique build timestamp.
+ * The app polls this file (with a cache-busting query param) to detect deploys
+ * independently of the Service Worker update mechanism.
+ */
+function versionFilePlugin(): Plugin {
+  const buildId = Date.now().toString();
+  return {
+    name: "version-file",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "_version.json",
+        source: JSON.stringify({ buildId }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    versionFilePlugin(),
     VitePWA({
       registerType: "prompt",
       injectRegister: "inline",
       manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        // Explicitly exclude _version.json from precache so it always hits network
+        globIgnores: ["_version.json"],
         cleanupOutdatedCaches: true,
         skipWaiting: false,
         clientsClaim: false,
+        // Serve _version.json network-only so the SW never intercepts it
+        runtimeCaching: [
+          {
+            urlPattern: /_version\.json/,
+            handler: "NetworkOnly",
+          },
+        ],
       },
       devOptions: {
         enabled: true,
