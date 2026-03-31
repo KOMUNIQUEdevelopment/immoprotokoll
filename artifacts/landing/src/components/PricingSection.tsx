@@ -145,7 +145,7 @@ function PricingCard({ name, price, currency, period, limits, cta, href, highlig
 
       <a 
         href={href}
-        className={`w-full py-4 text-center font-bold transition-colors mt-auto ${
+        className={`w-full py-3 text-sm font-semibold text-center tracking-wide rounded-lg transition-colors mt-auto ${
           highlight 
             ? 'bg-black text-white hover:bg-black/80' 
             : 'bg-black/5 text-black hover:bg-black/10'
