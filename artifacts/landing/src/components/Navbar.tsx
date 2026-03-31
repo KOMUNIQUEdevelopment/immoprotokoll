@@ -54,11 +54,11 @@ export default function Navbar() {
           <button onClick={toggleLang} className="text-sm font-bold uppercase hover:opacity-60">
             {lang === "de" ? "DE / en" : "de / EN"}
           </button>
-          <a href="https://app.immoprotokoll.com" className="text-sm font-medium hover:underline">
+          <a href="/app/" className="text-sm font-medium hover:underline">
             {t.nav.login}
           </a>
           <a 
-            href="https://app.immoprotokoll.com" 
+            href="/app/" 
             className="bg-black text-white px-5 py-2 text-sm font-bold rounded-lg hover:bg-black/80 transition-colors"
           >
             {t.nav.start_free}
@@ -88,13 +88,13 @@ export default function Navbar() {
             <button onClick={toggleLang} className="font-bold uppercase">
               Language: {lang}
             </button>
-            <a href="https://app.immoprotokoll.com" className="font-medium">
+            <a href="/app/" className="font-medium">
               {t.nav.login}
             </a>
           </div>
           
           <a 
-            href="https://app.immoprotokoll.com" 
+            href="/app/" 
             className="bg-black text-white text-center py-3 mt-2 font-bold w-full rounded-lg"
           >
             {t.nav.start_free}

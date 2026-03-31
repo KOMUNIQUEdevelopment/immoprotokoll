@@ -91,7 +91,7 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <a 
-                href="https://app.immoprotokoll.com" 
+                href="/app/" 
                 className="bg-black text-white px-7 py-3 text-sm font-semibold w-full sm:w-auto rounded-lg hover:bg-black/80 transition-colors flex items-center justify-center gap-2 tracking-wide"
               >
                 {t.hero.cta_primary}
@@ -294,7 +294,7 @@ export default function LandingPage() {
                 : "Digitize your handover protocols today."}
             </p>
             <a 
-              href="https://app.immoprotokoll.com" 
+              href="/app/" 
               className="inline-block bg-black text-white px-7 py-3 text-sm font-semibold rounded-lg hover:bg-black/80 transition-colors tracking-wide"
             >
               {t.hero.cta_primary}

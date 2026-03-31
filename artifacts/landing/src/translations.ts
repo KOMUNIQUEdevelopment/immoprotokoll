@@ -7,7 +7,7 @@ export const translations = {
       pricing: "Preise",
       faq: "FAQ",
       start_free: "Kostenlos starten",
-      login: "Anmelden"
+      login: "Login"
     },
     hero: {
       title: "Jede Mietübergabe. Sauber dokumentiert.",
