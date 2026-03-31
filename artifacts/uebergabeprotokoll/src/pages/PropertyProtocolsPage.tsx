@@ -5,7 +5,7 @@ import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
   ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
-  Pencil, Trash2, Copy, Eye, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp
+  Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,6 +182,11 @@ export default function PropertyProtocolsPage({
   };
 
   const handleCopyLink = (id: string) => {
+    // If sync is disabled, enable it first so the link becomes valid on the server
+    const proto = protocols[id];
+    if (proto && !proto.syncEnabled) {
+      onToggleSync(id);
+    }
     copyToClipboard(syncShareLink(id));
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -328,16 +333,14 @@ export default function PropertyProtocolsPage({
                       >
                         <Copy size={13} />
                       </button>
-                      {protocol.syncEnabled && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopyLink(protocol.id)}
-                          className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                          title={t("protocols.copyLink")}
-                        >
-                          {copiedId === protocol.id ? <Check size={13} /> : <Eye size={13} />}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(protocol.id)}
+                        className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
+                        title={t("protocols.copyLink")}
+                      >
+                        {copiedId === protocol.id ? <Check size={13} /> : <Link size={13} />}
+                      </button>
                       <button
                         type="button"
                         onClick={() => onToggleSync(protocol.id)}
