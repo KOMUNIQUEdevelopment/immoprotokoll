@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
+declare const __APP_BUILD_ID__: string;
+
 /**
  * Two-layer PWA update detection:
  *
@@ -9,11 +11,10 @@ import { useRegisterSW } from "virtual:pwa-register/react";
  *   May be blocked by CDN/HTTP caching on Replit's static hosting.
  *
  * Layer 2 – Version file polling (_version.json?t=<timestamp>)
- *   Fetched with a unique query param + cache:'no-store' on every poll so
- *   it bypasses both the HTTP cache AND the Service Worker's precache.
- *   The SW is configured with a NetworkOnly rule for _version.json so it
- *   never intercepts these requests.
- *   If the buildId changes from what was seen at load → show update banner.
+ *   The app's own build ID is embedded at compile time via __APP_BUILD_ID__.
+ *   On every poll the network-fetched buildId is compared against the
+ *   bundle-embedded ID. If they differ the new deploy is detected — even
+ *   when the old JS is still being served from a stale SW / HTTP cache.
  *
  * Either layer triggering needsUpdate is sufficient to show the banner.
  */
@@ -48,18 +49,21 @@ export function useSwUpdate() {
     },
   });
 
-  // Layer 2: version file polling — fully independent of the SW mechanism
+  // Layer 2: version file polling — fully independent of the SW mechanism.
+  // Uses the compile-time build ID (__APP_BUILD_ID__) so the check works even
+  // when the old bundle is loaded from a stale SW cache. No network init needed.
   useEffect(() => {
     const base = import.meta.env.BASE_URL ?? "/";
     const versionUrl = `${base}_version.json`;
 
-    let loadedBuildId: string | null = null;
+    // The bundle's own build ID, embedded at compile time by Vite define.
+    const myBuildId: string =
+      typeof __APP_BUILD_ID__ !== "undefined" ? __APP_BUILD_ID__ : "";
+
     let destroyed = false;
 
     const fetchBuildId = async (): Promise<string | null> => {
       try {
-        // Unique query param busts HTTP cache; cache:'no-store' bypasses it too.
-        // SW is configured NetworkOnly for _version.json so it never caches this.
         const res = await fetch(`${versionUrl}?t=${Date.now()}`, {
           cache: "no-store",
         });
@@ -71,25 +75,16 @@ export function useSwUpdate() {
       }
     };
 
-    const init = async () => {
-      loadedBuildId = await fetchBuildId();
-    };
-
     const poll = async () => {
-      if (destroyed) return;
-      const currentBuildId = await fetchBuildId();
-      if (
-        currentBuildId !== null &&
-        loadedBuildId !== null &&
-        currentBuildId !== loadedBuildId
-      ) {
+      if (destroyed || !myBuildId) return;
+      const serverBuildId = await fetchBuildId();
+      if (serverBuildId !== null && serverBuildId !== myBuildId) {
         setNeedsUpdate(true);
       }
     };
 
-    init();
-
-    // Poll every 60 s + check on focus / visibility
+    // Run immediately on mount, then every 60 s + on focus / visibility
+    poll();
     const versionPoll = setInterval(poll, 60_000);
     const onFocus = () => poll();
     const onVisible = () => {

@@ -28,13 +28,20 @@ if (!basePath) {
 }
 
 /**
+ * Build ID shared between versionFilePlugin and the Vite `define` block.
+ * Embedded into the JS bundle AND written to _version.json so the app can
+ * compare its own compiled ID against the network-fetched one to detect
+ * stale PWA installs — even after loading from a SW cache.
+ */
+const buildId = Date.now().toString();
+
+/**
  * Emits `_version.json` into the build output with a unique build timestamp.
  * Also serves it from the Vite dev server so version-polling works in dev too.
  * The app polls this file (with a cache-busting query param) to detect deploys
  * independently of the Service Worker update mechanism.
  */
 function versionFilePlugin(): Plugin {
-  const buildId = Date.now().toString();
   const payload = JSON.stringify({ buildId });
   return {
     name: "version-file",
@@ -63,6 +70,11 @@ function versionFilePlugin(): Plugin {
 
 export default defineConfig({
   base: basePath,
+  // Inject build ID as a compile-time constant so each deployed bundle
+  // knows its own version, even when loaded from a stale SW cache.
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     react(),
     tailwindcss(),
