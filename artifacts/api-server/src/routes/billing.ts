@@ -233,19 +233,39 @@ router.post(
         return;
       }
 
-      let customerId = account.stripeCustomerId;
-      if (!customerId) {
+      const createOrFetchCustomer = async (existingId: string | null): Promise<string> => {
+        if (existingId) {
+          // Verify the customer still exists in Stripe
+          try {
+            await stripe.customers.retrieve(existingId);
+            return existingId;
+          } catch (e: unknown) {
+            const stripeErr = e as { code?: string; param?: string };
+            if (stripeErr?.code === "resource_missing") {
+              // Stale customer — clear it and create a fresh one
+              logger.warn({ existingId, accountId }, "Stale Stripe customer ID cleared");
+              await db
+                .update(accountsTable)
+                .set({ stripeCustomerId: null, updatedAt: new Date() })
+                .where(eq(accountsTable.id, accountId));
+            } else {
+              throw e;
+            }
+          }
+        }
         const customer = await stripe.customers.create({
           name: account.name,
           email: req.user!.email,
           metadata: { accountId },
         });
-        customerId = customer.id;
         await db
           .update(accountsTable)
-          .set({ stripeCustomerId: customerId, updatedAt: new Date() })
+          .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
           .where(eq(accountsTable.id, accountId));
-      }
+        return customer.id;
+      };
+
+      const customerId = await createOrFetchCustomer(account.stripeCustomerId);
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
