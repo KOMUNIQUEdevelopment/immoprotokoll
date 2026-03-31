@@ -16,6 +16,7 @@ import { requireAuth, type AuthRequest } from "./middleware/auth";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initSuperAdmin } from "./lib/init";
+import { sendProtocolSignedEmail, sendTenantInviteEmail } from "./lib/email";
 
 const rawPort = process.env["PORT"];
 
@@ -502,8 +503,175 @@ app.post("/api/protocol/:id/sign", async (req, res) => {
 
     logger.info({ id, personId }, "Tenant signature saved and broadcast");
     res.json({ ok: true });
+
+    // ── "All signed" email notification (fire-and-forget) ──────────────────
+    // Check if every person in the protocol now has a signature
+    const allPersons = [
+      ...(Array.isArray(protocol.uebergeber) ? protocol.uebergeber : []),
+      ...(Array.isArray(protocol.uebernehmer) ? protocol.uebernehmer : []),
+    ] as Array<{ id: string; name: string }>;
+
+    const allSigned =
+      allPersons.length > 0 &&
+      allPersons.every((p) =>
+        sigs.some((s) => s.personId === p.id && s.signatureDataUrl)
+      );
+
+    if (allSigned) {
+      (async () => {
+        try {
+          // Resolve property language
+          let lang = "de-CH";
+          const propertyId = protocol.propertyId as string | undefined;
+          if (propertyId) {
+            const propRows = await db
+              .select({ language: propertiesTable.language })
+              .from(propertiesTable)
+              .where(eq(propertiesTable.id, propertyId))
+              .limit(1);
+            if (propRows.length > 0) lang = propRows[0].language ?? lang;
+          }
+
+          // Resolve property name for email body
+          let propertyName = "";
+          if (propertyId) {
+            const propNameRows = await db
+              .select({ name: propertiesTable.name })
+              .from(propertiesTable)
+              .where(eq(propertiesTable.id, propertyId))
+              .limit(1);
+            if (propNameRows.length > 0) propertyName = propNameRows[0].name ?? "";
+          }
+
+          // Notify all non-deleted users in the account
+          const accountUsers = await db
+            .select({ email: usersTable.email, firstName: usersTable.firstName })
+            .from(usersTable)
+            .where(eq(usersTable.accountId, rows[0].accountId));
+
+          const protocolName = (protocol.mietobjekt as string) || "Protokoll";
+          const signatoryNames = allPersons.map((p) => p.name).filter(Boolean);
+
+          for (const u of accountUsers) {
+            if (!u.email) continue;
+            await sendProtocolSignedEmail({
+              to: u.email,
+              propertyName,
+              protocolName,
+              signatoryNames,
+              lang,
+            });
+          }
+          logger.info({ id, accountId: rows[0].accountId }, "Protocol-signed emails sent");
+        } catch (err) {
+          logger.error({ err, id }, "Failed to send protocol-signed emails");
+        }
+      })();
+    }
   } catch (err) {
     logger.error({ err }, "Failed to save signature");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── REST: Mieter-Einladung per E-Mail senden (auth-geschützt) ────────────────
+app.post("/api/protocol/:id/send-tenant-invite", requireAuth, async (req, res) => {
+  const authReq = req as AuthRequest;
+  const { id } = req.params;
+  const { emails } = req.body as { emails?: string[] };
+
+  if (!Array.isArray(emails) || emails.length === 0) {
+    res.status(400).json({ error: "emails array is required" });
+    return;
+  }
+
+  const validEmails = emails
+    .map((e: string) => e.trim().toLowerCase())
+    .filter((e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+
+  if (validEmails.length === 0) {
+    res.status(400).json({ error: "No valid email addresses provided" });
+    return;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(
+        and(
+          eq(syncProtocolsTable.id, id),
+          eq(syncProtocolsTable.accountId, authReq.accountId!)
+        )
+      )
+      .limit(1);
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Protocol not found" });
+      return;
+    }
+
+    const protocol = rows[0].data as Record<string, unknown>;
+
+    // Enable sync if not already active (link won't work otherwise)
+    if (!protocol.syncEnabled) {
+      protocol.syncEnabled = true;
+      await db
+        .update(syncProtocolsTable)
+        .set({ data: protocol, updatedAt: new Date() })
+        .where(
+          and(
+            eq(syncProtocolsTable.accountId, authReq.accountId!),
+            eq(syncProtocolsTable.id, id)
+          )
+        );
+    }
+
+    // Resolve property language and name
+    let lang = "de-CH";
+    let propertyName = "";
+    const propertyId = protocol.propertyId as string | undefined;
+    if (propertyId) {
+      const propRows = await db
+        .select({ language: propertiesTable.language, name: propertiesTable.name })
+        .from(propertiesTable)
+        .where(eq(propertiesTable.id, propertyId))
+        .limit(1);
+      if (propRows.length > 0) {
+        lang = propRows[0].language ?? lang;
+        propertyName = propRows[0].name ?? "";
+      }
+    }
+
+    // Resolve account name for email sender line
+    const accountRows = await db
+      .select({ name: accountsTable.name })
+      .from(accountsTable)
+      .where(eq(accountsTable.id, authReq.accountId!))
+      .limit(1);
+    const senderAccountName = accountRows[0]?.name ?? "ImmoProtokoll";
+
+    const shareUrl = `https://immoprotokoll.com/app/#/view/${id}`;
+    const protocolName = (protocol.mietobjekt as string) || "Protokoll";
+
+    // Send to all valid emails (fire-and-forget)
+    (async () => {
+      for (const email of validEmails) {
+        await sendTenantInviteEmail({
+          to: email,
+          protocolName,
+          propertyName,
+          shareUrl,
+          senderAccountName,
+          lang,
+        });
+      }
+      logger.info({ id, count: validEmails.length }, "Tenant invite emails sent");
+    })();
+
+    res.json({ ok: true, sent: validEmails.length, syncEnabled: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to send tenant invite");
     res.status(500).json({ error: "Internal server error" });
   }
 });

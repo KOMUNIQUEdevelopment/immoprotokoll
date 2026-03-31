@@ -5,7 +5,7 @@ import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
   ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
-  Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Search
+  Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Search, Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,6 +118,125 @@ function RenameModal({ current, onSave, onClose }: RenameModalProps) {
   );
 }
 
+// ── Send Tenant Invite Modal ─────────────────────────────────────────────────
+
+interface SendInviteModalProps {
+  protocolId: string;
+  onClose: () => void;
+}
+
+function SendTenantInviteModal({ protocolId, onClose }: SendInviteModalProps) {
+  const { t } = useTranslation();
+  const [emailsInput, setEmailsInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSend = async () => {
+    const emails = emailsInput
+      .split(/[\s,;]+/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+
+    if (emails.length === 0) {
+      setError(t("protocols.sendInviteInvalidEmail"));
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/protocol/${protocolId}/send-tenant-invite`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError((data as { error?: string }).error ?? t("protocols.sendInviteError"));
+      } else {
+        setSent(true);
+      }
+    } catch {
+      setError(t("protocols.sendInviteError"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
+              <Mail size={15} className="text-neutral-700" />
+            </div>
+            <h2 className="font-semibold text-black text-sm">{t("protocols.sendInviteTitle")}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded-full text-neutral-500 hover:bg-neutral-100">
+            <X size={16} />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="space-y-4">
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                <Check size={18} className="text-neutral-700" />
+              </div>
+              <p className="text-sm font-medium text-black">{t("protocols.sendInviteSuccess")}</p>
+              <p className="text-xs text-neutral-500">{t("protocols.sendInviteSuccessHint")}</p>
+            </div>
+            <Button onClick={onClose} className="w-full bg-black text-white hover:bg-neutral-800 rounded-lg">
+              {t("common.close")}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-neutral-500">{t("protocols.sendInviteHint")}</p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-neutral-600 uppercase tracking-wider">
+                {t("protocols.sendInviteEmailsLabel")}
+              </label>
+              <textarea
+                value={emailsInput}
+                onChange={e => { setEmailsInput(e.target.value); setError(""); }}
+                placeholder={t("protocols.sendInviteEmailsPlaceholder")}
+                rows={3}
+                autoFocus
+                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-black transition-colors resize-none"
+              />
+              <p className="text-xs text-neutral-400">{t("protocols.sendInviteEmailsHint")}</p>
+            </div>
+            {error && <p className="text-xs font-medium text-neutral-700">{error}</p>}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={onClose} className="border-neutral-200">
+                {t("common.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSend}
+                disabled={loading || !emailsInput.trim()}
+                className="bg-black text-white hover:bg-neutral-800 gap-1.5"
+              >
+                {loading ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Mail size={13} />
+                )}
+                {t("protocols.sendInviteBtn")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function syncShareLink(id: string): string {
   return `${window.location.origin}${window.location.pathname}#/view/${id}`;
 }
@@ -146,6 +265,7 @@ export default function PropertyProtocolsPage({
   const [renameTarget, setRenameTarget] = useState<ProtocolData | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sendInviteId, setSendInviteId] = useState<string | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -398,6 +518,14 @@ export default function PropertyProtocolsPage({
                       </button>
                       <button
                         type="button"
+                        onClick={() => setSendInviteId(protocol.id)}
+                        className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
+                        title={t("protocols.sendInvite")}
+                      >
+                        <Mail size={13} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onToggleSync(protocol.id)}
                         className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
                         title={protocol.syncEnabled ? t("protocols.syncActive") : t("protocols.syncInactive")}
@@ -493,6 +621,12 @@ export default function PropertyProtocolsPage({
           current={renameTarget.mietobjekt || ""}
           onSave={name => onRename(renameTarget.id, name)}
           onClose={() => setRenameTarget(null)}
+        />
+      )}
+      {sendInviteId && (
+        <SendTenantInviteModal
+          protocolId={sendInviteId}
+          onClose={() => setSendInviteId(null)}
         />
       )}
     </div>

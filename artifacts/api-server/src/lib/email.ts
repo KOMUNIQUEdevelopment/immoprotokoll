@@ -5,13 +5,41 @@ const FROM_ADDRESS = "ImmoProtokoll <noreply@immoprotokoll.com>";
 const APP_URL = "https://immoprotokoll.com/app/";
 const SUPPORT_EMAIL = "support@immoprotokoll.com";
 
-function getResend(): Resend | null {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
-    logger.warn("RESEND_API_KEY not set — skipping email send");
+// Replit Resend connector — fetches a fresh API key each time (tokens can expire)
+async function getResend(): Promise<Resend | null> {
+  // Fallback: direct API key via env var (for local dev / self-hosted)
+  const directKey = process.env.RESEND_API_KEY;
+  if (directKey) return new Resend(directKey);
+
+  // Replit connector path
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? "repl " + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+    ? "depl " + process.env.WEB_REPL_RENEWAL
+    : null;
+
+  if (!hostname || !xReplitToken) {
+    logger.warn("Resend not configured — skipping email send");
     return null;
   }
-  return new Resend(key);
+
+  try {
+    const resp = await fetch(
+      `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=resend`,
+      { headers: { Accept: "application/json", "X-Replit-Token": xReplitToken } }
+    );
+    const data = await resp.json() as { items?: Array<{ settings?: { api_key?: string } }> };
+    const apiKey = data.items?.[0]?.settings?.api_key;
+    if (!apiKey) {
+      logger.warn("Resend connector found but api_key missing — skipping email send");
+      return null;
+    }
+    return new Resend(apiKey);
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch Resend connector credentials");
+    return null;
+  }
 }
 
 // ── Base HTML shell ────────────────────────────────────────────────────────────
@@ -99,7 +127,7 @@ function detail(label: string, value: string): string {
 }
 
 async function send(to: string, subject: string, html: string): Promise<void> {
-  const resend = getResend();
+  const resend = await getResend();
   if (!resend) return;
   try {
     const { error } = await resend.emails.send({ from: FROM_ADDRESS, to, subject, html });
@@ -238,6 +266,97 @@ export async function sendPaymentFailedEmail(
     ${body(`<span style="font-size:13px;color:#888;">If you believe this is a mistake or need help, please contact us at <a href="mailto:${SUPPORT_EMAIL}" style="color:#444;">${SUPPORT_EMAIL}</a>.</span>`)}
   `);
   await send(email, "Action required: your ImmoProtokoll payment failed", html);
+}
+
+// ── Multilingual protocol email helpers ────────────────────────────────────────
+
+type Lang = "de-CH" | "de-DE" | "en" | string;
+
+function isDE(lang: Lang): boolean {
+  return lang === "de-CH" || lang === "de-DE";
+}
+
+/** Sent to account users when ALL parties have signed a protocol */
+export async function sendProtocolSignedEmail(opts: {
+  to: string;
+  propertyName: string;
+  protocolName: string;
+  signatoryNames: string[];
+  lang: Lang;
+}): Promise<void> {
+  const { to, propertyName, protocolName, signatoryNames, lang } = opts;
+  const de = isDE(lang);
+
+  const subject = de
+    ? `Protokoll vollständig unterzeichnet – ${protocolName}`
+    : `Handover protocol fully signed – ${protocolName}`;
+
+  const headingText = de ? "Alle Unterschriften liegen vor" : "All signatures collected";
+
+  const introText = de
+    ? `Das Übergabeprotokoll <strong>${protocolName}</strong>${propertyName ? ` für <strong>${propertyName}</strong>` : ""} wurde von allen Beteiligten unterzeichnet.`
+    : `The handover protocol <strong>${protocolName}</strong>${propertyName ? ` for <strong>${propertyName}</strong>` : ""} has been signed by all parties.`;
+
+  const sigLabel = de ? "Unterzeichnet von" : "Signed by";
+  const btnLabel = de ? "ImmoProtokoll öffnen" : "Open ImmoProtokoll";
+
+  const sigList = signatoryNames.length > 0
+    ? `<div style="margin:16px 0;padding:16px;background:#f9f9f9;border-radius:8px;">
+        <p style="margin:0 0 8px 0;font-size:12px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${sigLabel}</p>
+        <ul style="margin:0;padding-left:18px;">
+          ${signatoryNames.map(n => `<li style="font-size:14px;color:#111;line-height:1.8;">${n}</li>`).join("")}
+        </ul>
+      </div>`
+    : "";
+
+  const html = emailShell(`
+    ${heading(headingText)}
+    ${body(introText)}
+    ${sigList}
+    ${button(btnLabel, APP_URL)}
+  `);
+
+  await send(to, subject, html);
+}
+
+/** Sent to tenants inviting them to review and sign a protocol */
+export async function sendTenantInviteEmail(opts: {
+  to: string;
+  protocolName: string;
+  propertyName: string;
+  shareUrl: string;
+  senderAccountName: string;
+  lang: Lang;
+}): Promise<void> {
+  const { to, protocolName, propertyName, shareUrl, senderAccountName, lang } = opts;
+  const de = isDE(lang);
+
+  const subject = de
+    ? `Bitte Übergabeprotokoll prüfen und unterschreiben`
+    : `Please review and sign the handover protocol`;
+
+  const headingText = de ? "Einladung zur Unterzeichnung" : "You're invited to sign";
+
+  const senderLine = de
+    ? `<strong>${senderAccountName}</strong> lädt Sie ein, das Übergabeprotokoll${propertyName ? ` für <strong>${propertyName}</strong>` : ""}${protocolName ? ` (<em>${protocolName}</em>)` : ""} zu prüfen und digital zu unterzeichnen.`
+    : `<strong>${senderAccountName}</strong> has invited you to review and sign the handover protocol${propertyName ? ` for <strong>${propertyName}</strong>` : ""}${protocolName ? ` (<em>${protocolName}</em>)` : ""}.`;
+
+  const noteText = de
+    ? "Sie können das Protokoll einsehen und Ihre Unterschrift direkt im Browser leisten – ohne Konto oder App."
+    : "You can review the protocol and sign it directly in your browser — no account or app required.";
+
+  const btnLabel = de ? "Protokoll öffnen und unterschreiben" : "Open & sign protocol";
+
+  const html = emailShell(`
+    ${heading(headingText)}
+    ${body(senderLine)}
+    ${body(noteText)}
+    ${button(btnLabel, shareUrl)}
+    ${divider()}
+    ${body(`<span style="font-size:12px;color:#aaa;">Wenn dieser Link nicht funktioniert, kopieren Sie ihn in Ihren Browser:<br/><span style="color:#666;">${shareUrl}</span></span>`)}
+  `);
+
+  await send(to, subject, html);
 }
 
 /** Sent when a plan is changed (upgrade or downgrade) */
