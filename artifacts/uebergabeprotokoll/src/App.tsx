@@ -20,7 +20,6 @@ import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
-import { InstallButton } from "./components/InstallButton";
 import i18n, { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage, getTranslations } from "./i18n";
 import {
   Save,
@@ -36,7 +35,6 @@ import {
   FolderArchive,
   Cloud,
   CloudOff,
-  LogOut,
   Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -492,19 +490,6 @@ function AppContent({
                   {isSaving ? tr.common.saving : `${tr.common.saved} ${formatRelative(lastSaved, t)}`}
                 </span>
               )}
-
-              <InstallButton />
-
-              <LanguageSelector currentLang={userLang} onChangeLang={onChangeLang} />
-
-              <button
-                type="button"
-                onClick={onLogout}
-                title={tr.auth.logout}
-                className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors hidden sm:flex"
-              >
-                <LogOut size={15} />
-              </button>
 
               <Button
                 variant="outline"
