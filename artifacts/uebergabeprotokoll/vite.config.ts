@@ -35,7 +35,7 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: "prompt",
-      injectRegister: "auto",
+      injectRegister: null,
       manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
