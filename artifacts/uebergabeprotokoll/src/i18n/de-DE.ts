@@ -96,6 +96,9 @@ const deDE: Translations = {
     uploadPhoto: "Foto hochladen",
     languageLabel: "Sprache der Liegenschaft",
     languageHint: "Gilt für Protokoll, PDF-Export und Mieteransicht.",
+    planLimitReached: "Limit des kostenlosen Plans erreicht",
+    planLimitUpgradeHint: "Ihr Free-Plan erlaubt nur 1 Liegenschaft. Upgraden Sie auf einen bezahlten Plan, um weitere Liegenschaften zu verwalten.",
+    upgradeNow: "Jetzt upgraden",
   },
   protocols: {
     protocol: "Protokoll",

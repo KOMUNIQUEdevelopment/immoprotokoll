@@ -3,13 +3,21 @@ import { useTranslation } from "react-i18next";
 import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
 import {
   Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
-  AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera,
+  AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera, ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n";
 
 const API_BASE = "/api";
+
+class ApiError extends Error {
+  code: string;
+  constructor(message: string, code = "") {
+    super(message);
+    this.code = code;
+  }
+}
 
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -18,8 +26,16 @@ async function apiFetch(path: string, options?: RequestInit) {
     ...options,
   });
   if (!res.ok) {
-    const msg = await res.text().catch(() => res.statusText);
-    throw new Error(msg || res.statusText);
+    let message = res.statusText;
+    let code = "";
+    try {
+      const body = await res.json();
+      message = body.error || message;
+      code = body.code || "";
+    } catch {
+      message = await res.text().catch(() => res.statusText) || res.statusText;
+    }
+    throw new ApiError(message, code);
   }
   return res.json();
 }
@@ -114,26 +130,34 @@ interface PropertyFormModalProps {
   initial?: Property;
   onSave: (name: string, adresse: string, language: string) => Promise<void>;
   onClose: () => void;
+  onGoToBilling?: () => void;
 }
 
-function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps) {
+function PropertyFormModal({ initial, onSave, onClose, onGoToBilling }: PropertyFormModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
   const [adresse, setAdresse] = useState(initial?.adresse ?? "");
   const [language, setLanguage] = useState<SupportedLanguage>((initial?.language as SupportedLanguage) ?? "de-CH");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError(t("properties.nameRequired")); return; }
     setSaving(true);
     setError("");
+    setErrorCode("");
     try {
       await onSave(name.trim(), adresse.trim(), language);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("properties.savingError"));
+      if (err instanceof ApiError) {
+        setError(err.message);
+        setErrorCode(err.code);
+      } else {
+        setError(err instanceof Error ? err.message : t("properties.savingError"));
+      }
     } finally {
       setSaving(false);
     }
@@ -183,7 +207,30 @@ function PropertyFormModal({ initial, onSave, onClose }: PropertyFormModalProps)
             </select>
             <p className="text-xs text-neutral-500 mt-1">{t("properties.languageHint")}</p>
           </div>
-          {error && <p className="text-xs text-neutral-700 bg-neutral-100 rounded-lg px-3 py-2">{error}</p>}
+          {error && errorCode === "PROPERTY_LIMIT_EXCEEDED" ? (
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={15} className="text-neutral-500 mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-black">{t("properties.planLimitReached")}</p>
+                  <p className="text-xs text-neutral-600">{t("properties.planLimitUpgradeHint")}</p>
+                </div>
+              </div>
+              {onGoToBilling && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => { onClose(); onGoToBilling(); }}
+                  className="w-full bg-black text-white hover:bg-neutral-800 gap-1.5 rounded-lg"
+                >
+                  {t("properties.upgradeNow")}
+                  <ArrowUpRight size={13} />
+                </Button>
+              )}
+            </div>
+          ) : error ? (
+            <p className="text-xs text-neutral-700 bg-neutral-100 rounded-lg px-3 py-2">{error}</p>
+          ) : null}
           <div className="flex gap-2 justify-end pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="border-neutral-200">
               {t("common.cancel")}
@@ -566,6 +613,7 @@ export default function PropertyListPage({
         <PropertyFormModal
           onSave={handleCreate}
           onClose={() => setShowForm(false)}
+          onGoToBilling={onShowBilling}
         />
       )}
 

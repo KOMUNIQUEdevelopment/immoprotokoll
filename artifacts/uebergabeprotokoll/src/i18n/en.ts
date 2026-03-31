@@ -96,6 +96,9 @@ const en: Translations = {
     uploadPhoto: "Upload photo",
     languageLabel: "Property language",
     languageHint: "Applies to the report editor, PDF export, and tenant view.",
+    planLimitReached: "Free plan limit reached",
+    planLimitUpgradeHint: "Your free plan allows only 1 property. Upgrade to a paid plan to manage more properties.",
+    upgradeNow: "Upgrade now",
   },
   protocols: {
     protocol: "Report",
