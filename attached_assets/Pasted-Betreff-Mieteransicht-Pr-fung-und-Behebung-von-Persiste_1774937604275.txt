@@ -1,0 +1,33 @@
+Betreff: Mieteransicht – Prüfung und Behebung von Persistenz- und Verfügbarkeitsproblemen
+
+Bitte analysiere den aktuellen Stand des Projekts und prüfe, ob die folgenden Probleme vorhanden sind. Falls ja, setze die beschriebenen Fixes um.
+
+Hintergrund / Ursache:
+
+Der API-Server läuft in einem Replit-Deployment-Container, dessen Dateisystem ephemer ist — d.h. bei jedem Container-Neustart (alle 15–20 Minuten) werden alle zur Laufzeit erstellten Dateien gelöscht. Eine data/protocols.json-Datei überlebt diesen Neustart nicht. Nach dem Neustart ist der Server leer, bis der Vermieter-Browser sich wieder verbindet (was 2–3 Minuten dauern kann). In diesem Fenster bekommt die Mieteransicht einen 404-Fehler.
+
+Fix 1 — PostgreSQL statt Datei-Persistenz (api-server/src/index.ts)
+
+Prüfe ob die Protokoll-Persistenz aktuell über readFileSync/writeFileSync auf eine data/protocols.json Datei läuft. Falls ja:
+
+Richte Replit's eingebaute PostgreSQL-Datenbank ein (DATABASE_URL Umgebungsvariable)
+Erstelle zwei Tabellen:
+protocols (id TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ)
+signatures (id TEXT PRIMARY KEY, data_url TEXT NOT NULL, updated_at TIMESTAMPTZ)
+Ersetze alle readFileSync/writeFileSync-Aufrufe durch async PostgreSQL-Queries (pg-Paket, Pool mit DATABASE_URL)
+Beim Server-Start: alle Protokolle und Signaturen aus der DB laden (SELECT * FROM protocols)
+Bei jeder Änderung (WS-update, POST /sign): Protokoll in DB speichern (INSERT ... ON CONFLICT DO UPDATE)
+Signaturen zusätzlich in der signatures-Tabelle persistieren
+Im GET /api/photos-Endpoint: falls eine sig_-ID nicht im In-Memory-Cache ist, aus signatures-Tabelle nachladen
+Die photos.json-Persistenz komplett entfernen — Fotos bleiben nur im RAM (sie werden vom Client bei Reconnect neu hochgeladen; die große Datei verursacht Performance-Probleme)
+SSL für die DB-Verbindung: ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+Fix 2 — Unbegrenzte Retries in der Mieteransicht (TenantViewPage.tsx)
+
+Prüfe ob der fetch-Retry-Loop für die Mieteransicht eine feste Obergrenze hat (z.B. n < 10). Falls ja:
+
+Die feste Retry-Grenze entfernen — der Loop soll unbegrenzt laufen
+Exponential-Backoff einbauen: Math.min(4000 * Math.pow(2, Math.max(0, attempt - 1)), 30000) — also 4s → 8s → 16s → 30s, dann immer 30s
+Ladeanzeige: Ab dem zweiten Versuch Text „Warte auf Synchronisierung… Das Protokoll wird geladen sobald der Vermieter die App öffnet. Diese Seite prüft automatisch alle paar Sekunden." sowie einen „Manuell neu laden"-Button anzeigen
+Einen permanenten „Nicht verfügbar"-Fehlerscreen soll es nicht mehr geben — nur bei echten Netzwerkfehlern (nicht bei 404)
+Die WS-Verbindung bleibt in jedem Zustand aktiv — wenn der Vermieter-Browser sich reconnectet und das Protokoll pusht, soll die Mieteransicht es sofort anzeigen (auch wenn der HTTP-Retry noch läuft)
+Nach der Umsetzung: Bestehende Protokolldaten aus einer evtl. vorhandenen data/protocols.json in die neue Datenbank migrieren, damit keine Daten verloren gehen.

@@ -162,7 +162,7 @@ interface TenantViewPageProps {
   protocolId: string;
 }
 
-type LoadState = "loading" | "loaded" | "not-found" | "error";
+type LoadState = "loading" | "loaded" | "not-found" | "error" | "waiting";
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -179,8 +179,12 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
+  const [retryAttempt, setRetryAttempt] = useState(0);
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
   const fetchedPhotoIds = useRef<Set<string>>(new Set());
 
   const tr = getTranslations(propertyLanguage) as Translations;
@@ -269,21 +273,42 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   }, [protocolId, hydrateAndSet]);
 
   useEffect(() => {
-    fetch(`/api/protocol/${protocolId}`)
-      .then(res => {
-        if (res.status === 404) throw Object.assign(new Error(), { code: "not-found" });
-        if (!res.ok) throw new Error("error");
-        return res.json();
-      })
-      .then((data: { protocol: ProtocolData; propertyLanguage?: string | null }) => {
-        if (data.propertyLanguage && ["de-CH", "de-DE", "en"].includes(data.propertyLanguage)) {
-          setPropertyLanguage(data.propertyLanguage as SupportedLanguage);
-        }
-        void hydrateAndSet(data.protocol);
-      })
-      .catch((err: Error & { code?: string }) => {
-        setLoadState(err.code === "not-found" ? "not-found" : "error");
-      });
+    retryCountRef.current = 0;
+    setRetryAttempt(0);
+
+    const doFetch = () => {
+      fetch(`/api/protocol/${protocolId}`)
+        .then(res => {
+          if (!res.ok) throw Object.assign(new Error(), { status: res.status });
+          return res.json();
+        })
+        .then((data: { protocol: ProtocolData; propertyLanguage?: string | null }) => {
+          if (data.propertyLanguage && ["de-CH", "de-DE", "en"].includes(data.propertyLanguage)) {
+            setPropertyLanguage(data.propertyLanguage as SupportedLanguage);
+          }
+          void hydrateAndSet(data.protocol);
+        })
+        .catch((err: { status?: number }) => {
+          const attempt = retryCountRef.current++;
+          setRetryAttempt(retryCountRef.current);
+
+          if (err.status === 404 && attempt >= 20) {
+            setLoadState("not-found");
+            return;
+          }
+
+          if (attempt >= 1) setLoadState("waiting");
+
+          const delay = Math.min(4000 * Math.pow(2, Math.max(0, attempt - 1)), 30000);
+          retryTimerRef.current = setTimeout(doFetch, delay);
+        });
+    };
+
+    doFetch();
+
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
   }, [protocolId, hydrateAndSet]);
 
   useEffect(() => {
@@ -374,6 +399,23 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <Loader2 size={30} className="animate-spin" />
           <p className="text-sm">{tr.tenant.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadState === "waiting") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-card border border-border rounded-2xl p-6 space-y-4 text-center shadow-md">
+          <Loader2 size={28} className="animate-spin mx-auto text-muted-foreground" />
+          <h1 className="font-bold text-base">{tr.tenant.waitingForSync}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">{tr.tenant.waitingMessage}</p>
+          <p className="text-xs text-muted-foreground">({tr.tenant.reload} #{retryAttempt})</p>
+          <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="gap-1.5">
+            <RefreshCw size={13} />
+            {tr.tenant.manualReload}
+          </Button>
         </div>
       </div>
     );
