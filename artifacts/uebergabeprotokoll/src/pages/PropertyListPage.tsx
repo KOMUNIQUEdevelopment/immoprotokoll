@@ -159,7 +159,16 @@ function PropertyFormModal({ initial, onSave, onClose, onGoToBilling }: Property
         setError(err.message);
         setErrorCode(err.code);
       } else {
-        setError(err instanceof Error ? err.message : t("properties.savingError"));
+        const raw = err instanceof Error ? err.message : t("properties.savingError");
+        // Last-resort: if the message is a JSON string (e.g. from a stale cached
+        // build that couldn't parse the response), extract the fields manually.
+        try {
+          const parsed = JSON.parse(raw);
+          setError(parsed.error || raw);
+          setErrorCode(parsed.code || "");
+        } catch {
+          setError(raw);
+        }
       }
     } finally {
       setSaving(false);
