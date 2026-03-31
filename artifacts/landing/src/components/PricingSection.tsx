@@ -127,7 +127,7 @@ function PricingCard({ name, price, currency, period, limits, cta, href, highlig
     >
       <h3 className="text-xl font-bold mb-4">{name}</h3>
       <div className="mb-6">
-        <span className="text-4xl font-black tracking-tight">
+        <span className={currency ? "text-4xl font-black tracking-tight" : "text-2xl font-bold tracking-tight"}>
           {currency && <span className="text-xl mr-1">{currency}</span>}
           {price}
         </span>
