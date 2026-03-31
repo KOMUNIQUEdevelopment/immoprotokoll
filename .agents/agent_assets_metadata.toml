@@ -6,6 +6,12 @@ uri = "file://attached_assets/generated_images/app-illustration.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "dhhMDnTC17HzGWGoZVHd5"
+uri = "file://attached_assets/generated_images/app-illustration-v2.png"
+type = "image"
+title = "grayscale schematic app screens"
+
 [[outputs]]
 id = "eZisqpFSQUy273E2RKLEQ"
 uri = "file://attached_assets/stock_images/property_inspection_1.jpg"

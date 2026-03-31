@@ -5,7 +5,7 @@ import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 export default function LandingPage() {
   const { t, lang } = useLanguage();
@@ -58,29 +58,6 @@ export default function LandingPage() {
   };
 
   const base = import.meta.env.BASE_URL;
-  const slides = useMemo(() => {
-    const all = [
-      { src: `${base}slides/slide-1.jpg`, alt: lang === "de" ? "Vermieter mit Hausmodell" : "Landlord with house model", bg: "#41C5BD" },
-      { src: `${base}slides/slide-2.jpg`, alt: lang === "de" ? "Nachdenklicher Vermieter" : "Thoughtful property owner", bg: "#F0F0F0" },
-      { src: `${base}slides/slide-3.jpg`, alt: lang === "de" ? "Lächelnder Mann mit Hausmodell" : "Smiling man with house model", bg: "#41C5BD" },
-      { src: `${base}slides/slide-4.jpg`, alt: lang === "de" ? "Frau mit Hausmodell" : "Woman with house model", bg: "#4A8EC9" },
-      { src: `${base}slides/slide-5.jpg`, alt: lang === "de" ? "Junge Frau mit Hausmodell" : "Young woman with house model", bg: "#4A8EC9" },
-      { src: `${base}slides/slide-6.jpg`, alt: lang === "de" ? "Elegant gekleidete Frau mit Hausmodell" : "Elegantly dressed woman with house model", bg: "#4A8EC9" },
-    ];
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
-    }
-    return all;
-  }, []);
-
-  const [activeSlide, setActiveSlide] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveSlide(i => (i + 1) % slides.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [slides.length]);
 
   return (
     <div className="min-h-screen bg-white text-black font-sans selection:bg-black selection:text-white flex flex-col">
@@ -130,7 +107,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* PHOTO SLIDER */}
+        {/* APP ILLUSTRATION */}
         <section className="px-4 pb-24 overflow-hidden">
           <motion.div
             initial="hidden"
@@ -139,27 +116,12 @@ export default function LandingPage() {
             variants={fadeUp}
             className="container mx-auto max-w-6xl"
           >
-            <div className="relative w-full aspect-[16/7] rounded-lg overflow-hidden shadow-xl bg-black">
-              {slides.map((slide, i) => (
-                <img
-                  key={i}
-                  src={slide.src}
-                  alt={slide.alt}
-                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ease-in-out"
-                  style={{ opacity: i === activeSlide ? 1 : 0 }}
-                />
-              ))}
-              {/* dot indicators */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                {slides.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveSlide(i)}
-                    aria-label={`Slide ${i + 1}`}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${i === activeSlide ? "bg-white scale-125" : "bg-white/40 hover:bg-white/70"}`}
-                  />
-                ))}
-              </div>
+            <div className="w-full rounded-lg overflow-hidden bg-white">
+              <img
+                src={`${base}app-illustration.png`}
+                alt={lang === "de" ? "ImmoProtokoll App – Checkliste, Fotos, Unterschrift" : "ImmoProtokoll App – checklist, photos, signature"}
+                className="w-full h-auto object-contain"
+              />
             </div>
           </motion.div>
         </section>
@@ -284,13 +246,7 @@ export default function LandingPage() {
         </section>
 
         {/* BOTTOM CTA */}
-        <section
-          className="py-32 text-black text-center px-4"
-          style={{
-            backgroundColor: slides[activeSlide].bg,
-            transition: "background-color 1200ms ease-in-out",
-          }}
-        >
+        <section className="py-32 bg-black/5 text-black text-center px-4">
           <motion.div 
             initial="hidden"
             whileInView="visible"
