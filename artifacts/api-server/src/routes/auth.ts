@@ -5,10 +5,16 @@ import {
   accountsTable,
   usersTable,
   sessionsTable,
+  passwordResetTokensTable,
   type SafeUser,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, lt } from "drizzle-orm";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
+import {
+  sendWelcomeEmail,
+  sendTeamInviteEmail,
+  sendPasswordResetEmail,
+} from "../lib/email";
 
 const router = Router();
 
@@ -88,6 +94,9 @@ router.post("/register", async (req: Request, res: Response) => {
 
   res.cookie(SESSION_COOKIE, session.id, sessionOptions());
   res.status(201).json({ user: toSafeUser(user), account });
+
+  // Send welcome email async (don't await — don't block the response)
+  sendWelcomeEmail(normalizedEmail, user.firstName, account.name).catch(() => {});
 });
 
 router.post("/login", async (req: Request, res: Response) => {
@@ -316,8 +325,135 @@ router.post(
 
     const { passwordHash: _pw, ...safeUser } = user;
     res.status(201).json({ user: safeUser });
+
+    // Send team-invite email async (include temp password in plaintext once — they should change it)
+    const inviterName = [req.user!.firstName, req.user!.lastName].filter(Boolean).join(" ") || req.user!.email;
+    sendTeamInviteEmail(
+      email.trim().toLowerCase(),
+      firstName?.trim() ?? "",
+      req.account?.name ?? "",
+      inviterName,
+      password,
+    ).catch(() => {});
   }
 );
+
+// ── Forgot password — request a reset link ────────────────────────────────────
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    res.status(400).json({ error: "email is required" });
+    return;
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Always respond with success to prevent user enumeration
+  res.json({ ok: true });
+
+  try {
+    const users = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, normalizedEmail))
+      .limit(1);
+
+    if (users.length === 0) return; // Silently skip — don't reveal existence
+
+    const user = users[0];
+
+    // Expire any existing unused tokens for this user
+    await db
+      .update(passwordResetTokensTable)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(passwordResetTokensTable.userId, user.id),
+          isNull(passwordResetTokensTable.usedAt),
+        )
+      );
+
+    // Generate a secure random token
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
+
+    await db.insert(passwordResetTokensTable).values({
+      userId: user.id,
+      email: normalizedEmail,
+      token,
+      expiresAt,
+    });
+
+    const APP_BASE = process.env.APP_BASE_URL ?? "https://immoprotokoll.com";
+    const resetUrl = `${APP_BASE}/app/#/reset-password/${token}`;
+
+    await sendPasswordResetEmail(normalizedEmail, user.firstName, resetUrl);
+  } catch (err) {
+    // Log but don't surface errors — response already sent
+    console.error("forgot-password error:", err);
+  }
+});
+
+// ── Reset password — consume token and set new password ───────────────────────
+router.post("/reset-password", async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body as { token?: string; newPassword?: string };
+
+  if (!token || !newPassword) {
+    res.status(400).json({ error: "token and newPassword are required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
+    return;
+  }
+
+  const rows = await db
+    .select()
+    .from(passwordResetTokensTable)
+    .where(
+      and(
+        eq(passwordResetTokensTable.token, token),
+        isNull(passwordResetTokensTable.usedAt),
+      )
+    )
+    .limit(1);
+
+  const resetToken = rows[0];
+
+  if (!resetToken) {
+    res.status(400).json({ error: "Invalid or expired reset link" });
+    return;
+  }
+
+  if (resetToken.expiresAt < new Date()) {
+    res.status(400).json({ error: "Reset link has expired — please request a new one" });
+    return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await db
+      .update(usersTable)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(usersTable.id, resetToken.userId));
+
+    await db
+      .update(passwordResetTokensTable)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokensTable.id, resetToken.id));
+
+    // Invalidate all active sessions for this user after password reset
+    await db.delete(sessionsTable).where(eq(sessionsTable.userId, resetToken.userId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // ── Remove an account member (owner only) ─────────────────────────────────────
 router.delete(

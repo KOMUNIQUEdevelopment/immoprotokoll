@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 interface LoginPageProps {
   onLogin: (email: string, password: string) => Promise<{ error?: string }>;
   onGoToRegister: () => void;
+  onGoToForgotPassword?: () => void;
 }
 
-export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
+export default function LoginPage({ onLogin, onGoToRegister, onGoToForgotPassword }: LoginPageProps) {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -84,6 +85,18 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
               </button>
             </div>
           </div>
+
+          {onGoToForgotPassword && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onGoToForgotPassword}
+                className="text-xs text-neutral-500 hover:text-black transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           {error && (
             <p className="text-xs text-foreground font-medium">{error}</p>

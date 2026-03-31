@@ -15,6 +15,8 @@ import SuperadminPage from "./pages/SuperadminPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { useSync } from "./hooks/useSync";
@@ -621,7 +623,7 @@ function SwUpdatePopup({
   );
 }
 
-type AuthScreen = "login" | "register";
+type AuthScreen = "login" | "register" | "forgot-password";
 
 function hashToInitialScreen(hash: string, pathname: string): AppScreen {
   if (pathname.endsWith("/pricing") || hash === "#/pricing") return "pricing";
@@ -636,6 +638,7 @@ export default function App() {
   const hash = window.location.hash;
   const pathname = window.location.pathname;
   const viewMatch = hash.match(/^#\/view\/(.+)$/);
+  const resetMatch = hash.match(/^#\/reset-password\/(.+)$/);
   const isPricingPage = pathname.endsWith("/pricing") || hash === "#/pricing";
 
   const { user, account, loading, login, register, logout, updateLanguage, isImpersonating, endImpersonation } = useAuth();
@@ -650,6 +653,21 @@ export default function App() {
     return (
       <QueryClientProvider client={queryClient}>
         <TenantViewPage protocolId={viewMatch[1]} />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
+  if (resetMatch) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ResetPasswordPage
+          token={resetMatch[1]}
+          onSuccess={() => {
+            window.location.hash = "";
+            setAuthScreen("login");
+          }}
+        />
         <Toaster />
       </QueryClientProvider>
     );
@@ -691,11 +709,16 @@ export default function App() {
           <LoginPage
             onLogin={login}
             onGoToRegister={() => setAuthScreen("register")}
+            onGoToForgotPassword={() => setAuthScreen("forgot-password")}
           />
-        ) : (
+        ) : authScreen === "register" ? (
           <RegisterPage
             onRegister={register}
             onGoToLogin={() => setAuthScreen("login")}
+          />
+        ) : (
+          <ForgotPasswordPage
+            onBack={() => setAuthScreen("login")}
           />
         )}
         <Toaster />

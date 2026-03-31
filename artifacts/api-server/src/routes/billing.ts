@@ -8,9 +8,16 @@ import {
   propertiesTable,
   syncProtocolsTable,
   stripeSettingsTable,
+  usersTable,
 } from "@workspace/db";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import {
+  sendSubscriptionActiveEmail,
+  sendSubscriptionCanceledEmail,
+  sendPaymentFailedEmail,
+  sendPlanChangedEmail,
+} from "../lib/email";
 
 const router = Router();
 
@@ -335,19 +342,49 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
+// ── Helper: look up the owner of an account ───────────────────────────────────
+async function getAccountOwner(accountId: string): Promise<{ email: string; firstName: string } | null> {
+  try {
+    const rows = await db
+      .select({ email: usersTable.email, firstName: usersTable.firstName })
+      .from(usersTable)
+      .where(eq(usersTable.accountId, accountId))
+      .limit(10);
+    // Prefer owner role; fall back to first user found
+    const owner = rows.find(r => (r as { role?: string }).role === "owner") ?? rows[0];
+    return owner ?? null;
+  } catch { return null; }
+}
+
+async function getAccountOwnerByCustomerId(customerId: string): Promise<{ email: string; firstName: string; accountId: string } | null> {
+  try {
+    const accounts = await db
+      .select({ id: accountsTable.id })
+      .from(accountsTable)
+      .where(eq(accountsTable.stripeCustomerId, customerId))
+      .limit(1);
+    if (!accounts[0]) return null;
+    const owner = await getAccountOwner(accounts[0].id);
+    return owner ? { ...owner, accountId: accounts[0].id } : null;
+  } catch { return null; }
+}
+
 // ── Webhook event handler ─────────────────────────────────────────────────────
 async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string, PlanInfo>) {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
-      await syncSubscription(sub, priceIdLookup);
+      const previousPlan = (event.data.previous_attributes as { metadata?: { plan?: string } } | undefined)
+        ?.metadata?.plan;
+      await syncSubscription(sub, priceIdLookup, previousPlan);
       break;
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
       const accountId = sub.metadata?.accountId;
       if (accountId) {
+        const oldPlan = sub.metadata?.plan ?? "free";
         await db
           .update(accountsTable)
           .set({
@@ -363,6 +400,8 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
           .set({ status: "canceled", canceledAt: new Date(), updatedAt: new Date() })
           .where(eq(subscriptionsTable.accountId, accountId));
         logger.info({ accountId }, "Subscription canceled — downgraded to free");
+        const owner = await getAccountOwner(accountId);
+        if (owner) sendSubscriptionCanceledEmail(owner.email, owner.firstName, oldPlan).catch(() => {});
       }
       break;
     }
@@ -379,6 +418,8 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
           .set({ status: "past_due", updatedAt: new Date() })
           .where(eq(subscriptionsTable.stripeCustomerId, customerId));
         logger.warn({ customerId }, "Invoice payment failed — marked past_due");
+        const owner = await getAccountOwnerByCustomerId(customerId);
+        if (owner) sendPaymentFailedEmail(owner.email, owner.firstName).catch(() => {});
       }
       break;
     }
@@ -387,7 +428,7 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
   }
 }
 
-async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<string, PlanInfo>) {
+async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<string, PlanInfo>, previousPlan?: string) {
   const accountId = sub.metadata?.accountId;
   if (!accountId) {
     logger.warn({ subId: sub.id }, "Subscription missing accountId metadata");
@@ -458,6 +499,21 @@ async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<str
   }
 
   logger.info({ accountId, plan, status: sub.status }, "Subscription synced");
+
+  // Send billing email async — don't block webhook response
+  if (stripeStatus === "active" || stripeStatus === "trialing") {
+    const owner = await getAccountOwner(accountId);
+    if (owner) {
+      const nextBillingDate = periodEnd.toLocaleDateString("en-GB", {
+        day: "2-digit", month: "long", year: "numeric",
+      });
+      if (previousPlan && previousPlan !== plan) {
+        sendPlanChangedEmail(owner.email, owner.firstName, previousPlan, plan).catch(() => {});
+      } else {
+        sendSubscriptionActiveEmail(owner.email, owner.firstName, plan, interval, nextBillingDate).catch(() => {});
+      }
+    }
+  }
 }
 
 export default router;
