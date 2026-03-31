@@ -33,7 +33,7 @@ export default function LoginPage({ onLogin, onGoToRegister }: LoginPageProps) {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
           <img
-            src="/immoprotokoll-logo.png"
+            src={`${import.meta.env.BASE_URL}immoprotokoll-logo-black.png`}
             alt="ImmoProtokoll"
             className="h-10 mx-auto"
           />

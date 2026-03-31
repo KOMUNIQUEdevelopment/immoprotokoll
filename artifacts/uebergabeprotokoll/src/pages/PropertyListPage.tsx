@@ -288,8 +288,8 @@ export default function PropertyListPage({
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-7" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            <span className="font-semibold text-sm text-black hidden sm:inline">{t("properties.properties")}</span>
+            <img src={`${import.meta.env.BASE_URL}immoprotokoll-logo-black.png`} alt="ImmoProtokoll" className="h-7 w-7 rounded-sm" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            <span className="font-semibold text-sm text-black">ImmoProtokoll</span>
           </div>
           <div className="flex items-center gap-2">
             <InstallButton />

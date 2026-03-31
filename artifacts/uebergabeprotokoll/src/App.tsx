@@ -677,7 +677,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-10" />
+          <img src={`${import.meta.env.BASE_URL}immoprotokoll-logo-black.png`} alt="ImmoProtokoll" className="h-10 w-10 rounded-sm" />
           <div className="w-5 h-5 border-2 border-neutral-200 border-t-black rounded-full animate-spin" />
         </div>
       </div>
