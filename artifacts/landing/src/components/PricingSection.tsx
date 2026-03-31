@@ -17,46 +17,54 @@ export default function PricingSection() {
           viewport={{ once: true, margin: "-100px" }}
           className="text-center max-w-3xl mx-auto mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-10">
             {t.pricing.title}
           </h2>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-8">
-            <div className="flex items-center gap-3 bg-black/5 p-1 rounded-full relative">
-              <div 
-                className="absolute inset-y-1 bg-white rounded-full shadow-sm transition-all duration-300 ease-in-out"
-                style={{
-                  width: isAnnual ? 'calc(50% + 20px)' : 'calc(50% - 20px)',
-                  left: isAnnual ? 'calc(50% - 20px)' : '4px',
-                  zIndex: 0
-                }}
-              />
-              <button 
+
+          {/* Billing period toggle */}
+          <div className="flex items-center justify-center mb-5">
+            <div className="inline-flex bg-[hsl(0,0%,93%)] p-1.5 rounded-2xl gap-1.5">
+              <button
                 onClick={() => setIsAnnual(false)}
-                className={`relative z-10 px-6 py-2 rounded-full text-sm font-bold transition-colors ${!isAnnual ? 'text-black' : 'text-black/60 hover:text-black'}`}
+                className={`px-8 py-3 rounded-xl text-base font-bold transition-all duration-200 ${
+                  !isAnnual
+                    ? 'bg-white text-black shadow-md'
+                    : 'text-[hsl(0,0%,50%)] hover:text-black'
+                }`}
               >
                 {t.pricing.monthly}
               </button>
-              <button 
+              <button
                 onClick={() => setIsAnnual(true)}
-                className={`relative z-10 px-6 py-2 rounded-full text-sm font-bold transition-colors ${isAnnual ? 'text-black' : 'text-black/60 hover:text-black'} flex items-center`}
+                className={`px-8 py-3 rounded-xl text-base font-bold transition-all duration-200 flex items-center gap-2.5 ${
+                  isAnnual
+                    ? 'bg-white text-black shadow-md'
+                    : 'text-[hsl(0,0%,50%)] hover:text-black'
+                }`}
               >
                 {t.pricing.annual}
-                <span className="ml-2 text-[10px] bg-black text-white px-2 py-0.5 rounded-full leading-none tracking-wider">-20%</span>
+                <span className="text-[11px] font-black bg-black text-white px-2 py-0.5 rounded-full tracking-wider">
+                  −20%
+                </span>
               </button>
             </div>
+          </div>
 
-            <div className="flex items-center gap-2">
-              {(["CHF", "EUR", "USD"] as const).map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCurrency(c)}
-                  className={`text-sm font-bold px-2 py-1 transition-all ${currency === c ? 'underline underline-offset-4' : 'opacity-50 hover:opacity-100'}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+          {/* Currency switcher */}
+          <div className="flex items-center justify-center gap-2">
+            {(["CHF", "EUR", "USD"] as const).map(c => (
+              <button
+                key={c}
+                onClick={() => setCurrency(c)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black tracking-wide border-2 transition-all duration-200 ${
+                  currency === c
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-[hsl(0,0%,55%)] border-[hsl(0,0%,88%)] hover:border-[hsl(0,0%,50%)] hover:text-black'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
           </div>
         </motion.div>
 
