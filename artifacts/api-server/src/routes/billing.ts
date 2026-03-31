@@ -447,8 +447,11 @@ async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<str
   const currency = fromPriceId?.currency ?? sub.metadata?.currency ?? "chf";
 
   const stripeStatus = sub.status as "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "incomplete";
-  const periodEnd = new Date((sub as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000);
-  const periodStart = new Date((sub as Stripe.Subscription & { current_period_start: number }).current_period_start * 1000);
+
+  const rawEnd = (sub as Stripe.Subscription & { current_period_end?: number | null }).current_period_end;
+  const rawStart = (sub as Stripe.Subscription & { current_period_start?: number | null }).current_period_start;
+  const periodEnd = rawEnd ? new Date(rawEnd * 1000) : null;
+  const periodStart = rawStart ? new Date(rawStart * 1000) : null;
 
   await db
     .update(accountsTable)
