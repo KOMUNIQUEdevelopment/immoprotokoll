@@ -30,12 +30,13 @@ async function apiFetch(path: string, options?: RequestInit) {
   if (!res.ok) {
     let message = res.statusText;
     let code = "";
+    const text = await res.text().catch(() => "");
     try {
-      const body = await res.json();
+      const body = JSON.parse(text);
       message = body.error || message;
       code = body.code || "";
     } catch {
-      message = await res.text().catch(() => res.statusText) || res.statusText;
+      message = text || message;
     }
     throw new ApiError(message, code);
   }
