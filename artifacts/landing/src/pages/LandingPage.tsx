@@ -177,29 +177,60 @@ export default function LandingPage() {
               {t.walkthrough.title}
             </motion.h2>
             
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
-              variants={staggerContainer}
-              className="grid grid-cols-2 md:grid-cols-5 gap-6"
-            >
-              {t.walkthrough.steps.map((step, i) => (
-                <motion.div
-                  key={i}
-                  variants={fadeUp}
-                  className="flex flex-col items-center text-center gap-4"
-                >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-black text-white font-bold text-lg shrink-0">
-                    {i + 1}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg mb-1">{step.title}</h3>
-                    <p className="text-black/60 text-sm leading-relaxed">{step.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+            <div className="relative">
+              {/* Centre line */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-black/10 hidden md:block" />
+
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-100px" }}
+                variants={staggerContainer}
+                className="flex flex-col gap-12"
+              >
+                {t.walkthrough.steps.map((step, i) => {
+                  const isLeft = i % 2 === 0;
+                  return (
+                    <motion.div
+                      key={i}
+                      variants={fadeUp}
+                      className="relative grid grid-cols-[auto_1fr] md:grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-8"
+                    >
+                      {/* Left slot — desktop only */}
+                      {isLeft ? (
+                        <div className="hidden md:block border border-black/10 rounded-lg p-6 bg-white shadow-sm text-right">
+                          <h3 className="font-bold text-lg mb-1">{step.title}</h3>
+                          <p className="text-black/60 text-sm leading-relaxed">{step.desc}</p>
+                        </div>
+                      ) : (
+                        <div className="hidden md:block" />
+                      )}
+
+                      {/* Number bubble */}
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-black text-white font-bold text-lg shrink-0 z-10">
+                        {i + 1}
+                      </div>
+
+                      {/* Right slot — desktop only */}
+                      {!isLeft ? (
+                        <div className="hidden md:block border border-black/10 rounded-lg p-6 bg-white shadow-sm">
+                          <h3 className="font-bold text-lg mb-1">{step.title}</h3>
+                          <p className="text-black/60 text-sm leading-relaxed">{step.desc}</p>
+                        </div>
+                      ) : (
+                        <div className="hidden md:block" />
+                      )}
+
+                      {/* Mobile: card inline next to bubble */}
+                      <div className="md:hidden border border-black/10 rounded-lg p-4 bg-white shadow-sm">
+                        <h3 className="font-bold text-base mb-1">{step.title}</h3>
+                        <p className="text-black/60 text-sm leading-relaxed">{step.desc}</p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            </div>
           </div>
         </section>
 
