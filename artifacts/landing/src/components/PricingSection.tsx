@@ -123,7 +123,7 @@ function PricingCard({ name, price, currency, period, limits, cta, href, highlig
       viewport={{ once: true, margin: "-50px" }}
       transition={{ delay }}
       whileHover={{ y: -5 }}
-      className={`border ${highlight ? 'border-black border-2' : 'border-black/20'} p-8 flex flex-col bg-white h-full`}
+      className={`border ${highlight ? 'border-black border-2' : 'border-black/20'} rounded-lg p-8 flex flex-col bg-white h-full`}
     >
       <h3 className="text-xl font-bold mb-4">{name}</h3>
       <div className="mb-6">
