@@ -4,6 +4,7 @@ import authRouter from "./auth";
 import propertiesRouter from "./properties";
 import billingRouter from "./billing";
 import superadminRouter from "./superadmin";
+import { supportPublicRouter, supportAdminRouter } from "./support";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,7 @@ router.use("/auth", authRouter);
 router.use("/properties", propertiesRouter);
 router.use("/billing", billingRouter);
 router.use("/superadmin", superadminRouter);
+router.use("/support", supportPublicRouter);
+router.use("/superadmin/support", supportAdminRouter);
 
 export default router;

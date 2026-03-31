@@ -6,3 +6,5 @@ export * from "./sync";
 export * from "./subscriptions";
 export * from "./stripeSettings";
 export * from "./passwordResetTokens";
+export * from "./supportTickets";
+export * from "./supportAgents";

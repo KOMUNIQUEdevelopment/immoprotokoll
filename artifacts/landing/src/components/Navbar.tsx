@@ -48,6 +48,9 @@ export default function Navbar() {
           <button onClick={() => scrollToSection('faq')} className="hover:opacity-60 transition-opacity">
             {t.nav.faq}
           </button>
+          <button onClick={() => scrollToSection('contact')} className="hover:opacity-60 transition-opacity">
+            {t.nav.contact}
+          </button>
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
@@ -82,6 +85,9 @@ export default function Navbar() {
           </button>
           <button onClick={() => scrollToSection('faq')} className="text-left font-medium text-lg py-2 border-b border-black/5">
             {t.nav.faq}
+          </button>
+          <button onClick={() => scrollToSection('contact')} className="text-left font-medium text-lg py-2 border-b border-black/5">
+            {t.nav.contact}
           </button>
           
           <div className="flex items-center justify-between pt-4">

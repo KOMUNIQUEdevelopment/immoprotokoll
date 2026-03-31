@@ -4,10 +4,12 @@ import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
 import {
   Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
   AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera, ArrowUpRight,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage } from "../i18n";
+import SupportModal from "../components/SupportModal";
 
 const API_BASE = "/api";
 
@@ -284,6 +286,7 @@ export default function PropertyListPage({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name-asc");
+  const [showSupport, setShowSupport] = useState(false);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetRef = useRef<string | null>(null);
@@ -395,6 +398,14 @@ export default function PropertyListPage({
                 <ShieldCheck size={16} />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setShowSupport(true)}
+              className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
+              title={t("support.openSupport")}
+            >
+              <HelpCircle size={16} />
+            </button>
             {onLogout && (
               <button
                 type="button"
@@ -632,6 +643,10 @@ export default function PropertyListPage({
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+
+      {showSupport && (
+        <SupportModal onClose={() => setShowSupport(false)} />
       )}
     </div>
   );

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, ChevronLeft, ChevronRight, Users, FileText, Building2,
-  Settings, LogOut, Shield, ArrowLeft, Check, X, ExternalLink,
+  Settings, LogOut, Shield, ArrowLeft, Check, X,
   RefreshCw, Eye, CreditCard, AlertTriangle, CheckCircle2,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import SuperadminSupportTab from "./SuperadminSupportTab";
 
 const API = "/api";
 
@@ -511,7 +513,10 @@ interface Props {
   onEndImpersonation: () => Promise<void>;
 }
 
+type AdminTab = "accounts" | "support";
+
 export default function SuperadminPage({ onBack, isImpersonating, onEndImpersonation }: Props) {
+  const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
   const [stats, setStats] = useState<Stats | null>(null);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -625,9 +630,35 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
           <Shield size={16} className="text-[hsl(0,0%,30%)]" />
           <h1 className="text-sm font-semibold text-[hsl(0,0%,10%)]">Superadmin Dashboard</h1>
         </div>
+        <div className="ml-auto flex items-center gap-1 border border-[hsl(0,0%,88%)] rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveTab("accounts")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "accounts"
+                ? "bg-[hsl(0,0%,8%)] text-white"
+                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
+            }`}
+          >
+            <Building2 size={13} /> Konten
+          </button>
+          <button
+            onClick={() => setActiveTab("support")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "support"
+                ? "bg-[hsl(0,0%,8%)] text-white"
+                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
+            }`}
+          >
+            <MessageSquare size={13} /> Support
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
+        {activeTab === "support" ? (
+          <SuperadminSupportTab />
+        ) : (
+        <>
         <div className={`flex flex-col ${selectedAccountId ? "w-1/2 border-r border-[hsl(0,0%,88%)]" : "w-full"}`}>
           {stats && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b border-[hsl(0,0%,90%)]">
@@ -740,6 +771,8 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
               onEdit={(acc) => setEditingAccount(acc)}
             />
           </div>
+        )}
+        </>
         )}
       </main>
 

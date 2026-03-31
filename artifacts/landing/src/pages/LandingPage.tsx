@@ -5,7 +5,7 @@ import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Camera, PenLine, FileDown, Share2, Monitor, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type FormEvent } from "react";
 
 export default function LandingPage() {
   const { t, lang } = useLanguage();
@@ -276,6 +276,9 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* SUPPORT / CONTACT */}
+        <ContactSection lang={lang} />
+
         {/* BOTTOM CTA */}
         <section className="py-32 bg-white text-black text-center px-4">
           <motion.div 
@@ -306,6 +309,143 @@ export default function LandingPage() {
 
       <Footer />
     </div>
+  );
+}
+
+function ContactSection({ lang }: { lang: string }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isDE = lang === "de";
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
+      setError(isDE ? "Bitte füllen Sie alle Felder aus." : "Please fill in all fields.");
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), subject: subject.trim(), message: message.trim() }),
+      });
+      const d = await r.json() as { ok?: boolean; error?: string };
+      if (!r.ok || !d.ok) throw new Error(d.error ?? "Failed");
+      setSent(true);
+    } catch {
+      setError(isDE ? "Fehler beim Senden. Bitte versuchen Sie es erneut." : "Failed to send. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <section id="contact" className="py-24 bg-black text-white px-4">
+      <div className="container mx-auto max-w-2xl">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
+            {isDE ? "Kontakt & Support" : "Contact & Support"}
+          </h2>
+          <p className="text-white/60 text-lg font-medium">
+            {isDE
+              ? "Haben Sie Fragen? Wir helfen Ihnen gerne weiter."
+              : "Have questions? We're happy to help."}
+          </p>
+        </div>
+
+        {sent ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 rounded-full border-2 border-white/20 flex items-center justify-center mx-auto mb-6">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold mb-3">{isDE ? "Anfrage gesendet" : "Request sent"}</h3>
+            <p className="text-white/60">
+              {isDE
+                ? "Wir haben Ihre Anfrage erhalten und melden uns in Kürze bei Ihnen."
+                : "We've received your request and will get back to you shortly."}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1.5">{isDE ? "Name" : "Name"}</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={isDE ? "Ihr vollständiger Name" : "Your full name"}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1.5">{isDE ? "E-Mail" : "Email"}</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={isDE ? "ihre@email.com" : "your@email.com"}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-1.5">{isDE ? "Betreff" : "Subject"}</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder={isDE ? "Womit können wir helfen?" : "How can we help?"}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-1.5">{isDE ? "Nachricht" : "Message"}</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={5}
+                placeholder={isDE ? "Beschreiben Sie Ihr Anliegen…" : "Describe your issue…"}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 resize-none"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-white/60 bg-white/10 rounded-lg px-4 py-3">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={sending}
+              className="w-full bg-white text-black px-7 py-3 text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors tracking-wide disabled:opacity-50"
+            >
+              {sending
+                ? (isDE ? "Wird gesendet…" : "Sending…")
+                : (isDE ? "Anfrage senden" : "Send request")}
+            </button>
+
+            <p className="text-center text-sm text-white/40">
+              {isDE ? "Oder schreiben Sie uns direkt: " : "Or write to us directly: "}
+              <a href="mailto:support@immoprotokoll.com" className="text-white/70 hover:text-white underline underline-offset-2">
+                support@immoprotokoll.com
+              </a>
+            </p>
+          </form>
+        )}
+      </div>
+    </section>
   );
 }
 

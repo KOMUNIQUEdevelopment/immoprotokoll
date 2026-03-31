@@ -541,6 +541,27 @@ const deCH = {
     phonePlaceholder: "Telefonnummer",
     emailPlaceholder: "E-Mail-Adresse",
   },
+  support: {
+    title: "Support",
+    subtitle: "Wie können wir helfen? Wir melden uns so schnell wie möglich.",
+    nameLabel: "Name",
+    namePlaceholder: "Ihr vollständiger Name",
+    emailLabel: "E-Mail",
+    emailPlaceholder: "ihre@email.com",
+    subjectLabel: "Betreff",
+    subjectPlaceholder: "Womit können wir helfen?",
+    messageLabel: "Nachricht",
+    messagePlaceholder: "Beschreiben Sie Ihr Anliegen…",
+    allFieldsRequired: "Bitte füllen Sie alle Felder aus.",
+    sendError: "Fehler beim Senden. Bitte versuchen Sie es erneut.",
+    sentTitle: "Anfrage gesendet",
+    sentBody: "Wir haben Ihre Anfrage erhalten und melden uns in Kürze bei Ihnen.",
+    send: "Anfrage senden",
+    sending: "Wird gesendet…",
+    cancel: "Abbrechen",
+    close: "Schliessen",
+    openSupport: "Support",
+  },
 };
 
 export default deCH;

@@ -6,6 +6,7 @@ export const translations = {
       features: "Funktionen",
       pricing: "Preise",
       faq: "FAQ",
+      contact: "Kontakt",
       start_free: "Kostenlos starten",
       login: "Login"
     },
@@ -93,6 +94,7 @@ export const translations = {
       features: "Features",
       pricing: "Pricing",
       faq: "FAQ",
+      contact: "Contact",
       start_free: "Start free",
       login: "Log in"
     },

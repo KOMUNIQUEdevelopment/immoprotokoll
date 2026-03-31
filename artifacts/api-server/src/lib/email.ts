@@ -359,6 +359,66 @@ export async function sendTenantInviteEmail(opts: {
   await send(to, subject, html);
 }
 
+/** Sent to support@immoprotokoll.com when a new ticket is submitted */
+export async function sendSupportTicketEmail(opts: {
+  ticketId: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  accountId?: string;
+}): Promise<void> {
+  const { ticketId, name, email, subject, message, accountId } = opts;
+  const html = emailShell(`
+    ${heading("New Support Request")}
+    ${body(`A new support ticket has been submitted.`)}
+    ${divider()}
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;width:100%;">
+      ${detail("Ticket ID", ticketId.slice(0, 8).toUpperCase())}
+      ${detail("Name", name)}
+      ${detail("Email", `<a href="mailto:${email}" style="color:#444;">${email}</a>`)}
+      ${detail("Subject", subject)}
+      ${accountId ? detail("Account ID", accountId) : ""}
+    </table>
+    <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin-bottom:24px;">
+      <p style="margin:0 0 8px 0;font-size:12px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Message</p>
+      <p style="margin:0;font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+    </div>
+    ${button("Reply to sender", `mailto:${email}?subject=Re: ${encodeURIComponent(subject)} [#${ticketId.slice(0, 8).toUpperCase()}]`)}
+  `);
+  await send(SUPPORT_EMAIL, `[Support] ${subject} — ${name}`, html);
+}
+
+/** Sent to a support agent when a ticket is assigned to them */
+export async function sendSupportTicketAssignedEmail(opts: {
+  agentName: string;
+  agentEmail: string;
+  ticketId: string;
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+}): Promise<void> {
+  const { agentName, agentEmail, ticketId, senderName, senderEmail, subject, message } = opts;
+  const html = emailShell(`
+    ${heading("Support ticket assigned to you")}
+    ${body(`Hi ${agentName},`)}
+    ${body(`A support ticket has been assigned to you. Please follow up with the customer as soon as possible.`)}
+    ${divider()}
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;width:100%;">
+      ${detail("Ticket ID", ticketId.slice(0, 8).toUpperCase())}
+      ${detail("From", `${senderName} &lt;<a href="mailto:${senderEmail}" style="color:#444;">${senderEmail}</a>&gt;`)}
+      ${detail("Subject", subject)}
+    </table>
+    <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin-bottom:24px;">
+      <p style="margin:0 0 8px 0;font-size:12px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Message</p>
+      <p style="margin:0;font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+    </div>
+    ${button("Reply to customer", `mailto:${senderEmail}?subject=Re: ${encodeURIComponent(subject)} [#${ticketId.slice(0, 8).toUpperCase()}]`)}
+  `);
+  await send(agentEmail, `[Support assigned] ${subject}`, html);
+}
+
 /** Sent when a plan is changed (upgrade or downgrade) */
 export async function sendPlanChangedEmail(
   email: string,
