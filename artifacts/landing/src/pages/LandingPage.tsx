@@ -277,7 +277,7 @@ export default function LandingPage() {
         </section>
 
         {/* BOTTOM CTA */}
-        <section className="py-32 bg-black/5 text-black text-center px-4">
+        <section className="py-32 bg-white text-black text-center px-4">
           <motion.div 
             initial="hidden"
             whileInView="visible"
@@ -295,7 +295,7 @@ export default function LandingPage() {
             </p>
             <a 
               href="https://app.immoprotokoll.com" 
-              className="inline-block bg-black text-white px-10 py-5 text-xl font-bold rounded-lg hover:bg-black/80 transition-colors shadow-lg"
+              className="inline-block bg-black text-white px-7 py-3 text-sm font-semibold rounded-lg hover:bg-black/80 transition-colors tracking-wide"
             >
               {t.hero.cta_primary}
             </a>
