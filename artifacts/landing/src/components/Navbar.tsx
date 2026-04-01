@@ -9,8 +9,8 @@ export default function Navbar() {
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const toggleLang = () => {
-    const newLang = lang === "de" ? "en" : "de";
+  const switchLang = (newLang: "de" | "en") => {
+    if (newLang === lang) return;
     const newPath = location.replace(`/${lang}`, `/${newLang}`);
     setLocation(newPath);
   };
@@ -57,9 +57,19 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
-          <button onClick={toggleLang} className="text-sm font-bold uppercase hover:opacity-60">
-            {lang === "de" ? "DE / en" : "de / EN"}
-          </button>
+          <div className="flex items-center rounded-lg border border-neutral-200 overflow-hidden text-xs font-semibold">
+            {(["de", "en"] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => switchLang(l)}
+                className={`px-3 py-1.5 transition-colors uppercase ${
+                  lang === l ? "bg-black text-white" : "text-neutral-500 hover:bg-neutral-50"
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
           <a href="/app/" className="text-sm font-medium hover:underline">
             {t.nav.login}
           </a>
@@ -97,9 +107,19 @@ export default function Navbar() {
           </button>
           
           <div className="flex items-center justify-between pt-4">
-            <button onClick={toggleLang} className="font-bold uppercase">
-              Language: {lang}
-            </button>
+            <div className="flex items-center rounded-lg border border-neutral-200 overflow-hidden text-sm font-semibold">
+              {(["de", "en"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => switchLang(l)}
+                  className={`px-4 py-2 transition-colors uppercase ${
+                    lang === l ? "bg-black text-white" : "text-neutral-500 hover:bg-neutral-50"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
             <a href="/app/" className="font-medium">
               {t.nav.login}
             </a>
