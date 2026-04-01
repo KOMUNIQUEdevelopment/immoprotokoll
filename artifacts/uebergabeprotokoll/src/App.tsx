@@ -19,6 +19,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
+import { PwaInstallBanner } from "./components/PwaInstallBanner";
 import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
@@ -399,6 +400,7 @@ function AppContent({
             onChangeLang={onChangeLang}
           />
           <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+          <PwaInstallBanner suppressWhenUpdatePending={needsUpdate} />
         </>
       );
     }
@@ -421,6 +423,7 @@ function AppContent({
           onRename={renameProtocol}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
+        <PwaInstallBanner suppressWhenUpdatePending={needsUpdate} />
       </>
     );
   }
