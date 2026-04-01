@@ -94,63 +94,67 @@ export default function PricingPage({
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-neutral-200 sticky top-0 z-40 bg-white">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onBack}
-              className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors"
-            >
-              <ArrowLeft size={16} />
-            </button>
-            <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-7" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-neutral-200 overflow-hidden text-xs font-medium">
-              {(["CHF", "EUR", "USD"] as Currency[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCurrency(c)}
-                  className={`px-3 py-1.5 transition-colors ${
-                    currency === c ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center rounded-lg border border-neutral-200 overflow-hidden text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => setInterval("monthly")}
-                className={`px-3 py-1.5 transition-colors ${
-                  interval === "monthly" ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
-                }`}
-              >
-                {t("pricing.intervalMonthly")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setInterval("annual")}
-                className={`px-3 py-1.5 transition-colors ${
-                  interval === "annual" ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
-                }`}
-              >
-                {t("pricing.intervalAnnual")}
-                <span className="ml-1 text-neutral-400 font-normal">{t("pricing.annualDiscount")}</span>
-              </button>
-            </div>
-          </div>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-black transition-colors"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <img src="/immoprotokoll-logo.png" alt="ImmoProtokoll" className="h-7" />
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-12">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-black mb-3">{t("pricing.title")}</h1>
           <p className="text-neutral-500 text-base max-w-lg mx-auto">
             {t("pricing.subtitle")}
           </p>
+        </div>
+
+        {/* Currency + interval selectors — prominently above the table */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+          <div className="flex items-center rounded-xl border border-neutral-200 overflow-hidden text-sm font-medium shadow-sm">
+            {(["CHF", "EUR", "USD"] as Currency[]).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
+                className={`px-5 py-2.5 transition-colors ${
+                  currency === c ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center rounded-xl border border-neutral-200 overflow-hidden text-sm font-medium shadow-sm">
+            <button
+              type="button"
+              onClick={() => setInterval("monthly")}
+              className={`px-5 py-2.5 transition-colors ${
+                interval === "monthly" ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              {t("pricing.intervalMonthly")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setInterval("annual")}
+              className={`px-5 py-2.5 transition-colors flex items-center gap-2 ${
+                interval === "annual" ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              {t("pricing.intervalAnnual")}
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                interval === "annual" ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-500"
+              }`}>
+                {t("pricing.annualDiscount")}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
