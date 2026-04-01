@@ -4,7 +4,7 @@ import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
 import {
   Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
   AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera, ArrowUpRight,
-  HelpCircle,
+  HelpCircle, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -297,6 +297,7 @@ export default function PropertyListPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name-asc");
   const [showSupport, setShowSupport] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetRef = useRef<string | null>(null);
@@ -407,6 +408,43 @@ export default function PropertyListPage({
               >
                 <ShieldCheck size={16} />
               </button>
+            )}
+            {onChangeLang && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowLangMenu(v => !v)}
+                  className="flex items-center gap-1 p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
+                  title={LANGUAGE_LABELS[userLang as SupportedLanguage] ?? userLang}
+                >
+                  <Globe size={15} />
+                  <span className="text-xs font-medium hidden sm:inline">
+                    {userLang === "de-CH" ? "DE-CH" : userLang === "de-DE" ? "DE-DE" : "EN"}
+                  </span>
+                </button>
+                {showLangMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
+                    <div className="absolute right-0 top-9 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl min-w-[160px] py-1 overflow-hidden">
+                      {SUPPORTED_LANGUAGES.map(lang => (
+                        <button
+                          key={lang}
+                          type="button"
+                          onClick={() => { onChangeLang(lang); setShowLangMenu(false); }}
+                          className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
+                            lang === userLang
+                              ? "font-semibold text-black bg-neutral-50"
+                              : "text-neutral-600 hover:bg-neutral-50"
+                          }`}
+                        >
+                          {LANGUAGE_LABELS[lang]}
+                          {lang === userLang && <Check size={13} className="text-black" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             <button
               type="button"
