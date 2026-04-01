@@ -608,7 +608,7 @@ export default function PropertyListPage({
                       );
                     })()}
                   </button>
-                  <div className="flex items-center gap-1 pr-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 pr-3 shrink-0">
                     <button
                       type="button"
                       onClick={e => { e.stopPropagation(); setEditTarget(property); }}

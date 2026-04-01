@@ -491,7 +491,7 @@ export default function PropertyProtocolsPage({
                         )}
                       </div>
                     </button>
-                    <div className="flex items-center gap-1 px-4 pb-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 px-4 pb-3">
                       <button
                         type="button"
                         onClick={() => setRenameTarget(protocol)}
