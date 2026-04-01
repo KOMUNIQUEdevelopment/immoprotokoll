@@ -46,6 +46,35 @@ export function useBilling() {
     }
   }, []);
 
+  const startUpgrade = useCallback(async (targetPlan: "agentur"): Promise<{ success?: boolean; noSubscription?: boolean; error?: string }> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/upgrade", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPlan }),
+      });
+      if (res.ok) {
+        return { success: true };
+      }
+      const err = await res.json() as { error: string };
+      if (err.error === "NO_SUBSCRIPTION") {
+        return { noSubscription: true };
+      }
+      const msg = err.error ?? i18n.t("billing.checkoutFailed");
+      setError(msg);
+      return { error: msg };
+    } catch {
+      const msg = i18n.t("billing.checkoutError");
+      setError(msg);
+      return { error: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const openPortal = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -73,5 +102,5 @@ export function useBilling() {
     }
   }, []);
 
-  return { loading, error, startCheckout, openPortal };
+  return { loading, error, startCheckout, startUpgrade, openPortal };
 }

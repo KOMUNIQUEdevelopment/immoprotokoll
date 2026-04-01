@@ -289,6 +289,108 @@ router.post(
   }
 );
 
+// ── POST /api/billing/upgrade ─────────────────────────────────────────────────
+// Upgrades an existing paid subscription to a higher plan (e.g. privat → agentur).
+// Keeps the same billing interval and currency. Uses Stripe subscription update
+// with proration so the customer is charged the difference immediately.
+router.post(
+  "/upgrade",
+  requireAuth,
+  requireRole("owner"),
+  async (req: AuthRequest, res: Response) => {
+    const { targetPlan } = req.body as { targetPlan?: string };
+
+    if (!targetPlan || !["privat", "agentur"].includes(targetPlan)) {
+      res.status(400).json({ error: "Invalid target plan" });
+      return;
+    }
+
+    const mode = await getStripeMode();
+    if (!getStripeSecretKey(mode)) {
+      res.status(503).json({ error: "Stripe not configured" });
+      return;
+    }
+
+    const accountId = req.user!.accountId;
+    try {
+      const [account] = await db
+        .select({
+          plan: accountsTable.plan,
+          stripeSubscriptionId: accountsTable.stripeSubscriptionId,
+          billingInterval: accountsTable.billingInterval,
+          currency: accountsTable.currency,
+        })
+        .from(accountsTable)
+        .where(eq(accountsTable.id, accountId))
+        .limit(1);
+
+      if (!account) {
+        res.status(404).json({ error: "Account not found" });
+        return;
+      }
+
+      // Validate upgrade direction (must go up)
+      const ORDER: Record<string, number> = { free: 0, privat: 1, agentur: 2, custom: 3 };
+      if ((ORDER[targetPlan] ?? 0) <= (ORDER[account.plan] ?? 0)) {
+        res.status(400).json({ error: "Target plan must be higher than current plan" });
+        return;
+      }
+
+      if (!account.stripeSubscriptionId) {
+        // No active subscription — caller should use /checkout instead
+        res.status(422).json({ error: "NO_SUBSCRIPTION" });
+        return;
+      }
+
+      const interval = (account.billingInterval ?? "monthly") as "monthly" | "annual";
+      const currency = (account.currency ?? "chf").toLowerCase();
+
+      const newPriceId = await getStripePriceId(
+        targetPlan as "privat" | "agentur",
+        interval,
+        currency,
+        mode
+      );
+
+      if (!newPriceId) {
+        res.status(422).json({
+          error: `No Stripe price configured for ${targetPlan}/${interval}/${currency} (mode: ${mode})`,
+        });
+        return;
+      }
+
+      const stripe = makeStripe(mode);
+
+      // Retrieve subscription to get the item ID we need to replace
+      const stripeSub = await stripe.subscriptions.retrieve(account.stripeSubscriptionId);
+      const item = stripeSub.items.data[0];
+      if (!item) {
+        res.status(500).json({ error: "Subscription item not found" });
+        return;
+      }
+
+      // Update subscription — Stripe handles proration automatically
+      await stripe.subscriptions.update(account.stripeSubscriptionId, {
+        items: [{ id: item.id, price: newPriceId }],
+        proration_behavior: "create_prorations",
+        metadata: { accountId, plan: targetPlan, interval, currency },
+      });
+
+      // Optimistically update DB; the webhook will do a full sync shortly after
+      await db
+        .update(accountsTable)
+        .set({ plan: targetPlan as "privat" | "agentur", updatedAt: new Date() })
+        .where(eq(accountsTable.id, accountId));
+
+      logger.info({ accountId, from: account.plan, to: targetPlan }, "Plan upgraded");
+      res.json({ success: true, plan: targetPlan });
+    } catch (err) {
+      logger.error({ err }, "Error upgrading subscription");
+      res.status(500).json({ error: "Failed to upgrade subscription" });
+    }
+  }
+);
+
 // ── POST /api/billing/portal ──────────────────────────────────────────────────
 router.post(
   "/portal",

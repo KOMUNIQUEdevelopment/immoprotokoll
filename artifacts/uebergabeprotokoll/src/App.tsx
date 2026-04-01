@@ -351,9 +351,33 @@ function AppContent({
         <PricingPage
           onBack={() => setAppScreen("protocols")}
           onSelectPlan={async (plan, interval, currency) => {
-            const result = await billing.startCheckout({ plan, interval, currency });
-            if (result.error) {
-              toast({ title: t("protocols.paymentFailed"), description: result.error, variant: "destructive" });
+            const currentPlan = account?.plan;
+            const ORDER: Record<string, number> = { free: 0, privat: 1, agentur: 2, custom: 3 };
+            const isUpgrade =
+              plan === "agentur" &&
+              (ORDER[currentPlan ?? "free"] ?? 0) > 0 &&
+              (ORDER[currentPlan ?? "free"] ?? 0) < ORDER[plan];
+
+            if (isUpgrade) {
+              // Existing subscriber upgrading — update subscription in-place, no new checkout
+              const result = await billing.startUpgrade(plan);
+              if (result.success) {
+                setAppScreen("billing-success");
+              } else if (result.noSubscription) {
+                // Fallback: no active subscription found, proceed with checkout
+                const checkoutResult = await billing.startCheckout({ plan, interval, currency });
+                if (checkoutResult.error) {
+                  toast({ title: t("protocols.paymentFailed"), description: checkoutResult.error, variant: "destructive" });
+                }
+              } else if (result.error) {
+                toast({ title: t("protocols.paymentFailed"), description: result.error, variant: "destructive" });
+              }
+            } else {
+              // New subscriber — standard Stripe Checkout session
+              const result = await billing.startCheckout({ plan, interval, currency });
+              if (result.error) {
+                toast({ title: t("protocols.paymentFailed"), description: result.error, variant: "destructive" });
+              }
             }
           }}
           currentPlan={account?.plan}

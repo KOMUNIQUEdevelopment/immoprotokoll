@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, CreditCard, ExternalLink, Check, AlertTriangle, RefreshCw, Lock, Building2, FileText } from "lucide-react";
+import { ArrowLeft, CreditCard, ExternalLink, Check, AlertTriangle, RefreshCw, Lock, Building2, FileText, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
@@ -65,6 +65,9 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState("");
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
+  const [upgraded, setUpgraded] = useState(false);
 
   const isOwner = !userRole || userRole === "owner";
 
@@ -109,6 +112,56 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
     } finally {
       setPortalLoading(false);
     }
+  };
+
+  const handleUpgrade = async (targetPlan: "agentur") => {
+    setUpgradeLoading(true);
+    setUpgradeError("");
+    try {
+      const res = await fetch("/api/billing/upgrade", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPlan }),
+      });
+      if (res.ok) {
+        setUpgraded(true);
+        // Reload subscription info to reflect new plan
+        await loadSubscription();
+      } else {
+        const err = await res.json() as { error: string };
+        if (err.error === "NO_SUBSCRIPTION") {
+          // Shouldn't happen in this path but redirect to pricing as fallback
+          onShowPricing();
+        } else {
+          setUpgradeError(err.error ?? t("billing.connectionError"));
+        }
+      }
+    } catch {
+      setUpgradeError(t("billing.connectionError"));
+    } finally {
+      setUpgradeLoading(false);
+    }
+  };
+
+  // Agentur price in the user's billing currency + interval
+  const AGENTUR_PRICES: Record<string, { monthly: number; annual: number }> = {
+    chf: { monthly: 49, annual: 470.40 },
+    eur: { monthly: 49, annual: 470.40 },
+    usd: { monthly: 49, annual: 470.40 },
+  };
+
+  const CURRENCY_SYMBOL: Record<string, string> = { chf: "CHF", eur: "€", usd: "$" };
+
+  const getAgenturPrice = () => {
+    if (!sub) return "CHF 49";
+    const cur = (sub.currency ?? "chf").toLowerCase();
+    const prices = AGENTUR_PRICES[cur] ?? AGENTUR_PRICES.chf;
+    const symbol = CURRENCY_SYMBOL[cur] ?? "CHF";
+    if (sub.billingInterval === "annual") {
+      return `${symbol} ${prices.annual.toFixed(2)} / Jahr`;
+    }
+    return `${symbol} ${prices.monthly} / Monat`;
   };
 
   const langToLocale = (lang: string) => {
@@ -280,6 +333,67 @@ export default function BillingPage({ onBack, onShowPricing, accountId: _account
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upgrade card: Privat → Agentur */}
+            {isOwner && sub.plan === "privat" && !upgraded && (
+              <div className="rounded-2xl border border-neutral-200 p-5 mb-6">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div>
+                    <p className="text-xs text-neutral-400 font-medium uppercase tracking-wide mb-1">Upgrade verfügbar</p>
+                    <p className="text-sm font-semibold text-black">Auf Agentur wechseln</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      Mehr Immobilien, Team-Zugang, volle Skalierung
+                    </p>
+                  </div>
+                  <Building2 size={18} className="text-neutral-300 shrink-0 mt-1" />
+                </div>
+                <ul className="space-y-1.5 mb-4">
+                  {[
+                    "Bis zu 50 Immobilien",
+                    "30 Protokolle pro Immobilie",
+                    "Team-Mitglieder einladen",
+                    "Prioritätssupport",
+                  ].map(f => (
+                    <li key={f} className="flex items-center gap-2 text-xs text-neutral-600">
+                      <Check size={12} className="text-black shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                {upgradeError && (
+                  <p className="text-xs text-black bg-neutral-100 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                    <AlertTriangle size={12} className="shrink-0" />
+                    {upgradeError}
+                  </p>
+                )}
+                <Button
+                  className="w-full bg-black text-white hover:bg-neutral-800 gap-2"
+                  onClick={() => handleUpgrade("agentur")}
+                  disabled={upgradeLoading}
+                >
+                  {upgradeLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
+                  {upgradeLoading
+                    ? "Upgrade wird durchgeführt…"
+                    : `Auf Agentur upgraden — ${getAgenturPrice()}`}
+                </Button>
+                <p className="text-xs text-neutral-400 text-center mt-2">
+                  Anteilige Abrechnung ab heute. Kein Abbruch nötig.
+                </p>
+              </div>
+            )}
+
+            {/* Upgrade success notice */}
+            {upgraded && (
+              <div className="flex items-start gap-3 bg-neutral-50 border border-neutral-200 rounded-xl p-4 mb-6">
+                <Check size={16} className="text-black shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-black">Upgrade erfolgreich</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Du nutzt jetzt den Agentur-Plan. Die Änderung ist sofort aktiv.
+                  </p>
                 </div>
               </div>
             )}
