@@ -4,7 +4,7 @@ import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
 import {
   Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
   AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera, ArrowUpRight,
-  HelpCircle, Globe,
+  HelpCircle, Globe, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ interface PropertyListPageProps {
   onShowBilling?: () => void;
   onShowPricing?: () => void;
   onShowSuperadmin?: () => void;
+  onShowTeam?: () => void;
   currentPlan?: string;
   userLang?: string;
   onChangeLang?: (lang: SupportedLanguage) => void;
@@ -282,6 +283,7 @@ export default function PropertyListPage({
   onShowBilling,
   onShowPricing,
   onShowSuperadmin,
+  onShowTeam,
   currentPlan = "free",
   userLang = "de-CH",
   onChangeLang,
@@ -397,6 +399,16 @@ export default function PropertyListPage({
                 className="flex items-center gap-1 px-2 py-1 rounded-md border border-neutral-200 text-xs font-medium text-neutral-500 hover:bg-neutral-50 hover:text-black transition-colors"
               >
                 {currentPlan === "free" ? "Free" : currentPlan === "privat" ? "Privat" : currentPlan === "agentur" ? "Agentur" : "Custom"}
+              </button>
+            )}
+            {onShowTeam && (
+              <button
+                type="button"
+                onClick={onShowTeam}
+                className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
+                title="Benutzerverwaltung"
+              >
+                <Users size={16} />
               </button>
             )}
             {onShowSuperadmin && (

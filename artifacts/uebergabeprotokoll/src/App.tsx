@@ -12,6 +12,7 @@ import PropertyProtocolsPage from "./pages/PropertyProtocolsPage";
 import PricingPage from "./pages/PricingPage";
 import BillingPage from "./pages/BillingPage";
 import SuperadminPage from "./pages/SuperadminPage";
+import TeamPage from "./pages/TeamPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -57,7 +58,7 @@ function formatRelative(date: Date | null, t: (key: string, opts?: Record<string
 
 type EditorTab = "protokoll" | "unterschriften";
 
-type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel" | "superadmin";
+type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel" | "superadmin" | "team";
 
 function LanguageSelector({
   currentLang,
@@ -106,6 +107,7 @@ function LanguageSelector({
 function AppContent({
   onLogout,
   accountId,
+  userId,
   account,
   userRole,
   userLang,
@@ -117,6 +119,7 @@ function AppContent({
 }: {
   onLogout: () => void;
   accountId: string;
+  userId: string;
   account: { plan: "free" | "privat" | "agentur" | "custom" } | null;
   userRole?: "owner" | "administrator" | "property_manager";
   userLang: string;
@@ -407,6 +410,16 @@ function AppContent({
       );
     }
 
+    if (appScreen === "team") {
+      return (
+        <TeamPage
+          onBack={() => setAppScreen("protocols")}
+          currentUserId={userId}
+          currentUserRole={userRole ?? "property_manager"}
+        />
+      );
+    }
+
     if (!selectedProperty) {
       return (
         <>
@@ -419,6 +432,12 @@ function AppContent({
             onShowBilling={() => setAppScreen("billing")}
             onShowPricing={() => setAppScreen("pricing")}
             onShowSuperadmin={isSuperAdmin ? () => setAppScreen("superadmin") : undefined}
+            onShowTeam={
+              (account?.plan === "agentur" || account?.plan === "custom") &&
+              (userRole === "owner" || userRole === "administrator")
+                ? () => setAppScreen("team")
+                : undefined
+            }
             currentPlan={account?.plan ?? "free"}
             userLang={userLang}
             onChangeLang={onChangeLang}
@@ -758,6 +777,7 @@ export default function App() {
       <AppContent
         onLogout={logout}
         accountId={user.accountId}
+        userId={user.id}
         account={account}
         userRole={user.role}
         userLang={user.preferredLanguage ?? "de-CH"}
