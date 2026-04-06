@@ -230,12 +230,20 @@ STRIPE_PRICE_AGENTUR_ANNUAL_CHF=price_xxx
 ```
 (plus `_EUR` and `_USD` variants). Add these to `--set-env-vars` in `cloudbuild.yaml`.
 
-### cloudbuild.yaml Substitutions to Update
+### Production URLs
 
-Before first deploy, edit `cloudbuild.yaml` and update:
-- `_SQL_INSTANCE`: `DEIN_PROJEKT:europe-west6:immoprotokoll-db`
-- `_APP_DOMAIN`: comma-separated list of CORS origins
-- `_APP_BASE_URL`: production landing page URL
+- **Cloud Run Service**: `https://immoprotokoll-990431565530.europe-west6.run.app`
+  - Landing Page: `/`
+  - PWA: `/app/`
+  - API Health: `/api/healthz` → `{"status":"ok"}`
+- **Custom domain**: to be connected via GCP Console → Cloud Run → Manage Custom Domains
+
+### cloudbuild.yaml Substitutions (already configured)
+
+Values set in `cloudbuild.yaml`:
+- `_SQL_INSTANCE`: `immoprotokoll-492520:europe-west6:immoprotokoll-db` ✅
+- `_APP_DOMAIN`: `https://immoprotokoll.com,https://app.immoprotokoll.com`
+- `_APP_BASE_URL`: `https://immoprotokoll.com`
 
 ### WebSocket Support
 
