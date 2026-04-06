@@ -1,34 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { ProtocolData, ProtocolSeeds, RoomPhoto, createDefaultProtocol, migrateProtocol } from "./types";
+import { ProtocolData, ProtocolSeeds, createDefaultProtocol, migrateProtocol } from "./types";
 import i18n from "./i18n";
-import { SyncMessage } from "./hooks/useSync";
-import {
-  savePhotosToDb,
-  loadAllPhotosFromDb,
-  deletePhotosFromDb,
-  collectPhotoEntries,
-  uploadPhotosToServer,
-  fetchMissingPhotosFromServer,
-} from "./photoDb";
-
-// Legacy keys — only used for one-time migration when accountId is first set
-const LEGACY_PROTOCOLS_KEY = "uebergabeprotokoll_protocols";
-const LEGACY_LEGACY_KEY = "uebergabeprotokoll_data";
-const LEGACY_TRASH_KEY = "uebergabeprotokoll_trash";
-
-function getProtocolsKey(accountId: string): string {
-  return `immo_protocols_${accountId}`;
-}
-function getTrashKey(accountId: string): string {
-  return `immo_trash_${accountId}`;
-}
+import { uploadPhotosToServer, fetchMissingPhotosFromServer } from "./photoDb";
 
 export interface TrashedEntry {
   protocol: ProtocolData;
-  deletedAt: string; // ISO timestamp
+  deletedAt: string;
 }
 
-// Strip photo dataUrls from a single protocol (used for WS sync)
+// Strip photo dataUrls before sending to server — photos live in sync_photos, not in protocol JSON
 function stripSingleProtocol(p: ProtocolData): ProtocolData {
   return {
     ...p,
@@ -38,191 +18,14 @@ function stripSingleProtocol(p: ProtocolData): ProtocolData {
       ...r,
       photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
     })),
-    // Use null (not "") so the receiving side can distinguish "stripped but
-    // actually signed" from "genuinely unsigned".  The actual dataUrl lives
-    // in IndexedDB / the server photo store.
     personSignatures: (p.personSignatures ?? []).map((s) => ({
       ...s,
-      signatureDataUrl: null,
+      signatureDataUrl: s.signatureDataUrl ?? null,
     })),
   };
 }
 
-// Merge room lists: start from LOCAL rooms (preserving local deletions/additions)
-// and only add rooms from the server that are genuinely new (added on another device).
-// deletedRoomIds is the authoritative list of rooms the user explicitly removed —
-// those are NEVER restored regardless of what the server sends.
-type RoomData = ProtocolData["rooms"][number];
-function mergeRooms(
-  localRooms: RoomData[],
-  remoteRooms: RoomData[],
-  deletedRoomIds: string[]
-): RoomData[] {
-  const deletedSet = new Set(deletedRoomIds);
-  const localRoomIds = new Set(localRooms.map(r => r.id));
-  const merged = localRooms.map(localRoom => {
-    const remoteRoom = remoteRooms.find(r => r.id === localRoom.id);
-    if (!remoteRoom) return localRoom; // not on server, keep local as-is
-    // Merge photos: prefer local with dataUrl, fall back to remote stub
-    const photos = localRoom.photos.map(localPh => {
-      if (localPh.dataUrl) return localPh;
-      return remoteRoom.photos.find(rp => rp.id === localPh.id) ?? localPh;
-    });
-    // Add photo stubs from server not yet known locally (uploaded on another device)
-    const localPhIds = new Set(localRoom.photos.map(p => p.id));
-    const newRemotePhotos = remoteRoom.photos.filter(rp => !localPhIds.has(rp.id));
-    return { ...remoteRoom, photos: [...photos, ...newRemotePhotos] };
-  });
-  // Add rooms only the server knows about (added on another device, never seen locally).
-  // Guard against server rooms whose name+floor already exists locally
-  // (different ID but same logical room — prevents duplicates).
-  const localRoomNameFloors = new Set(
-    localRooms.map(r => `${r.name.trim().toLowerCase()}|${(r.floor ?? "").toLowerCase()}`)
-  );
-  const newServerRooms = remoteRooms.filter(
-    r =>
-      !localRoomIds.has(r.id) &&
-      !deletedSet.has(r.id) &&
-      !localRoomNameFloors.has(
-        `${r.name.trim().toLowerCase()}|${(r.floor ?? "").toLowerCase()}`
-      )
-  );
-  return [...merged, ...newServerRooms];
-}
-
-// Merge two personSignature arrays: prefer non-null values over null ones.
-// "local" wins when remote is stripped/null; remote wins when it has the
-// actual signature (e.g. from the sign endpoint broadcast).
-function mergeSignatures(
-  local: ProtocolData["personSignatures"],
-  remote: ProtocolData["personSignatures"]
-): ProtocolData["personSignatures"] {
-  const result = (remote ?? []).map((rs) => {
-    if (rs.signatureDataUrl) return rs; // remote has the real sig → use it
-    const ls = (local ?? []).find((s) => s.personId === rs.personId);
-    return ls?.signatureDataUrl ? { ...rs, signatureDataUrl: ls.signatureDataUrl } : rs;
-  });
-  // Carry over any local sigs for persons not listed in remote
-  for (const ls of local ?? []) {
-    if (ls.signatureDataUrl && !result.some((s) => s.personId === ls.personId)) {
-      result.push(ls);
-    }
-  }
-  return result;
-}
-
-// Strip photo dataUrls so localStorage only holds tiny metadata
-function stripPhotoDataUrls(
-  protocols: Record<string, ProtocolData>
-): Record<string, ProtocolData> {
-  return Object.fromEntries(
-    Object.entries(protocols).map(([id, p]) => [id, stripSingleProtocol(p)])
-  );
-}
-
-function loadLocalProtocols(key: string): Record<string, ProtocolData> {
-  // Try the namespaced key first
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      const raw = JSON.parse(saved) as Record<string, Record<string, unknown>>;
-      return Object.fromEntries(
-        Object.entries(raw).map(([id, p]) => [id, migrateProtocol(p)])
-      );
-    }
-  } catch (e) {
-    console.warn("Failed to load protocols from localStorage", e);
-  }
-
-  // One-time migration from the legacy global key
-  try {
-    const legacySaved = localStorage.getItem(LEGACY_PROTOCOLS_KEY);
-    if (legacySaved) {
-      const raw = JSON.parse(legacySaved) as Record<string, Record<string, unknown>>;
-      const protocols = Object.fromEntries(
-        Object.entries(raw).map(([id, p]) => [id, migrateProtocol(p)])
-      );
-      // Write to namespaced key and clear legacy key to prevent cross-account reuse
-      localStorage.setItem(key, JSON.stringify(protocols));
-      localStorage.removeItem(LEGACY_PROTOCOLS_KEY);
-      localStorage.removeItem(LEGACY_LEGACY_KEY);
-      return protocols;
-    }
-  } catch {}
-
-  return {};
-}
-
-function loadLocalTrash(key: string): Record<string, TrashedEntry> {
-  // Try namespaced key first
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved) as Record<string, TrashedEntry>;
-  } catch (e) {
-    console.warn("Failed to load trash from localStorage", e);
-  }
-  // One-time migration from legacy key
-  try {
-    const legacySaved = localStorage.getItem(LEGACY_TRASH_KEY);
-    if (legacySaved) {
-      const trash = JSON.parse(legacySaved) as Record<string, TrashedEntry>;
-      localStorage.setItem(key, JSON.stringify(trash));
-      localStorage.removeItem(LEGACY_TRASH_KEY);
-      return trash;
-    }
-  } catch {}
-  return {};
-}
-
-function persistTrash(trash: Record<string, TrashedEntry>, key: string): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(trash));
-  } catch (e) {
-    console.error("localStorage trash save failed", e);
-  }
-}
-
-function persistAll(protocols: Record<string, ProtocolData>, key: string): boolean {
-  // 1a. Save photo blobs + signatures to IndexedDB (fire-and-forget, large data)
-  const photoEntries = collectPhotoEntries(protocols);
-  if (photoEntries.length > 0) {
-    savePhotosToDb(photoEntries).catch((e) =>
-      console.error("IndexedDB photo save failed", e)
-    );
-    // Also upload to server so other devices can fetch them
-    uploadPhotosToServer(photoEntries).catch((e) =>
-      console.warn("Server photo upload failed", e)
-    );
-  }
-
-  // 1b. Delete stale signatures from IndexedDB for persons whose signature is
-  //     currently null (explicitly cleared, or never signed).  Without this,
-  //     a cleared signature would be restored from IndexedDB on the next load.
-  const nullSigIds: string[] = [];
-  for (const p of Object.values(protocols)) {
-    for (const s of p.personSignatures ?? []) {
-      if (s.personId && !s.signatureDataUrl) {
-        nullSigIds.push(`sig_${s.personId}`);
-      }
-    }
-  }
-  if (nullSigIds.length > 0) {
-    deletePhotosFromDb(nullSigIds).catch(() => {});
-  }
-
-  // 2. Save stripped metadata to localStorage (small, sync)
-  try {
-    localStorage.setItem(key, JSON.stringify(stripPhotoDataUrls(protocols)));
-    return true;
-  } catch (e) {
-    console.error("localStorage save failed (quota exceeded?)", e);
-    return false;
-  }
-}
-
-// Collect photo IDs that have no dataUrl (need to be fetched from somewhere).
-// Also includes signature IDs (sig_<personId>) so that signatures uploaded by
-// other devices via /api/photos are fetched and applied on this device too.
+// Collect photo IDs that need to be fetched from the server
 function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string[] {
   const ids: string[] = [];
   for (const p of Object.values(protocols)) {
@@ -237,19 +40,16 @@ function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string
         if (!ph.dataUrl) ids.push(ph.id);
       }
     }
-    // Signatures are uploaded to the server photo store by every device that
-    // holds them (via persistAll → uploadPhotosToServer).  Collect any that
-    // are currently null so they get fetched from the server.
     for (const sig of p.personSignatures ?? []) {
       if (sig.personId && !sig.signatureDataUrl) {
         ids.push(`sig_${sig.personId}`);
       }
     }
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
-// Re-hydrate stripped protocols with photo dataUrls from IndexedDB
+// Hydrate protocol map with fetched photo dataUrls
 function hydratePhotos(
   protocols: Record<string, ProtocolData>,
   photoMap: Record<string, string>
@@ -277,548 +77,419 @@ function hydratePhotos(
         })),
         personSignatures: (p.personSignatures ?? []).map((s) => ({
           ...s,
-          signatureDataUrl:
-            photoMap[`sig_${s.personId}`] ?? s.signatureDataUrl,
+          signatureDataUrl: photoMap[`sig_${s.personId}`] ?? s.signatureDataUrl,
         })),
       },
     ])
   );
 }
 
+// ── One-time migration: upload any localStorage protocols to the cloud ─────────
+// Protocols with syncEnabled:false were only in localStorage (not on server).
+// On first load with the new cloud-only architecture we upload them so no data is lost.
+const MIGRATED_KEY = "immo_cloud_migrated_v1";
+
+async function migrateLocalStorageToCloud(accountId: string): Promise<void> {
+  const migratedKey = `${MIGRATED_KEY}_${accountId}`;
+  if (localStorage.getItem(migratedKey)) return; // already done
+
+  const keys = [
+    `immo_protocols_${accountId}`,
+    "uebergabeprotokoll_protocols",
+  ];
+
+  const allProtocols: Record<string, ProtocolData> = {};
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const data = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+      for (const [id, p] of Object.entries(data)) {
+        if (!allProtocols[id]) {
+          allProtocols[id] = migrateProtocol(p);
+        }
+      }
+    } catch {}
+  }
+
+  if (Object.keys(allProtocols).length === 0) {
+    localStorage.setItem(migratedKey, "1");
+    return;
+  }
+
+  // Upload each protocol to the cloud (skip ones without propertyId)
+  const uploads = Object.values(allProtocols).filter((p) => p.propertyId);
+  for (const p of uploads) {
+    try {
+      await fetch("/api/protocols", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+      });
+      // Ignore errors (409 conflict = already on server from WS sync, that's fine)
+    } catch {}
+  }
+
+  // Mark as migrated and clear legacy localStorage
+  localStorage.setItem(migratedKey, "1");
+  for (const key of [`immo_protocols_${accountId}`, `immo_trash_${accountId}`, "uebergabeprotokoll_protocols", "uebergabeprotokoll_trash", "uebergabeprotokoll_data"]) {
+    try { localStorage.removeItem(key); } catch {}
+  }
+}
+
 export function useProtocolsStore(accountId: string | null) {
-  // Namespace localStorage keys per account to prevent cross-tenant data leakage
-  const protocolsKey = accountId ? getProtocolsKey(accountId) : null;
-  const trashKey = accountId ? getTrashKey(accountId) : null;
-
-  // Stable ref so callbacks always read the latest keys without re-capturing
-  const keysRef = useRef({ protocolsKey, trashKey });
-  keysRef.current = { protocolsKey, trashKey };
-
-  // Key-aware wrappers — safe to call inside any setX updater
-  const saveProt = (protocols: Record<string, ProtocolData>) => {
-    const pk = keysRef.current.protocolsKey;
-    if (pk) persistAll(protocols, pk);
-  };
-  const saveTrash = (trash: Record<string, TrashedEntry>) => {
-    const tk = keysRef.current.trashKey;
-    if (tk) persistTrash(trash, tk);
-  };
-
-  const [protocols, setProtocols] = useState<Record<string, ProtocolData>>(() =>
-    protocolsKey ? loadLocalProtocols(protocolsKey) : {}
-  );
-  const [trashedProtocols, setTrashedProtocols] = useState<Record<string, TrashedEntry>>(() =>
-    trashKey ? loadLocalTrash(trashKey) : {}
-  );
+  const [protocols, setProtocols] = useState<Record<string, ProtocolData>>({});
+  const [trashedProtocols, setTrashedProtocols] = useState<Record<string, TrashedEntry>>({});
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wsSendRef = useRef<((msg: SyncMessage) => void) | null>(null);
 
-  // If accountId changes (different user on same device), reinitialize state from
-  // the new account's namespaced storage so no cross-account data is ever visible.
-  const prevAccountIdRef = useRef<string | null | undefined>(undefined);
+  // Keep a ref to latest protocols so debounced timers always save fresh data
+  const latestProtocols = useRef<Record<string, ProtocolData>>({});
+  latestProtocols.current = protocols;
+
+  // Per-protocol debounced save timers
+  const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // ── Load from server on mount / accountId change ───────────────────────────
   useEffect(() => {
-    if (prevAccountIdRef.current === undefined) {
-      // Skip first render — useState lazy initializer already loaded the right data
-      prevAccountIdRef.current = accountId;
+    if (!accountId) {
+      setIsLoading(false);
+      setProtocols({});
+      setTrashedProtocols({});
       return;
     }
-    if (prevAccountIdRef.current === accountId) return;
-    prevAccountIdRef.current = accountId;
+
+    setIsLoading(true);
     setCurrentId(null);
-    setProtocols(protocolsKey ? loadLocalProtocols(protocolsKey) : {});
-    setTrashedProtocols(trashKey ? loadLocalTrash(trashKey) : {});
-  // Keys derive deterministically from accountId so no stale-closure risk.
+
+    // One-time migration: upload any locally-stored (unsynced) protocols to cloud
+    migrateLocalStorageToCloud(accountId).catch(console.warn);
+
+    Promise.all([
+      fetch("/api/protocols", { credentials: "include" }).then((r) => r.json() as Promise<{ protocols: Record<string, Record<string, unknown>> }>),
+      fetch("/api/protocols/trash", { credentials: "include" }).then((r) => r.json() as Promise<{ trash: Record<string, { protocol: Record<string, unknown>; deletedAt: string }> }>),
+    ])
+      .then(([protData, trashData]) => {
+        const prots: Record<string, ProtocolData> = {};
+        for (const [id, p] of Object.entries(protData.protocols ?? {})) {
+          prots[id] = migrateProtocol(p);
+        }
+
+        const trash: Record<string, TrashedEntry> = {};
+        for (const [id, entry] of Object.entries(trashData.trash ?? {})) {
+          trash[id] = {
+            protocol: migrateProtocol(entry.protocol),
+            deletedAt: entry.deletedAt,
+          };
+        }
+
+        setProtocols(prots);
+        setTrashedProtocols(trash);
+
+        // Fetch photos for all loaded protocols
+        const missingIds = collectMissingPhotoIds(prots);
+        if (missingIds.length > 0) {
+          fetchMissingPhotosFromServer(missingIds)
+            .then((photoMap) => {
+              if (Object.keys(photoMap).length > 0) {
+                setProtocols((prev) => hydratePhotos(prev, photoMap));
+              }
+            })
+            .catch(console.warn);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
+  // ── Internal: save a single protocol to server (debounced 1.5s) ───────────
+  const scheduleSave = useCallback((id: string) => {
+    if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id]);
+    autoSaveTimers.current[id] = setTimeout(() => {
+      const p = latestProtocols.current[id];
+      if (!p) return;
+      fetch(`/api/protocols/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+      })
+        .then(() => setLastSaved(new Date()))
+        .catch(console.warn);
+    }, 1500);
+  }, []);
+
+  // ── Internal: save immediately (flush pending debounce) ────────────────────
+  const flushSave = useCallback((id: string) => {
+    if (autoSaveTimers.current[id]) {
+      clearTimeout(autoSaveTimers.current[id]);
+      delete autoSaveTimers.current[id];
+    }
+    const p = latestProtocols.current[id];
+    if (!p) return;
+    fetch(`/api/protocols/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+    })
+      .then(() => setLastSaved(new Date()))
+      .catch(console.warn);
+  }, []);
+
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
 
-  // Fetch photos that are missing locally from the server and apply them to state.
-  // Called both on mount (after IndexedDB hydration) and after every WS sync event.
-  const fetchAndApplyServerPhotos = useCallback(async (missingIds: string[]) => {
-    if (missingIds.length === 0) return;
-    try {
-      const serverMap = await fetchMissingPhotosFromServer(missingIds);
-      if (Object.keys(serverMap).length === 0) return;
-      // Cache fetched photos in local IndexedDB for offline use
-      savePhotosToDb(
-        Object.entries(serverMap).map(([id, dataUrl]) => ({ id, dataUrl }))
-      ).catch(console.warn);
-      setProtocols((prev) => hydratePhotos(prev, serverMap));
-    } catch (e) {
-      console.warn("Server photo fetch failed", e);
-    }
-  }, []);
-
-  // On mount: load photos from local IndexedDB and hydrate state.
-  useEffect(() => {
-    // Request persistent storage so the browser doesn't evict IndexedDB data
-    if (navigator.storage?.persist) {
-      navigator.storage.persist().catch(() => {});
-    }
-
-    loadAllPhotosFromDb().then(async (photoMap) => {
-      let missingIds: string[] = [];
-      setProtocols((prev) => {
-        const hydrated = hydratePhotos(prev, photoMap);
-        // Migrate legacy embedded photos to IndexedDB if still present
-        const hasEmbedded = Object.values(prev).some(
-          (p) =>
-            (p.kitchenPhotos ?? []).some((ph) => ph.dataUrl) ||
-            p.rooms.some((r) => r.photos.some((ph) => ph.dataUrl)) ||
-            (p.personSignatures ?? []).some((s) => s.signatureDataUrl)
-        );
-        const pk = keysRef.current.protocolsKey;
-        if (hasEmbedded && pk) persistAll(prev, pk);
-        // After IndexedDB hydration, still-missing IDs must come from server
-        missingIds = collectMissingPhotoIds(hydrated);
-        return hydrated;
-      });
-      // Fetch from server after state update (WS init may not have fired yet;
-      // receiveInit will also call this when it does fire)
-      await fetchAndApplyServerPhotos(missingIds);
-
-      // Re-upload all photos found in IndexedDB to the server.
-      // This acts as a retry for any uploads that previously failed (e.g. offline,
-      // network error). The server endpoint uses ON CONFLICT DO UPDATE, so
-      // re-uploading already-present photos is safe and idempotent.
-      if (Object.keys(photoMap).length > 0) {
-        const entries = Object.entries(photoMap).map(([id, dataUrl]) => ({ id, dataUrl }));
-        uploadPhotosToServer(entries).catch(() => {});
-      }
-    }).catch((err) => {
-      console.warn("Photo hydration from IndexedDB failed:", err);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const saveAll = useCallback((all: Record<string, ProtocolData>) => {
-    const pk = keysRef.current.protocolsKey;
-    if (!pk) return false;
-    const ok = persistAll(all, pk);
-    if (ok) setLastSaved(new Date());
-    return ok;
-  }, []);
-
-  const receiveInit = useCallback((remoteProtocols: Record<string, ProtocolData>) => {
-    let missingIds: string[] = [];
-    setProtocols(prev => {
-      const synced = Object.fromEntries(
-        Object.entries(remoteProtocols).map(([id, p]) => [
-          id,
-          { ...migrateProtocol(p as unknown as Record<string, unknown>), syncEnabled: true },
-        ])
-      );
-
-      if (Object.keys(synced).length === 0) {
-        const localSynced = Object.values(prev).filter(p => p.syncEnabled);
-        if (localSynced.length > 0) {
-          setTimeout(() => {
-            localSynced.forEach(p => {
-              wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(p) });
-            });
-          }, 200);
-        }
-        return prev;
-      }
-
-      const merged: Record<string, ProtocolData> = { ...prev };
-
-      Object.entries(synced).forEach(([id, remoteP]) => {
-        const localP = prev[id];
-        if (!localP) {
-          // New protocol on this device — use remote stubs (photo IDs, no dataUrls)
-          merged[id] = remoteP;
-        } else {
-          // Merge deletedRoomIds: union of local + remote so deletions from any
-          // device propagate everywhere.
-          const deletedRoomIds = [
-            ...new Set([
-              ...(localP.deletedRoomIds ?? []),
-              ...(remoteP.deletedRoomIds ?? []),
-            ]),
-          ];
-          // Merge rooms: local list is authoritative; deletedRoomIds blocks restoration.
-          const rooms = mergeRooms(localP.rooms, remoteP.rooms, deletedRoomIds);
-          const mergeFlatPhotos = (local: typeof localP.kitchenPhotos, remote: typeof remoteP.kitchenPhotos) => {
-            const loc = local ?? [];
-            const rem = remote ?? [];
-            const merged2 = loc.map(localPh => {
-              if (localPh.dataUrl) return localPh;
-              return rem.find(rp => rp.id === localPh.id) ?? localPh;
-            });
-            const localIds = new Set(loc.map(p => p.id));
-            return [...merged2, ...rem.filter(rp => !localIds.has(rp.id))];
-          };
-          const meterPhotos = mergeFlatPhotos(localP.meterPhotos, remoteP.meterPhotos);
-          const kitchenPhotos = mergeFlatPhotos(localP.kitchenPhotos, remoteP.kitchenPhotos);
-          // Merge signatures: preserve local non-null values that the remote
-          // doesn't have (remote signatures are always stripped to null on WS).
-          const personSignatures = mergeSignatures(localP.personSignatures, remoteP.personSignatures);
-          merged[id] = { ...remoteP, rooms, meterPhotos, kitchenPhotos, personSignatures, deletedRoomIds, syncEnabled: true };
-        }
-      });
-
-      // Collect IDs still missing dataUrls → need to fetch from server
-      missingIds = collectMissingPhotoIds(merged);
-      saveProt(merged);
-      return merged;
-    });
-    // Trigger server fetch AFTER state update (outside the updater to avoid side-effect issues)
-    if (missingIds.length > 0) {
-      setTimeout(() => fetchAndApplyServerPhotos(missingIds), 0);
-    }
-  }, [fetchAndApplyServerPhotos]);
-
-  const receiveRemote = useCallback((remote: ProtocolData) => {
-    let missingIds: string[] = [];
-    setProtocols(prev => {
-      const existing = prev[remote.id];
-      // Merge deletedRoomIds: union of local + remote.
-      const deletedRoomIds = [
-        ...new Set([
-          ...(existing?.deletedRoomIds ?? []),
-          ...(remote.deletedRoomIds ?? []),
-        ]),
-      ];
-      // Merge rooms: local list is authoritative; deletedRoomIds blocks restoration.
-      const rooms = mergeRooms(existing?.rooms ?? [], remote.rooms, deletedRoomIds);
-      const mergeFlatPhotos2 = (local: RoomPhoto[], remoteArr: RoomPhoto[]) => {
-        const merged2 = local.map(localPh => {
-          if (localPh.dataUrl) return localPh;
-          return remoteArr.find(rp => rp.id === localPh.id) ?? localPh;
-        });
-        const localIds = new Set(local.map(p => p.id));
-        return [...merged2, ...remoteArr.filter(rp => !localIds.has(rp.id))];
-      };
-      const meterPhotos = mergeFlatPhotos2(existing?.meterPhotos ?? [], remote.meterPhotos ?? []);
-      const kitchenPhotos = mergeFlatPhotos2(existing?.kitchenPhotos ?? [], remote.kitchenPhotos ?? []);
-      // Merge signatures: prefer local non-null over remote null/stripped
-      const personSignatures = mergeSignatures(existing?.personSignatures, remote.personSignatures);
-      const merged = { ...remote, rooms, meterPhotos, kitchenPhotos, personSignatures, deletedRoomIds, syncEnabled: true };
-      const next = { ...prev, [remote.id]: merged };
-      missingIds = collectMissingPhotoIds({ [remote.id]: merged });
-      saveProt(next);
-      return next;
-    });
-    if (missingIds.length > 0) {
-      setTimeout(() => fetchAndApplyServerPhotos(missingIds), 0);
-    }
-  }, [fetchAndApplyServerPhotos]);
-
-  const receiveDelete = useCallback((id: string) => {
-    setProtocols(prev => {
-      if (!prev[id]) return prev;
-      const next = { ...prev };
-      delete next[id];
-      saveProt(next);
-      return next;
-    });
-    setCurrentId(prev => (prev === id ? null : prev));
-  }, []);
-
-  const toggleSync = useCallback((id: string) => {
-    setProtocols(prev => {
-      if (!prev[id]) return prev;
-      const current = prev[id];
-      const enabling = !current.syncEnabled;
-      const updated = { ...current, syncEnabled: enabling };
-      const next = { ...prev, [id]: updated };
-      saveProt(next);
-      if (enabling) {
-        setTimeout(() => wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) }), 0);
-      } else {
-        setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
-      }
-      return next;
-    });
-  }, []);
-
-  const renameProtocol = useCallback((id: string, name: string) => {
-    setProtocols(prev => {
-      if (!prev[id]) return prev;
-      const trimmed = name.trim();
-      if (!trimmed) return prev;
-      const updated = { ...prev[id], mietobjekt: trimmed, lastSaved: new Date().toISOString() };
-      const next = { ...prev, [id]: updated };
-      saveProt(next);
-      if (updated.syncEnabled) {
-        wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
-      }
-      return next;
-    });
-  }, []);
-
+  // ── createNew ──────────────────────────────────────────────────────────────
   const createNew = useCallback((propertyId: string | null = null, seeds?: ProtocolSeeds) => {
     const p = createDefaultProtocol(propertyId, seeds);
-    setProtocols(prev => {
-      const next = { ...prev, [p.id]: p };
-      saveProt(next);
-      return next;
-    });
+    // Optimistic UI: add to local state immediately
+    setProtocols((prev) => ({ ...prev, [p.id]: p }));
     setCurrentId(p.id);
+    // Save to server
+    fetch("/api/protocols", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+    }).catch(console.warn);
     return p.id;
   }, []);
 
+  // ── duplicateProtocol ──────────────────────────────────────────────────────
   const duplicateProtocol = useCallback((id: string) => {
-    setProtocols(prev => {
-      const source = prev[id];
-      if (!source) return prev;
-      const newId = crypto.randomUUID();
-      const copy: ProtocolData = {
-        ...JSON.parse(JSON.stringify(source)),
-        id: newId,
-        mietobjekt: (source.mietobjekt ? source.mietobjekt + " " + i18n.t("common.copy") : i18n.t("protocols.unnamed")),
-        syncEnabled: false,
-        lastSaved: new Date().toISOString(),
-        personSignatures: [],
-        rooms: source.rooms.map(r => ({
-          ...r,
-          id: crypto.randomUUID(),
-          photos: r.photos.map(ph => ({ ...ph, id: crypto.randomUUID() })),
-        })),
-        meterPhotos: (source.meterPhotos ?? []).map(ph => ({
-          ...ph,
-          id: crypto.randomUUID(),
-        })),
-        kitchenPhotos: (source.kitchenPhotos ?? []).map(ph => ({
-          ...ph,
-          id: crypto.randomUUID(),
-        })),
-        uebergeber: source.uebergeber.map(p => ({ ...p, id: crypto.randomUUID() })),
-        uebernehmer: source.uebernehmer.map(p => ({ ...p, id: crypto.randomUUID() })),
-        zusatzvereinbarungen: (source.zusatzvereinbarungen ?? []).map(z => ({
-          ...z,
-          id: crypto.randomUUID(),
-        })),
-      };
-      const next = { ...prev, [newId]: copy };
-      saveProt(next);
-      return next;
-    });
+    const source = latestProtocols.current[id];
+    if (!source) return;
+    const newId = crypto.randomUUID();
+    const copy: ProtocolData = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: newId,
+      mietobjekt: source.mietobjekt
+        ? source.mietobjekt + " " + i18n.t("common.copy")
+        : i18n.t("protocols.unnamed"),
+      lastSaved: new Date().toISOString(),
+      personSignatures: [],
+      rooms: source.rooms.map((r) => ({
+        ...r,
+        id: crypto.randomUUID(),
+        photos: r.photos.map((ph) => ({ ...ph, id: crypto.randomUUID() })),
+      })),
+      meterPhotos: (source.meterPhotos ?? []).map((ph) => ({
+        ...ph,
+        id: crypto.randomUUID(),
+      })),
+      kitchenPhotos: (source.kitchenPhotos ?? []).map((ph) => ({
+        ...ph,
+        id: crypto.randomUUID(),
+      })),
+      uebergeber: source.uebergeber.map((p) => ({ ...p, id: crypto.randomUUID() })),
+      uebernehmer: source.uebernehmer.map((p) => ({ ...p, id: crypto.randomUUID() })),
+      zusatzvereinbarungen: (source.zusatzvereinbarungen ?? []).map((z) => ({
+        ...z,
+        id: crypto.randomUUID(),
+      })),
+    };
+    setProtocols((prev) => ({ ...prev, [newId]: copy }));
+    // Upload photos that were on the source (re-use same photo IDs since we gave them new IDs)
+    // Actually the photos have new IDs so they start as stubs (empty dataUrls) — user must re-add
+    // Save to server (stripped)
+    fetch("/api/protocols", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ protocol: stripSingleProtocol(copy) }),
+    }).catch(console.warn);
   }, []);
 
+  // ── renameProtocol ─────────────────────────────────────────────────────────
+  const renameProtocol = useCallback((id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setProtocols((prev) => {
+      if (!prev[id]) return prev;
+      const updated = { ...prev[id], mietobjekt: trimmed, lastSaved: new Date().toISOString() };
+      setTimeout(() => scheduleSave(id), 0);
+      return { ...prev, [id]: updated };
+    });
+  }, [scheduleSave]);
+
+  // ── switchTo ───────────────────────────────────────────────────────────────
   const switchTo = useCallback((id: string) => {
     setCurrentId(id);
-  }, []);
-
-  const backToList = useCallback(() => {
-    // Flush any pending debounced save so that photos (and other unsaved changes)
-    // taken within the 1500ms window are persisted before leaving the protocol.
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-      // Immediately persist latest state to IndexedDB + server
-      setProtocols(latest => {
-        const pk = keysRef.current.protocolsKey;
-        if (pk) persistAll(latest, pk);
-        return latest;
-      });
+    // Fetch photos for this protocol if any are missing
+    const p = latestProtocols.current[id];
+    if (p) {
+      const missingIds = collectMissingPhotoIds({ [id]: p });
+      if (missingIds.length > 0) {
+        fetchMissingPhotosFromServer(missingIds)
+          .then((photoMap) => {
+            if (Object.keys(photoMap).length > 0) {
+              setProtocols((prev) => hydratePhotos(prev, photoMap));
+            }
+          })
+          .catch(console.warn);
+      }
     }
+  }, []);
+
+  // ── backToList ─────────────────────────────────────────────────────────────
+  const backToList = useCallback(() => {
+    if (currentId) flushSave(currentId);
     setCurrentId(null);
-  }, []);
+  }, [currentId, flushSave]);
 
+  // ── deleteProtocol (soft delete → trash) ──────────────────────────────────
   const deleteProtocol = useCallback((id: string) => {
-    // Move to trash instead of permanent deletion.
-    // Photos in IndexedDB are preserved so the protocol can be restored.
-    setProtocols(prev => {
-      const target = prev[id];
-      if (!target) return prev;
-      const wasSync = target.syncEnabled;
-      // Add to trash
-      setTrashedProtocols(t => {
-        const next = { ...t, [id]: { protocol: target, deletedAt: new Date().toISOString() } };
-        saveTrash(next);
-        return next;
-      });
+    const target = latestProtocols.current[id];
+    if (!target) return;
+    // Optimistic UI
+    setTrashedProtocols((prev) => ({
+      ...prev,
+      [id]: { protocol: target, deletedAt: new Date().toISOString() },
+    }));
+    setProtocols((prev) => {
       const next = { ...prev };
       delete next[id];
-      saveProt(next);
-      if (wasSync) {
-        // Remove from server so other devices don't see it anymore
-        setTimeout(() => wsSendRef.current?.({ type: "delete", id }), 0);
-      }
       return next;
     });
-    setCurrentId(prev => (prev === id ? null : prev));
+    setCurrentId((prev) => (prev === id ? null : prev));
+    // Server
+    fetch(`/api/protocols/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(console.warn);
   }, []);
 
+  // ── restoreFromTrash ───────────────────────────────────────────────────────
   const restoreFromTrash = useCallback((id: string) => {
-    setTrashedProtocols(prev => {
-      const entry = prev[id];
-      if (!entry) return prev;
-      // Put the protocol back into active list (sync disabled to avoid surprises)
-      const restored = { ...entry.protocol, syncEnabled: false };
-      setProtocols(p => {
-        const next = { ...p, [id]: restored };
-        saveProt(next);
-        return next;
-      });
+    const entry = trashedProtocols[id];
+    if (!entry) return;
+    const restored = { ...entry.protocol };
+    setProtocols((prev) => ({ ...prev, [id]: restored }));
+    setTrashedProtocols((prev) => {
       const next = { ...prev };
       delete next[id];
-      saveTrash(next);
       return next;
     });
-  }, []);
+    // Server
+    fetch(`/api/protocols/${id}/restore`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(console.warn);
+    // Re-fetch photos
+    const missingIds = collectMissingPhotoIds({ [id]: restored });
+    if (missingIds.length > 0) {
+      fetchMissingPhotosFromServer(missingIds)
+        .then((photoMap) => {
+          if (Object.keys(photoMap).length > 0) {
+            setProtocols((prev) => hydratePhotos(prev, photoMap));
+          }
+        })
+        .catch(console.warn);
+    }
+  }, [trashedProtocols]);
 
+  // ── permanentlyDelete ──────────────────────────────────────────────────────
   const permanentlyDelete = useCallback((id: string) => {
-    setTrashedProtocols(prev => {
-      const entry = prev[id];
-      if (entry) {
-        // Clean up photos from IndexedDB
-        const photoIds: string[] = [
-          ...(entry.protocol.meterPhotos ?? []).map((ph) => ph.id),
-          ...(entry.protocol.kitchenPhotos ?? []).map((ph) => ph.id),
-          ...entry.protocol.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
-          ...(entry.protocol.personSignatures ?? []).map((s) => `sig_${s.personId}`),
-        ];
-        if (photoIds.length > 0) {
-          deletePhotosFromDb(photoIds).catch((e) =>
-            console.warn("Failed to delete photos from IndexedDB", e)
-          );
-        }
-      }
+    setTrashedProtocols((prev) => {
       const next = { ...prev };
       delete next[id];
-      saveTrash(next);
       return next;
     });
+    fetch(`/api/protocols/trash/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(console.warn);
   }, []);
 
+  // ── emptyTrash ─────────────────────────────────────────────────────────────
   const emptyTrash = useCallback(() => {
-    setTrashedProtocols(prev => {
-      // Clean up all photos from IndexedDB
-      const allPhotoIds: string[] = [];
-      for (const entry of Object.values(prev)) {
-        allPhotoIds.push(
-          ...(entry.protocol.meterPhotos ?? []).map((ph) => ph.id),
-          ...(entry.protocol.kitchenPhotos ?? []).map((ph) => ph.id),
-          ...entry.protocol.rooms.flatMap((r) => r.photos.map((ph) => ph.id)),
-          ...(entry.protocol.personSignatures ?? []).map((s) => `sig_${s.personId}`)
-        );
-      }
-      if (allPhotoIds.length > 0) {
-        deletePhotosFromDb(allPhotoIds).catch((e) =>
-          console.warn("Failed to delete photos from IndexedDB", e)
-        );
-      }
-      saveTrash({});
-      return {};
-    });
+    setTrashedProtocols({});
+    fetch("/api/protocols/trash", {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(console.warn);
   }, []);
 
+  // ── manualSave ─────────────────────────────────────────────────────────────
   const manualSave = useCallback(() => {
     if (!currentId) return;
     setIsSaving(true);
-    setProtocols(prev => {
-      if (!prev[currentId]) return prev;
-      const updated = { ...prev[currentId], lastSaved: new Date().toISOString() };
-      const next = { ...prev, [currentId]: updated };
-      saveProt(next);
-      if (updated.syncEnabled) {
-        wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(updated) });
-      }
-      return next;
-    });
+    flushSave(currentId);
     setLastSaved(new Date());
     setTimeout(() => setIsSaving(false), 800);
-  }, [currentId]);
+  }, [currentId, flushSave]);
 
+  // ── updateProtocol (debounced save) ───────────────────────────────────────
   const updateProtocol = useCallback(
     (updater: (prev: ProtocolData) => ProtocolData) => {
       if (!currentId) return;
       const id = currentId;
-      setProtocols(prev => {
+      setProtocols((prev) => {
         if (!prev[id]) return prev;
         const updated = updater(prev[id]);
-        const next = { ...prev, [id]: updated };
-        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        autoSaveTimer.current = setTimeout(() => {
-          // Re-read latest state so we never save a stale snapshot.
-          setProtocols(latest => {
-            if (latest[id]) {
-              saveAll(latest);
-              if (latest[id].syncEnabled) {
-                wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
-              }
-            }
-            return latest;
-          });
-        }, 1500);
-        return next;
+        // Also upload any new photos (those with dataUrls) to the server
+        const photoEntries: { id: string; dataUrl: string }[] = [];
+        for (const ph of updated.meterPhotos ?? []) {
+          if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+        }
+        for (const ph of updated.kitchenPhotos ?? []) {
+          if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+        }
+        for (const r of updated.rooms) {
+          for (const ph of r.photos) {
+            if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+          }
+        }
+        for (const sig of updated.personSignatures ?? []) {
+          if (sig.personId && sig.signatureDataUrl) {
+            photoEntries.push({ id: `sig_${sig.personId}`, dataUrl: sig.signatureDataUrl });
+          }
+        }
+        if (photoEntries.length > 0) {
+          uploadPhotosToServer(photoEntries).catch(console.warn);
+        }
+        setTimeout(() => scheduleSave(id), 0);
+        return { ...prev, [id]: updated };
       });
     },
-    [currentId, saveAll]
+    [currentId, scheduleSave]
   );
 
-  // Dedicated structural mutations: bypass the debounce timer entirely.
-  // persistAll is called synchronously (localStorage write) then, after React
-  // commits the state, the WS update is sent so the server stays in sync.
+  // ── addRoom ────────────────────────────────────────────────────────────────
   const addRoom = useCallback((room: ProtocolData["rooms"][number]) => {
     if (!currentId) return;
     const id = currentId;
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-    }
-    setProtocols(prev => {
+    setProtocols((prev) => {
       if (!prev[id]) return prev;
       const updated = { ...prev[id], rooms: [...prev[id].rooms, room] };
-      const next = { ...prev, [id]: updated };
-      saveProt(next);
-      return next;
+      setTimeout(() => scheduleSave(id), 0);
+      return { ...prev, [id]: updated };
     });
-    // WS send outside the updater so it always uses the committed state.
-    setTimeout(() => {
-      setProtocols(latest => {
-        if (latest[id]?.syncEnabled) {
-          wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
-        }
-        return latest;
-      });
-    }, 0);
-  }, [currentId]);
+  }, [currentId, scheduleSave]);
 
+  // ── deleteRoom ─────────────────────────────────────────────────────────────
   const deleteRoom = useCallback((roomId: string) => {
     if (!currentId) return;
     const id = currentId;
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-    }
-    setProtocols(prev => {
+    setProtocols((prev) => {
       if (!prev[id]) return prev;
       const updated = {
         ...prev[id],
-        rooms: prev[id].rooms.filter(r => r.id !== roomId),
-        // Record this ID so migration and server sync never restore the room.
+        rooms: prev[id].rooms.filter((r) => r.id !== roomId),
         deletedRoomIds: [...new Set([...(prev[id].deletedRoomIds ?? []), roomId])],
       };
-      const next = { ...prev, [id]: updated };
-      saveProt(next);
-      return next;
+      setTimeout(() => scheduleSave(id), 0);
+      return { ...prev, [id]: updated };
     });
-    // WS send outside the updater so it always uses the committed state.
-    setTimeout(() => {
-      setProtocols(latest => {
-        if (latest[id]?.syncEnabled) {
-          wsSendRef.current?.({ type: "update", protocol: stripSingleProtocol(latest[id]) });
-        }
-        return latest;
-      });
-    }, 0);
-  }, [currentId]);
+  }, [currentId, scheduleSave]);
 
-  /**
-   * Permanently remove all local protocols (and trash entries) belonging to the given propertyId.
-   * Called after a property is deleted server-side (cascade deletes the server rows).
-   * This keeps the local store consistent with the server without waiting for the next WS reconnect.
-   */
+  // ── deleteProtocolsForProperty ─────────────────────────────────────────────
   const deleteProtocolsForProperty = useCallback((propertyId: string) => {
-    setProtocols(prev => {
+    setProtocols((prev) => {
       const next = { ...prev };
       let changed = false;
       for (const [id, p] of Object.entries(next)) {
@@ -827,10 +498,9 @@ export function useProtocolsStore(accountId: string | null) {
           changed = true;
         }
       }
-      if (changed) saveProt(next);
       return changed ? next : prev;
     });
-    setTrashedProtocols(prev => {
+    setTrashedProtocols((prev) => {
       const next = { ...prev };
       let changed = false;
       for (const [id, e] of Object.entries(next)) {
@@ -839,7 +509,6 @@ export function useProtocolsStore(accountId: string | null) {
           changed = true;
         }
       }
-      if (changed) saveTrash(next);
       return changed ? next : prev;
     });
   }, []);
@@ -849,6 +518,7 @@ export function useProtocolsStore(accountId: string | null) {
     trashedProtocols,
     currentProtocol,
     currentId,
+    isLoading,
     isEditing: currentId !== null,
     createNew,
     duplicateProtocol,
@@ -863,13 +533,8 @@ export function useProtocolsStore(accountId: string | null) {
     updateProtocol,
     addRoom,
     deleteRoom,
-    toggleSync,
-    receiveInit,
-    receiveRemote,
-    receiveDelete,
     manualSave,
     isSaving,
     lastSaved,
-    wsSendRef,
   };
 }

@@ -16,6 +16,7 @@ export const syncProtocolsTable = pgTable(
       .references(() => propertiesTable.id, { onDelete: "cascade" }),
     data: jsonb("data").notNull().$type<Record<string, unknown>>(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   // Composite PK scopes data to account; unique("id") makes the protocol UUID
   // globally addressable so tenant-view public routes can safely query by id alone.

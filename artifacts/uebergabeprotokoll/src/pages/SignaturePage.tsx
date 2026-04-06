@@ -99,7 +99,7 @@ export default function SignaturePage({ protocol, updateProtocol, language = "de
       personSignatures: upsertSignature(p.personSignatures, personId, dataUrl),
     }));
 
-    if (dataUrl && protocol.syncEnabled && protocol.id) {
+    if (dataUrl && protocol.id) {
       fetch(`/api/protocol/${protocol.id}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -4,7 +4,7 @@ import i18n from "../i18n";
 import { ProtocolData, Property, UNASSIGNED_PROPERTY } from "../types";
 import { TrashedEntry } from "../store";
 import {
-  ArrowLeft, Plus, ClipboardList, Cloud, CloudOff, MapPin, Calendar,
+  ArrowLeft, Plus, ClipboardList, MapPin, Calendar,
   Pencil, Trash2, Copy, Link, Check, X, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Search, Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,6 @@ interface PropertyProtocolsPageProps {
   onPermanentlyDelete: (id: string) => void;
   onEmptyTrash: () => void;
   onDuplicate: (id: string) => void;
-  onToggleSync: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
 
@@ -257,7 +256,6 @@ export default function PropertyProtocolsPage({
   onPermanentlyDelete,
   onEmptyTrash,
   onDuplicate,
-  onToggleSync,
   onRename,
 }: PropertyProtocolsPageProps) {
   const { t } = useTranslation();
@@ -324,11 +322,6 @@ export default function PropertyProtocolsPage({
   };
 
   const handleCopyLink = (id: string) => {
-    // If sync is disabled, enable it first so the link becomes valid on the server
-    const proto = protocols[id];
-    if (proto && !proto.syncEnabled) {
-      onToggleSync(id);
-    }
     copyToClipboard(syncShareLink(id));
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -483,13 +476,6 @@ export default function PropertyProtocolsPage({
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        {protocol.syncEnabled ? (
-                          <Cloud size={14} className="text-neutral-400" />
-                        ) : (
-                          <CloudOff size={14} className="text-neutral-200" />
-                        )}
-                      </div>
                     </button>
                     <div className="flex items-center gap-1 px-4 pb-3">
                       <button
@@ -523,14 +509,6 @@ export default function PropertyProtocolsPage({
                         title={t("protocols.sendInvite")}
                       >
                         <Mail size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onToggleSync(protocol.id)}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors text-xs flex items-center gap-1"
-                        title={protocol.syncEnabled ? t("protocols.syncActive") : t("protocols.syncInactive")}
-                      >
-                        {protocol.syncEnabled ? <Cloud size={13} /> : <CloudOff size={13} />}
                       </button>
                       <button
                         type="button"

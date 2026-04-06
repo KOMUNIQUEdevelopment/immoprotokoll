@@ -21,7 +21,6 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { exportToPDF, exportPhotosAsZip } from "./pdfExport";
 import { useSwUpdate } from "./hooks/useSwUpdate";
 import { PwaInstallBanner } from "./components/PwaInstallBanner";
-import { useSync } from "./hooks/useSync";
 import { useAuth } from "./hooks/useAuth";
 import { useBilling } from "./hooks/useBilling";
 import i18n, { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type SupportedLanguage, getTranslations } from "./i18n";
@@ -31,14 +30,10 @@ import {
   ClipboardList,
   PenLine,
   CheckCircle2,
-  Wifi,
-  WifiOff,
   X,
   RefreshCw,
   ArrowLeft,
   FolderArchive,
-  Cloud,
-  CloudOff,
   Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -136,6 +131,7 @@ function AppContent({
     currentProtocol,
     currentId,
     isEditing,
+    isLoading,
     createNew,
     duplicateProtocol,
     switchTo,
@@ -147,14 +143,9 @@ function AppContent({
     emptyTrash,
     renameProtocol,
     updateProtocol,
-    toggleSync,
-    receiveInit,
-    receiveRemote,
-    receiveDelete,
     manualSave,
     isSaving,
     lastSaved,
-    wsSendRef,
   } = useProtocolsStore(accountId);
 
   const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
@@ -166,21 +157,6 @@ function AppContent({
   const billing = useBilling();
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
-  const { status: syncStatus } = useSync({
-    onInit: receiveInit,
-    onUpdate: receiveRemote,
-    onDelete: receiveDelete,
-    onError: (err) => {
-      if (err.code === "PROTOCOL_LIMIT_EXCEEDED") {
-        toast({
-          title: t("protocols.protocolLimitReached"),
-          description: err.message || t("protocols.protocolLimitHint"),
-          variant: "destructive",
-        });
-      }
-    },
-    sendRef: wsSendRef,
-  });
 
   const propertyLang = (selectedProperty?.language ?? "de-CH") as SupportedLanguage;
   const tr = getTranslations(propertyLang);
@@ -301,6 +277,17 @@ function AppContent({
       </button>
     </div>
   ) : null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <img src={`${import.meta.env.BASE_URL}immoprotokoll-logo-black.png`} alt="ImmoProtokoll" className="h-10 w-10 rounded-sm" />
+          <div className="w-5 h-5 border-2 border-neutral-200 border-t-black rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   if (!isEditing) {
     if (appScreen === "billing-success") {
@@ -462,7 +449,6 @@ function AppContent({
           onPermanentlyDelete={permanentlyDelete}
           onEmptyTrash={emptyTrash}
           onDuplicate={duplicateProtocol}
-          onToggleSync={toggleSync}
           onRename={renameProtocol}
         />
         <SwUpdatePopup needsUpdate={needsUpdate} applyUpdate={applyUpdate} dismiss={dismissUpdate} />
@@ -496,43 +482,6 @@ function AppContent({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {currentProtocol && (
-                <button
-                  type="button"
-                  onClick={() => toggleSync(currentProtocol.id)}
-                  title={currentProtocol.syncEnabled ? tr.protocols.syncActive : tr.protocols.syncInactive}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium transition-colors ${
-                    currentProtocol.syncEnabled
-                      ? "border-black bg-black text-white"
-                      : "border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-                  }`}
-                >
-                  {currentProtocol.syncEnabled ? (
-                    <Cloud size={13} />
-                  ) : (
-                    <CloudOff size={13} />
-                  )}
-                  <span className="hidden sm:inline">{tr.protocols.syncLabel}</span>
-                </button>
-              )}
-
-              <span
-                title={
-                  syncStatus === "connected"
-                    ? tr.protocols.connected
-                    : syncStatus === "connecting"
-                    ? tr.protocols.connecting
-                    : tr.protocols.offline
-                }
-                className="hidden sm:flex items-center"
-              >
-                {syncStatus === "connected" ? (
-                  <Wifi size={13} className="text-black" />
-                ) : (
-                  <WifiOff size={13} className="text-neutral-400" />
-                )}
-              </span>
-
               {lastSaved && (
                 <span className="text-xs text-neutral-400 hidden sm:block whitespace-nowrap">
                   {isSaving ? tr.common.saving : `${tr.common.saved} ${formatRelative(lastSaved, t)}`}
