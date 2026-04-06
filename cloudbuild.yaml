@@ -70,5 +70,6 @@ substitutions:
   _APP_BASE_URL: 'https://immoprotokoll.com'
 
 options:
-  logging: LEGACY
+  logging: CLOUD_LOGGING_ONLY
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
   machineType: E2_HIGHCPU_8
