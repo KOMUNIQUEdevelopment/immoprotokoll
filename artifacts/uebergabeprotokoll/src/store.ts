@@ -355,6 +355,11 @@ export function useProtocolsStore(accountId: string | null) {
 
   // On mount: load photos from local IndexedDB and hydrate state.
   useEffect(() => {
+    // Request persistent storage so the browser doesn't evict IndexedDB data
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+
     loadAllPhotosFromDb().then(async (photoMap) => {
       let missingIds: string[] = [];
       setProtocols((prev) => {
@@ -375,6 +380,15 @@ export function useProtocolsStore(accountId: string | null) {
       // Fetch from server after state update (WS init may not have fired yet;
       // receiveInit will also call this when it does fire)
       await fetchAndApplyServerPhotos(missingIds);
+
+      // Re-upload all photos found in IndexedDB to the server.
+      // This acts as a retry for any uploads that previously failed (e.g. offline,
+      // network error). The server endpoint uses ON CONFLICT DO UPDATE, so
+      // re-uploading already-present photos is safe and idempotent.
+      if (Object.keys(photoMap).length > 0) {
+        const entries = Object.entries(photoMap).map(([id, dataUrl]) => ({ id, dataUrl }));
+        uploadPhotosToServer(entries).catch(() => {});
+      }
     }).catch((err) => {
       console.warn("Photo hydration from IndexedDB failed:", err);
     });

@@ -16,7 +16,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Camera, ImagePlus, Trash2, GripVertical } from "lucide-react";
+import { Camera, ImagePlus, Trash2, GripVertical, ImageOff } from "lucide-react";
 import { RoomPhoto } from "../types";
 import { Button } from "@/components/ui/button";
 import exifr from "exifr";
@@ -59,11 +59,18 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel, tr, locale }: So
       style={style}
       className="relative group rounded-lg overflow-hidden border border-border bg-card shadow-sm"
     >
-      <img
-        src={photo.dataUrl}
-        alt={`${tr.roomPhotos} ${ts}`}
-        className="w-full aspect-[4/3] object-cover"
-      />
+      {photo.dataUrl ? (
+        <img
+          src={photo.dataUrl}
+          alt={`${tr.roomPhotos} ${ts}`}
+          className="w-full aspect-[4/3] object-cover"
+        />
+      ) : (
+        <div className="w-full aspect-[4/3] bg-neutral-100 flex flex-col items-center justify-center gap-1 text-neutral-400">
+          <ImageOff size={20} />
+          <span className="text-xs">Wird geladen…</span>
+        </div>
+      )}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <button
           {...listeners}
