@@ -67,7 +67,7 @@ steps:
       - --port=8080
 
 substitutions:
-  _SQL_INSTANCE: 'PROJEKT_ID:europe-west6:immoprotokoll-db'
+  _SQL_INSTANCE: 'immoprotokoll-492520:europe-west6:immoprotokoll-db'
   _APP_DOMAIN: 'https://immoprotokoll.com,https://app.immoprotokoll.com'
   _APP_BASE_URL: 'https://immoprotokoll.com'
 
