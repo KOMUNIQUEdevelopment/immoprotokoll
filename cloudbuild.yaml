@@ -46,7 +46,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --add-cloudsql-instances=$_SQL_INSTANCE
-      - --set-env-vars=^:^NODE_ENV=production:ALLOWED_ORIGINS=$_APP_DOMAIN:APP_BASE_URL=$_APP_BASE_URL
+      - --set-env-vars=^|^NODE_ENV=production|ALLOWED_ORIGINS=$_APP_DOMAIN|APP_BASE_URL=$_APP_BASE_URL
       - --update-secrets=DATABASE_URL=DATABASE_URL:latest
       - --update-secrets=SUPERADMIN_PASSWORD=SUPERADMIN_PASSWORD:latest
       - --update-secrets=RESEND_API_KEY=RESEND_API_KEY:latest
