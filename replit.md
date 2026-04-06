@@ -18,7 +18,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Build**: esbuild (ESM bundle → `dist/index.mjs`)
 - **Frontend**: React + Vite + Tailwind CSS
 
 ## Design System
@@ -115,7 +115,7 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
+- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.mjs`, ESM)
 - Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
 
 ### `lib/db` (`@workspace/db`)
@@ -150,3 +150,93 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+---
+
+## GCP Deployment (europe-west6 / Zürich)
+
+### Architecture on GCP
+
+Single **Cloud Run** service that serves everything:
+- `/api/*` — Express REST + WebSocket endpoints
+- `/app/*` — Übergabeprotokoll PWA (static files built into Docker image)
+- `/` — Landing Page (static files built into Docker image)
+
+Supporting services: **Cloud SQL** (PostgreSQL 15), **Artifact Registry** (Docker images), **Secret Manager** (secrets), optional **Cloud Storage** (file uploads).
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `artifacts/api-server/Dockerfile` | Multi-stage build: API + both frontends |
+| `cloudbuild.yaml` | CI/CD: build → push → deploy on git push |
+
+### How the Dockerfile Works
+
+1. **Builder stage** (`node:24-slim`): installs all pnpm deps, builds API via esbuild, builds both Vite frontends with correct `BASE_PATH` env vars
+2. **Runtime stage** (`node:24-slim`): copies only the compiled output — `dist/index.mjs`, pino workers, and both `dist/public/` folders. No `node_modules` needed (esbuild bundles deps).
+
+### Deployment Trigger
+
+The only deployment trigger is **Replit Git Panel → Push to main**. Cloud Build picks up the push, runs `cloudbuild.yaml`, and deploys to Cloud Run.
+
+### Required Secrets in GCP Secret Manager (region: europe-west6)
+
+| Secret Name | Description |
+|-------------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string via Cloud SQL Unix socket |
+| `SUPERADMIN_PASSWORD` | Initial superadmin password (support@immoprotokoll.com) |
+| `RESEND_API_KEY` | Resend transactional email API key |
+| `STRIPE_SECRET_KEY` | Stripe live secret key |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe live publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe live webhook signing secret |
+| `STRIPE_SECRET_KEY_TEST` | Stripe test secret key |
+| `STRIPE_PUBLISHABLE_KEY_TEST` | Stripe test publishable key |
+| `STRIPE_WEBHOOK_SECRET_TEST` | Stripe test webhook signing secret |
+
+### Required Env Vars (set directly on Cloud Run, not Secret Manager)
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `ALLOWED_ORIGINS` | `https://immoprotokoll.com,https://app.immoprotokoll.com` |
+| `APP_BASE_URL` | `https://immoprotokoll.com` |
+
+### DATABASE_URL Format for Cloud SQL (Unix socket)
+
+```
+postgresql://postgres:PASSWORT@localhost/app_db?host=/cloudsql/PROJEKT_ID:europe-west6:immoprotokoll-db
+```
+
+### DB Migrations on GCP
+
+Currently `drizzle-kit push` is used (development-style, no migration tracking). For production GCP, run schema sync after each deploy:
+
+```bash
+# One-time or after schema changes:
+DATABASE_URL="..." pnpm --filter @workspace/db run push-force
+```
+
+This should be run as a Cloud Build step or as a manual CLI step after setting up the DB. The migration files in `lib/db/drizzle/` contain the full schema history.
+
+### Stripe Live Price IDs
+
+Stripe price IDs for live mode are passed as env vars (not secrets, they are public):
+```
+STRIPE_PRICE_PRIVAT_MONTHLY_CHF=price_xxx
+STRIPE_PRICE_PRIVAT_ANNUAL_CHF=price_xxx
+STRIPE_PRICE_AGENTUR_MONTHLY_CHF=price_xxx
+STRIPE_PRICE_AGENTUR_ANNUAL_CHF=price_xxx
+```
+(plus `_EUR` and `_USD` variants). Add these to `--set-env-vars` in `cloudbuild.yaml`.
+
+### cloudbuild.yaml Substitutions to Update
+
+Before first deploy, edit `cloudbuild.yaml` and update:
+- `_SQL_INSTANCE`: `DEIN_PROJEKT:europe-west6:immoprotokoll-db`
+- `_APP_DOMAIN`: comma-separated list of CORS origins
+- `_APP_BASE_URL`: production landing page URL
+
+### WebSocket Support
+
+Cloud Run supports WebSockets natively. No additional configuration needed. The `/api/sync` endpoint handles WS upgrades via the HTTP server upgrade event.

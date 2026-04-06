@@ -1,3 +1,4 @@
+import path from "node:path";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -60,5 +61,30 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 app.use("/api", router);
+
+// ── Production: serve built frontend static files ────────────────────────────
+// In development (Replit), Vite dev servers run separately.
+// In production (Cloud Run), Express serves all static assets directly.
+if (isProduction) {
+  const cwd = process.cwd();
+
+  // Übergabeprotokoll PWA at /app/ (built to artifacts/uebergabeprotokoll/dist/public/)
+  const appDir = path.join(cwd, "artifacts/uebergabeprotokoll/dist/public");
+  app.use("/app", express.static(appDir));
+  // SPA catch-all: unmatched paths (e.g. deep hash-routes) → index.html
+  app.use("/app", (_req: Request, res: Response) => {
+    res.sendFile(path.join(appDir, "index.html"));
+  });
+
+  // Landing page at / (built to artifacts/landing/dist/public/)
+  const landingDir = path.join(cwd, "artifacts/landing/dist/public");
+  app.use("/", express.static(landingDir));
+  // SPA catch-all for landing
+  app.use("/", (_req: Request, res: Response) => {
+    res.sendFile(path.join(landingDir, "index.html"));
+  });
+
+  logger.info("Production mode: serving static files from dist/public directories");
+}
 
 export default app;
