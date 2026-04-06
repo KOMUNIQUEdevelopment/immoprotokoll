@@ -10,7 +10,7 @@ const router = Router();
 
 // ── GET /api/protocols — list active protocols ────────────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   try {
     const rows = await db
       .select()
@@ -32,7 +32,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // ── GET /api/protocols/trash — list trashed protocols ────────────────────────
 // MUST be before /:id to avoid "trash" being treated as an id
 router.get("/trash", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   try {
     const rows = await db
       .select()
@@ -57,7 +57,7 @@ router.get("/trash", requireAuth, async (req: AuthRequest, res: Response) => {
 // ── DELETE /api/protocols/trash — empty all trash ─────────────────────────────
 // MUST be before DELETE /:id to avoid "trash" being treated as an id
 router.delete("/trash", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   try {
     await db
       .delete(syncProtocolsTable)
@@ -73,7 +73,7 @@ router.delete("/trash", requireAuth, async (req: AuthRequest, res: Response) => 
 
 // ── DELETE /api/protocols/trash/:id — permanently delete one trashed protocol ─
 router.delete("/trash/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   const { id } = req.params;
   try {
     await db
@@ -91,7 +91,7 @@ router.delete("/trash/:id", requireAuth, async (req: AuthRequest, res: Response)
 
 // ── POST /api/protocols/:id/restore — restore from trash ─────────────────────
 router.post("/:id/restore", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   const { id } = req.params;
   try {
     await db
@@ -110,7 +110,7 @@ router.post("/:id/restore", requireAuth, async (req: AuthRequest, res: Response)
 
 // ── POST /api/protocols — create new protocol ─────────────────────────────────
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   const { protocol } = req.body as { protocol?: Record<string, unknown> };
   if (!protocol || typeof protocol !== "object" || !protocol.id) {
     res.status(400).json({ error: "protocol.id is required" });
@@ -178,7 +178,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
 // ── PUT /api/protocols/:id — update protocol ──────────────────────────────────
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   const { id } = req.params;
   const { protocol } = req.body as { protocol?: Record<string, unknown> };
   if (!protocol || typeof protocol !== "object") {
@@ -239,7 +239,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 
 // ── DELETE /api/protocols/:id — soft delete (move to trash) ──────────────────
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const accountId = req.accountId!;
+  const accountId = req.user!.accountId;
   const { id } = req.params;
   try {
     await db
