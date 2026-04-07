@@ -659,8 +659,7 @@ export default function App() {
         <ResetPasswordPage
           token={resetMatch[1]}
           onSuccess={() => {
-            window.location.hash = "";
-            setAuthScreen("login");
+            window.location.replace(window.location.pathname + window.location.search);
           }}
         />
         <Toaster />
