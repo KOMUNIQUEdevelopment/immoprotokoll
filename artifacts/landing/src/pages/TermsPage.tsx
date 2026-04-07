@@ -15,7 +15,7 @@ export default function TermsPage() {
     title,
     description,
     lang,
-    path: lang === 'de' ? '/de/agb' : '/en/terms'
+    path: lang === 'de' ? '/agb' : '/en/terms'
   });
 
   return (

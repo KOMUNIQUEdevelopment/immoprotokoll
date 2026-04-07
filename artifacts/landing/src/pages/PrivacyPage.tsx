@@ -15,7 +15,7 @@ export default function PrivacyPage() {
     title,
     description,
     lang,
-    path: lang === 'de' ? '/de/datenschutz' : '/en/privacy'
+    path: lang === 'de' ? '/datenschutz' : '/en/privacy'
   });
 
   return (

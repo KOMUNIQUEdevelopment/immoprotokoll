@@ -71,52 +71,59 @@ function RouteWrapper({ component: Component, lang }: { component: any, lang: "d
   );
 }
 
-function AutoRedirect() {
+function RedirectTo({ to }: { to: string }) {
   const [, setLocation] = useLocation();
-  
-  useEffect(() => {
-    const browserLang = navigator.language.toLowerCase();
-    if (browserLang.startsWith("de")) {
-      setLocation("/de", { replace: true });
-    } else {
-      setLocation("/en", { replace: true });
-    }
-  }, [setLocation]);
-
+  useEffect(() => { setLocation(to, { replace: true }); }, [to, setLocation]);
   return null;
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={AutoRedirect} />
-      
-      <Route path="/de">
+      {/* Root = German (no redirect, no /de/ prefix) */}
+      <Route path="/">
         {() => <RouteWrapper component={LandingPage} lang="de" />}
       </Route>
+
+      {/* English */}
       <Route path="/en">
         {() => <RouteWrapper component={LandingPage} lang="en" />}
       </Route>
 
-      <Route path="/de/datenschutz">
+      {/* DE sub-pages — no /de/ prefix */}
+      <Route path="/datenschutz">
         {() => <RouteWrapper component={PrivacyPage} lang="de" />}
       </Route>
-      <Route path="/en/privacy">
-        {() => <RouteWrapper component={PrivacyPage} lang="en" />}
+      <Route path="/agb">
+        {() => <RouteWrapper component={TermsPage} lang="de" />}
+      </Route>
+      <Route path="/impressum">
+        {() => <RouteWrapper component={ImprintPage} lang="de" />}
       </Route>
 
-      <Route path="/de/agb">
-        {() => <RouteWrapper component={TermsPage} lang="de" />}
+      {/* EN sub-pages */}
+      <Route path="/en/privacy">
+        {() => <RouteWrapper component={PrivacyPage} lang="en" />}
       </Route>
       <Route path="/en/terms">
         {() => <RouteWrapper component={TermsPage} lang="en" />}
       </Route>
-
-      <Route path="/de/impressum">
-        {() => <RouteWrapper component={ImprintPage} lang="de" />}
-      </Route>
       <Route path="/en/imprint">
         {() => <RouteWrapper component={ImprintPage} lang="en" />}
+      </Route>
+
+      {/* Legacy /de/* → redirect to root equivalents */}
+      <Route path="/de">
+        {() => <RedirectTo to="/" />}
+      </Route>
+      <Route path="/de/datenschutz">
+        {() => <RedirectTo to="/datenschutz" />}
+      </Route>
+      <Route path="/de/agb">
+        {() => <RedirectTo to="/agb" />}
+      </Route>
+      <Route path="/de/impressum">
+        {() => <RedirectTo to="/impressum" />}
       </Route>
 
       <Route component={NotFound} />

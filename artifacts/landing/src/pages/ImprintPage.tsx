@@ -15,7 +15,7 @@ export default function ImprintPage() {
     title,
     description,
     lang,
-    path: lang === 'de' ? '/de/impressum' : '/en/imprint'
+    path: lang === 'de' ? '/impressum' : '/en/imprint'
   });
 
   return (

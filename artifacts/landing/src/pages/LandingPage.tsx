@@ -39,7 +39,7 @@ export default function LandingPage() {
     title,
     description,
     lang,
-    path: `/${lang}`,
+    path: lang === "de" ? "/" : "/en",
     schema
   });
 
@@ -257,7 +257,7 @@ export default function LandingPage() {
               className="flex flex-col gap-4"
             >
               {t.faq.questions.map((q, i) => {
-                const privacyHref = lang === "de" ? `/${lang}/datenschutz` : `/${lang}/privacy`;
+                const privacyHref = lang === "de" ? "/datenschutz" : "/en/privacy";
                 const privacyLinkText = lang === "de" ? "Datenschutzerklärung" : "Privacy Policy";
                 const answer = i === 1 ? (
                   <span>
