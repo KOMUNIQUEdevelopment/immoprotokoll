@@ -79,7 +79,7 @@ router.delete("/trash/:id", requireAuth, async (req: AuthRequest, res: Response)
     await db
       .delete(syncProtocolsTable)
       .where(and(
-        eq(syncProtocolsTable.id, id),
+        eq(syncProtocolsTable.id, id as string),
         eq(syncProtocolsTable.accountId, accountId),
         isNotNull(syncProtocolsTable.deletedAt)
       ));
@@ -98,7 +98,7 @@ router.post("/:id/restore", requireAuth, async (req: AuthRequest, res: Response)
       .update(syncProtocolsTable)
       .set({ deletedAt: null, updatedAt: new Date() })
       .where(and(
-        eq(syncProtocolsTable.id, id),
+        eq(syncProtocolsTable.id, id as string),
         eq(syncProtocolsTable.accountId, accountId),
         isNotNull(syncProtocolsTable.deletedAt)
       ));
@@ -191,7 +191,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       .select()
       .from(syncProtocolsTable)
       .where(and(
-        eq(syncProtocolsTable.id, id),
+        eq(syncProtocolsTable.id, id as string),
         eq(syncProtocolsTable.accountId, accountId),
         isNull(syncProtocolsTable.deletedAt)
       ))
@@ -227,7 +227,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       .update(syncProtocolsTable)
       .set({ data: protocol, updatedAt: new Date() })
       .where(and(
-        eq(syncProtocolsTable.id, id),
+        eq(syncProtocolsTable.id, id as string),
         eq(syncProtocolsTable.accountId, accountId)
       ));
 
@@ -246,7 +246,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       .update(syncProtocolsTable)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(
-        eq(syncProtocolsTable.id, id),
+        eq(syncProtocolsTable.id, id as string),
         eq(syncProtocolsTable.accountId, accountId),
         isNull(syncProtocolsTable.deletedAt)
       ));

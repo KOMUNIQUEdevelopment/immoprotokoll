@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import express from "express";
-import { eq, and, count, inArray } from "drizzle-orm";
+import { eq, and, count, inArray, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   sessionsTable,
@@ -857,11 +857,27 @@ app.get("/api/photos", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// ── Startup migrations ────────────────────────────────────────────────────────
+// Create tables that may not exist yet on older production instances.
+// Using CREATE TABLE IF NOT EXISTS is idempotent and safe to run every start.
+async function runStartupMigrations() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS sync_photos (
+      id          TEXT        NOT NULL,
+      account_id  TEXT        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      data_url    TEXT        NOT NULL,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (account_id, id)
+    )
+  `);
+}
+
 server.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+  runStartupMigrations().catch((err) => logger.error({ err }, "runStartupMigrations failed"));
   initSuperAdmin().catch((err) => logger.error({ err }, "initSuperAdmin failed"));
 });

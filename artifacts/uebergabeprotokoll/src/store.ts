@@ -133,39 +133,46 @@ export function useProtocolsStore(accountId: string | null) {
   }, [accountId]);
 
   // ── Internal: save a single protocol to server (debounced 1.5s) ───────────
-  const scheduleSave = useCallback((id: string) => {
-    if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id]);
-    autoSaveTimers.current[id] = setTimeout(() => {
-      const p = latestProtocols.current[id];
-      if (!p) return;
-      fetch(`/api/protocols/${id}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
-      })
-        .then(() => setLastSaved(new Date()))
-        .catch(console.warn);
-    }, 1500);
-  }, []);
-
-  // ── Internal: save immediately (flush pending debounce) ────────────────────
-  const flushSave = useCallback((id: string) => {
-    if (autoSaveTimers.current[id]) {
-      clearTimeout(autoSaveTimers.current[id]);
-      delete autoSaveTimers.current[id];
-    }
+  const doSave = useCallback((id: string, keepalive = false) => {
     const p = latestProtocols.current[id];
     if (!p) return;
+    const body = JSON.stringify({ protocol: stripSingleProtocol(p) });
+    // keepalive: true lets the request survive a page unload (for beforeunload flush).
+    // Browsers cap keepalive bodies at 64KB; for large protocols fall back to regular fetch.
+    const useKeepalive = keepalive && body.length < 60_000;
     fetch(`/api/protocols/${id}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+      body,
+      ...(useKeepalive ? { keepalive: true } : {}),
     })
-      .then(() => setLastSaved(new Date()))
-      .catch(console.warn);
+      .then((res) => {
+        if (res.ok) {
+          setLastSaved(new Date());
+        } else {
+          console.error(`Protocol save failed: HTTP ${res.status} for ${id}`);
+        }
+      })
+      .catch((err) => console.error("Protocol save network error:", err));
   }, []);
+
+  const scheduleSave = useCallback((id: string) => {
+    if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id]);
+    autoSaveTimers.current[id] = setTimeout(() => {
+      delete autoSaveTimers.current[id];
+      doSave(id);
+    }, 1500);
+  }, [doSave]);
+
+  // ── Internal: save immediately (flush pending debounce) ────────────────────
+  const flushSave = useCallback((id: string, keepalive = false) => {
+    if (autoSaveTimers.current[id]) {
+      clearTimeout(autoSaveTimers.current[id]);
+      delete autoSaveTimers.current[id];
+    }
+    doSave(id, keepalive);
+  }, [doSave]);
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;
 
