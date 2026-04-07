@@ -57,8 +57,15 @@ app.use(
   (_req: Request, _res: Response, next: NextFunction) => next()
 );
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+// Skip global body parsers for photo upload — it uses its own 50mb parser
+const skipForPhotoUpload = (
+  middleware: ReturnType<typeof express.json>
+) => (req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "POST" && req.path === "/api/photos") return next();
+  middleware(req, res, next);
+};
+app.use(skipForPhotoUpload(express.json({ limit: "5mb" })));
+app.use(skipForPhotoUpload(express.urlencoded({ extended: true, limit: "5mb" })));
 
 app.use("/api", router);
 

@@ -428,33 +428,46 @@ export function useProtocolsStore(accountId: string | null) {
     (updater: (prev: ProtocolData) => ProtocolData) => {
       if (!currentId) return;
       const id = currentId;
-      setProtocols((prev) => {
-        if (!prev[id]) return prev;
-        const updated = updater(prev[id]);
-        // Also upload any new photos (those with dataUrls) to the server
-        const photoEntries: { id: string; dataUrl: string }[] = [];
-        for (const ph of updated.meterPhotos ?? []) {
-          if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+      const prev = latestProtocols.current[id];
+      if (!prev) return;
+
+      const updated = updater(prev);
+
+      // Collect only NEW photo IDs (not present in the previous state) to upload
+      const prevPhotoIds = new Set<string>();
+      for (const ph of prev.meterPhotos ?? []) prevPhotoIds.add(ph.id);
+      for (const ph of prev.kitchenPhotos ?? []) prevPhotoIds.add(ph.id);
+      for (const r of prev.rooms) for (const ph of r.photos) prevPhotoIds.add(ph.id);
+      for (const sig of prev.personSignatures ?? []) if (sig.personId) prevPhotoIds.add(`sig_${sig.personId}`);
+
+      const photoEntries: { id: string; dataUrl: string }[] = [];
+      for (const ph of updated.meterPhotos ?? []) {
+        if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+      }
+      for (const ph of updated.kitchenPhotos ?? []) {
+        if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+      }
+      for (const r of updated.rooms) {
+        for (const ph of r.photos) {
+          if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
         }
-        for (const ph of updated.kitchenPhotos ?? []) {
-          if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
+      }
+      for (const sig of updated.personSignatures ?? []) {
+        const sigId = `sig_${sig.personId}`;
+        if (sig.personId && sig.signatureDataUrl && !prevPhotoIds.has(sigId)) {
+          photoEntries.push({ id: sigId, dataUrl: sig.signatureDataUrl });
         }
-        for (const r of updated.rooms) {
-          for (const ph of r.photos) {
-            if (ph.dataUrl) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
-          }
-        }
-        for (const sig of updated.personSignatures ?? []) {
-          if (sig.personId && sig.signatureDataUrl) {
-            photoEntries.push({ id: `sig_${sig.personId}`, dataUrl: sig.signatureDataUrl });
-          }
-        }
-        if (photoEntries.length > 0) {
-          uploadPhotosToServer(photoEntries).catch(console.warn);
-        }
-        setTimeout(() => scheduleSave(id), 0);
-        return { ...prev, [id]: updated };
+      }
+
+      if (photoEntries.length > 0) {
+        uploadPhotosToServer(photoEntries).catch(console.warn);
+      }
+
+      setProtocols((p) => {
+        if (!p[id]) return p;
+        return { ...p, [id]: updated };
       });
+      setTimeout(() => scheduleSave(id), 0);
     },
     [currentId, scheduleSave]
   );

@@ -12,12 +12,15 @@ export async function uploadPhotosToServer(
   for (let i = 0; i < valid.length; i += UPLOAD_BATCH) {
     const batch = valid.slice(i, i + UPLOAD_BATCH);
     try {
-      await fetch(`${getApiBase()}/photos`, {
+      const res = await fetch(`${getApiBase()}/photos`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photos: batch }),
       });
+      if (!res.ok) {
+        console.warn(`Photo upload failed: HTTP ${res.status}`);
+      }
     } catch (e) {
       console.warn("Photo server upload failed (offline?)", e);
     }
