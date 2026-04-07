@@ -916,6 +916,38 @@ async function runStartupMigrations() {
       )
     ON CONFLICT (id) DO NOTHING
   `);
+
+  // ── Support tables ───────────────────────────────────────────────────────────
+  await db.execute(sql`
+    DO $$ BEGIN
+      CREATE TYPE support_ticket_status AS ENUM ('open', 'in_progress', 'closed');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS support_agents (
+      id         TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      name       TEXT        NOT NULL,
+      email      TEXT        NOT NULL UNIQUE,
+      is_active  BOOLEAN     NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id                    TEXT                   PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      name                  TEXT                   NOT NULL,
+      email                 TEXT                   NOT NULL,
+      subject               TEXT                   NOT NULL,
+      message               TEXT                   NOT NULL,
+      status                support_ticket_status  NOT NULL DEFAULT 'open',
+      account_id            TEXT                   REFERENCES accounts(id) ON DELETE SET NULL,
+      assigned_to_agent_id  TEXT                   REFERENCES support_agents(id) ON DELETE SET NULL,
+      created_at            TIMESTAMPTZ            NOT NULL DEFAULT NOW(),
+      updated_at            TIMESTAMPTZ            NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 server.listen(port, (err?: Error) => {
