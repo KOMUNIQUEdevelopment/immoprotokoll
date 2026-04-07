@@ -1,14 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ProtocolData, ProtocolSeeds, createDefaultProtocol, migrateProtocol } from "./types";
 import i18n from "./i18n";
-import { uploadPhotosToServer, fetchMissingPhotosFromServer, retryPendingPhotoUploads } from "./photoDb";
 
 export interface TrashedEntry {
   protocol: ProtocolData;
   deletedAt: string;
 }
 
-// Strip photo dataUrls before sending to server — photos live in sync_photos, not in protocol JSON
+// Strip photo dataUrls before sending to server — photos are stored separately by ID
+// and served via /api/photos/:id URL. Only signatures are kept (they may still use dataUrls).
 function stripSingleProtocol(p: ProtocolData): ProtocolData {
   return {
     ...p,
@@ -23,65 +23,6 @@ function stripSingleProtocol(p: ProtocolData): ProtocolData {
       signatureDataUrl: s.signatureDataUrl ?? null,
     })),
   };
-}
-
-// Collect photo IDs that need to be fetched from the server
-function collectMissingPhotoIds(protocols: Record<string, ProtocolData>): string[] {
-  const ids: string[] = [];
-  for (const p of Object.values(protocols)) {
-    for (const ph of p.meterPhotos ?? []) {
-      if (!ph.dataUrl) ids.push(ph.id);
-    }
-    for (const ph of p.kitchenPhotos ?? []) {
-      if (!ph.dataUrl) ids.push(ph.id);
-    }
-    for (const r of p.rooms) {
-      for (const ph of r.photos) {
-        if (!ph.dataUrl) ids.push(ph.id);
-      }
-    }
-    for (const sig of p.personSignatures ?? []) {
-      if (sig.personId && !sig.signatureDataUrl) {
-        ids.push(`sig_${sig.personId}`);
-      }
-    }
-  }
-  return [...new Set(ids)];
-}
-
-// Hydrate protocol map with fetched photo dataUrls
-function hydratePhotos(
-  protocols: Record<string, ProtocolData>,
-  photoMap: Record<string, string>
-): Record<string, ProtocolData> {
-  if (Object.keys(photoMap).length === 0) return protocols;
-  return Object.fromEntries(
-    Object.entries(protocols).map(([id, p]) => [
-      id,
-      {
-        ...p,
-        meterPhotos: (p.meterPhotos ?? []).map((ph) => ({
-          ...ph,
-          dataUrl: photoMap[ph.id] ?? ph.dataUrl,
-        })),
-        kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({
-          ...ph,
-          dataUrl: photoMap[ph.id] ?? ph.dataUrl,
-        })),
-        rooms: p.rooms.map((r) => ({
-          ...r,
-          photos: r.photos.map((ph) => ({
-            ...ph,
-            dataUrl: photoMap[ph.id] ?? ph.dataUrl,
-          })),
-        })),
-        personSignatures: (p.personSignatures ?? []).map((s) => ({
-          ...s,
-          signatureDataUrl: photoMap[`sig_${s.personId}`] ?? s.signatureDataUrl,
-        })),
-      },
-    ])
-  );
 }
 
 // ── One-time migration: upload any localStorage protocols to the cloud ─────────
@@ -153,18 +94,6 @@ export function useProtocolsStore(accountId: string | null) {
   // Per-protocol debounced save timers
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // ── Retry pending photo uploads when tab becomes visible (handles mobile backgrounding) ──
-  useEffect(() => {
-    if (!accountId) return;
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        retryPendingPhotoUploads().catch(console.warn);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [accountId]);
-
   // ── Load from server on mount / accountId change ───────────────────────────
   useEffect(() => {
     if (!accountId) {
@@ -179,9 +108,6 @@ export function useProtocolsStore(accountId: string | null) {
 
     // One-time migration: upload any locally-stored (unsynced) protocols to cloud
     migrateLocalStorageToCloud(accountId).catch(console.warn);
-
-    // Retry any photos that failed to upload in a previous session
-    retryPendingPhotoUploads().catch(console.warn);
 
     Promise.all([
       fetch("/api/protocols", { credentials: "include" }).then((r) => r.json() as Promise<{ protocols: Record<string, Record<string, unknown>> }>),
@@ -203,18 +129,7 @@ export function useProtocolsStore(accountId: string | null) {
 
         setProtocols(prots);
         setTrashedProtocols(trash);
-
-        // Fetch photos for all loaded protocols
-        const missingIds = collectMissingPhotoIds(prots);
-        if (missingIds.length > 0) {
-          fetchMissingPhotosFromServer(missingIds)
-            .then((photoMap) => {
-              if (Object.keys(photoMap).length > 0) {
-                setProtocols((prev) => hydratePhotos(prev, photoMap));
-              }
-            })
-            .catch(console.warn);
-        }
+        // Photos are now loaded on-demand via /api/photos/:id URL — no pre-fetching needed
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -334,20 +249,7 @@ export function useProtocolsStore(accountId: string | null) {
   // ── switchTo ───────────────────────────────────────────────────────────────
   const switchTo = useCallback((id: string) => {
     setCurrentId(id);
-    // Fetch photos for this protocol if any are missing
-    const p = latestProtocols.current[id];
-    if (p) {
-      const missingIds = collectMissingPhotoIds({ [id]: p });
-      if (missingIds.length > 0) {
-        fetchMissingPhotosFromServer(missingIds)
-          .then((photoMap) => {
-            if (Object.keys(photoMap).length > 0) {
-              setProtocols((prev) => hydratePhotos(prev, photoMap));
-            }
-          })
-          .catch(console.warn);
-      }
-    }
+    // Photos are loaded on-demand via /api/photos/:id URL — no pre-fetching needed
   }, []);
 
   // ── backToList ─────────────────────────────────────────────────────────────
@@ -394,17 +296,7 @@ export function useProtocolsStore(accountId: string | null) {
       method: "POST",
       credentials: "include",
     }).catch(console.warn);
-    // Re-fetch photos
-    const missingIds = collectMissingPhotoIds({ [id]: restored });
-    if (missingIds.length > 0) {
-      fetchMissingPhotosFromServer(missingIds)
-        .then((photoMap) => {
-          if (Object.keys(photoMap).length > 0) {
-            setProtocols((prev) => hydratePhotos(prev, photoMap));
-          }
-        })
-        .catch(console.warn);
-    }
+    // Photos are loaded on-demand via /api/photos/:id URL — no pre-fetching needed
   }, [trashedProtocols]);
 
   // ── permanentlyDelete ──────────────────────────────────────────────────────
@@ -439,47 +331,12 @@ export function useProtocolsStore(accountId: string | null) {
   }, [currentId, flushSave]);
 
   // ── updateProtocol (debounced save) ───────────────────────────────────────
+  // Note: photos are uploaded directly in PhotoManager before onChange is called.
+  // No photo upload logic needed here.
   const updateProtocol = useCallback(
     (updater: (prev: ProtocolData) => ProtocolData) => {
       if (!currentId) return;
       const id = currentId;
-      const prev = latestProtocols.current[id];
-      if (!prev) return;
-
-      const updated = updater(prev);
-
-      // Collect only NEW photo IDs (not present in the previous state) to upload
-      const prevPhotoIds = new Set<string>();
-      for (const ph of prev.meterPhotos ?? []) prevPhotoIds.add(ph.id);
-      for (const ph of prev.kitchenPhotos ?? []) prevPhotoIds.add(ph.id);
-      for (const r of prev.rooms) for (const ph of r.photos) prevPhotoIds.add(ph.id);
-      for (const sig of prev.personSignatures ?? []) if (sig.personId) prevPhotoIds.add(`sig_${sig.personId}`);
-
-      const photoEntries: { id: string; dataUrl: string }[] = [];
-      for (const ph of updated.meterPhotos ?? []) {
-        if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
-      }
-      for (const ph of updated.kitchenPhotos ?? []) {
-        if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
-      }
-      for (const r of updated.rooms) {
-        for (const ph of r.photos) {
-          if (ph.dataUrl && !prevPhotoIds.has(ph.id)) photoEntries.push({ id: ph.id, dataUrl: ph.dataUrl });
-        }
-      }
-      for (const sig of updated.personSignatures ?? []) {
-        const sigId = `sig_${sig.personId}`;
-        if (sig.personId && sig.signatureDataUrl && !prevPhotoIds.has(sigId)) {
-          photoEntries.push({ id: sigId, dataUrl: sig.signatureDataUrl });
-        }
-      }
-
-      if (photoEntries.length > 0) {
-        uploadPhotosToServer(photoEntries).catch(console.warn);
-      }
-
-      // Apply updater inside setProtocols to always work on the latest state
-      // (guards against concurrent updates from WebSocket sync etc.)
       setProtocols((p) => {
         if (!p[id]) return p;
         return { ...p, [id]: updater(p[id]) };

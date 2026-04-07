@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,7 +16,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Camera, ImagePlus, Trash2, GripVertical, ImageOff } from "lucide-react";
+import { Camera, ImagePlus, Trash2, GripVertical, Loader2 } from "lucide-react";
 import { RoomPhoto } from "../types";
 import { Button } from "@/components/ui/button";
 import exifr from "exifr";
@@ -59,18 +59,11 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel, tr, locale }: So
       style={style}
       className="relative group rounded-lg overflow-hidden border border-border bg-card shadow-sm"
     >
-      {photo.dataUrl ? (
-        <img
-          src={photo.dataUrl}
-          alt={`${tr.roomPhotos} ${ts}`}
-          className="w-full aspect-[4/3] object-cover"
-        />
-      ) : (
-        <div className="w-full aspect-[4/3] bg-neutral-100 flex flex-col items-center justify-center gap-1 text-neutral-400">
-          <ImageOff size={20} />
-          <span className="text-xs">Wird geladen…</span>
-        </div>
-      )}
+      <img
+        src={photo.dataUrl || `/api/photos/${photo.id}`}
+        alt={`${tr.roomPhotos} ${ts}`}
+        className="w-full aspect-[4/3] object-cover bg-neutral-100"
+      />
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <button
           {...listeners}
@@ -210,6 +203,7 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -222,19 +216,40 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
       const validFiles = Array.from(files).filter(f => f.type.startsWith("image/"));
       if (validFiles.length === 0) return;
 
+      setUploadingCount((n) => n + validFiles.length);
+
       Promise.all(
         validFiles.map(async (file) => {
           const [dataUrl, timestamp] = await Promise.all([
             compressImage(file),
             getPhotoTimestamp(file),
           ]);
-          return { id: crypto.randomUUID(), dataUrl, timestamp } satisfies RoomPhoto;
+          const id = crypto.randomUUID();
+
+          // Upload to server immediately — photos stored by ID, retrieved via URL
+          const res = await fetch("/api/photos", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photos: [{ id, dataUrl }] }),
+          });
+          if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
+
+          // No dataUrl in state — photo is on the server, displayed via /api/photos/:id
+          return { id, dataUrl: "", timestamp } satisfies RoomPhoto;
         })
       ).then((newPhotos) => {
         onChange([...photos, ...newPhotos]);
-      }).catch(console.error);
+      }).catch((err) => {
+        console.error("Photo upload failed:", err);
+        alert(effectiveLang.startsWith("en")
+          ? "Photo upload failed. Please check your connection and try again."
+          : "Foto-Upload fehlgeschlagen. Bitte Verbindung prüfen und nochmal versuchen.");
+      }).finally(() => {
+        setUploadingCount((n) => Math.max(0, n - validFiles.length));
+      });
     },
-    [photos, onChange]
+    [photos, onChange, effectiveLang]
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -252,12 +267,13 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="gap-1.5"
+          disabled={uploadingCount > 0}
           onClick={() => cameraInputRef.current?.click()}
         >
           <Camera size={15} />
@@ -268,11 +284,20 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
           variant="outline"
           size="sm"
           className="gap-1.5"
+          disabled={uploadingCount > 0}
           onClick={() => fileInputRef.current?.click()}
         >
           <ImagePlus size={15} />
           {tr.photoGallery}
         </Button>
+        {uploadingCount > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 size={13} className="animate-spin" />
+            {uploadingCount === 1
+              ? (effectiveLang.startsWith("en") ? "Uploading photo…" : "Foto wird hochgeladen…")
+              : (effectiveLang.startsWith("en") ? `Uploading ${uploadingCount} photos…` : `${uploadingCount} Fotos werden hochgeladen…`)}
+          </span>
+        )}
         <input
           ref={cameraInputRef}
           type="file"

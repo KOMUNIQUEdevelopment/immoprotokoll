@@ -751,6 +751,41 @@ app.get("/api/protocol/:id/photos", async (req, res) => {
   }
 });
 
+// ── REST: Einzelnes Foto abrufen als Binärdaten (requires auth) ──────────────
+app.get("/api/photos/:id", requireAuth, async (req: AuthRequest, res) => {
+  const photoId = (req.params as { id: string }).id ?? "";
+  const accountId = req.user!.accountId;
+
+  try {
+    const rows = await db
+      .select({ dataUrl: syncPhotosTable.dataUrl })
+      .from(syncPhotosTable)
+      .where(and(eq(syncPhotosTable.accountId, accountId), eq(syncPhotosTable.id, photoId)))
+      .limit(1);
+
+    if (!rows[0]) {
+      res.status(404).end();
+      return;
+    }
+
+    const { dataUrl } = rows[0];
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!match) {
+      res.status(500).end();
+      return;
+    }
+
+    const buffer = Buffer.from(match[2], "base64");
+    res.setHeader("Content-Type", match[1]);
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
+  } catch (err) {
+    logger.error({ err, photoId }, "Failed to serve photo");
+    res.status(500).end();
+  }
+});
+
 // ── REST: Fotos hochladen (requires auth; account-scoped) ────────────────────
 app.post(
   "/api/photos",

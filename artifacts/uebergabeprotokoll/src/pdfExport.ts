@@ -450,24 +450,37 @@ export async function exportToPDF(protocol: ProtocolData, options?: ExportOption
 // ─── photo rotation helper ────────────────────────────────────────────────────
 
 /**
- * If the photo is portrait (height > width), rotate it 90° clockwise so it
- * becomes landscape. This prevents squishing in the fixed landscape PDF cells.
- * Returns the original dataUrl unchanged for landscape/square images.
+ * Load a photo as a dataUrl.
+ * Uses photo.dataUrl if available; otherwise fetches from server via /api/photos/:id.
  */
+async function loadPhotoDataUrl(photo: RoomPhoto): Promise<string> {
+  if (photo.dataUrl) return photo.dataUrl;
+  try {
+    const res = await fetch(`/api/photos/${photo.id}`, { credentials: "include" });
+    if (!res.ok) return "";
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 function ensureLandscape(dataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     if (!dataUrl) { resolve(dataUrl); return; }
     const img = new Image();
     img.onload = () => {
       if (img.naturalWidth >= img.naturalHeight) {
-        // Already landscape or square — no change needed
         resolve(dataUrl);
         return;
       }
-      // Portrait → rotate 90° CW to landscape
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalHeight;   // new width = old height
-      canvas.height = img.naturalWidth;   // new height = old width
+      canvas.width = img.naturalHeight;
+      canvas.height = img.naturalWidth;
       const ctx = canvas.getContext("2d");
       if (!ctx) { resolve(dataUrl); return; }
       ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -509,10 +522,13 @@ async function addPhotosBlock(
 
     const photo = photos[i];
     try {
-      // Rotate portrait photos to landscape so they fill the cell correctly
-      const landDataUrl = await ensureLandscape(photo.dataUrl);
-      const fmt = landDataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-      doc.addImage(landDataUrl, fmt, margin, y, photoW, photoH);
+      // Load photo data (from state or server URL), then rotate portrait to landscape
+      const photoDataUrl = await loadPhotoDataUrl(photo);
+      const landDataUrl = await ensureLandscape(photoDataUrl);
+      if (landDataUrl) {
+        const fmt = landDataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+        doc.addImage(landDataUrl, fmt, margin, y, photoW, photoH);
+      }
     } catch {
       // skip broken images
     }
