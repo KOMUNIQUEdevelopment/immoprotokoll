@@ -387,8 +387,8 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
       expiresAt,
     });
 
-    const APP_BASE = process.env.APP_BASE_URL ?? "https://immoprotokoll.com";
-    const resetUrl = `${APP_BASE}/app/#/reset-password/${token}`;
+    const APP_APP_URL = process.env.APP_APP_URL ?? "https://app.immoprotokoll.com";
+    const resetUrl = `${APP_APP_URL}/#/reset-password/${token}`;
 
     await sendPasswordResetEmail(normalizedEmail, user.firstName, resetUrl);
   } catch (err) {

@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { logger } from "./logger";
 
 const FROM_ADDRESS = "ImmoProtokoll <noreply@immoprotokoll.com>";
-const APP_URL = "https://immoprotokoll.com/app/";
+const APP_URL = process.env.APP_APP_URL ?? "https://app.immoprotokoll.com";
 const SUPPORT_EMAIL = "support@immoprotokoll.com";
 
 // Replit Resend connector — fetches a fresh API key each time (tokens can expire)
