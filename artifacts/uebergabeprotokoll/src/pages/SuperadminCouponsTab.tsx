@@ -97,9 +97,14 @@ function CreateForm({ mode, onCreated, onCancel }: CreateFormProps) {
       } else {
         let msg = "Fehler beim Erstellen";
         try {
-          const d = await r.json() as { error?: string };
-          msg = d.error ?? msg;
-        } catch { /* ignore json parse error */ }
+          const text = await r.text();
+          try {
+            const d = JSON.parse(text) as { error?: string };
+            msg = d.error?.trim() || text.trim().slice(0, 300) || msg;
+          } catch {
+            msg = text.trim().slice(0, 300) || msg;
+          }
+        } catch { /* ignore */ }
         setError(`${r.status}: ${msg}`);
       }
     } catch (err) {

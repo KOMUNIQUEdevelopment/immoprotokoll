@@ -463,7 +463,6 @@ router.post("/coupons", async (req: AuthRequest, res: Response) => {
       name: name || undefined,
       percent_off,
       duration,
-      ...(max_redemptions ? { max_redemptions } : {}),
     });
 
     let customerId: string | undefined;
