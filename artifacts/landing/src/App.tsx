@@ -6,6 +6,50 @@ import NotFound from "@/pages/not-found";
 import { LanguageProvider, useLanguage } from "./i18n";
 import { useEffect } from "react";
 
+const SEO_META: Record<"de" | "en", { title: string; description: string; ogTitle: string; ogDescription: string; lang: string; ogLocale: string }> = {
+  de: {
+    lang: "de",
+    ogLocale: "de_CH",
+    title: "ImmoProtokoll – Digitales Übergabeprotokoll für Vermieter",
+    description: "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow. Übergabeprotokolle erstellen, unterschreiben und archivieren – für private Vermieter und Immobilienagenturen.",
+    ogTitle: "ImmoProtokoll – Digitales Übergabeprotokoll für Vermieter",
+    ogDescription: "Ersetzen Sie Klemmbrett und Papier durch einen makellosen digitalen Workflow. Übergabeprotokolle erstellen, unterschreiben und archivieren – für private Vermieter und Immobilienagenturen.",
+  },
+  en: {
+    lang: "en",
+    ogLocale: "en_US",
+    title: "ImmoProtokoll – Digital Property Handover Protocol",
+    description: "Replace clipboards and paper with a flawless digital workflow. Create, sign and archive property handover protocols – for landlords and real estate agencies.",
+    ogTitle: "ImmoProtokoll – Digital Property Handover Protocol",
+    ogDescription: "Replace clipboards and paper with a flawless digital workflow. Create, sign and archive property handover protocols – for landlords and real estate agencies.",
+  },
+};
+
+function setMeta(name: string, content: string, attr: "name" | "property" = "name") {
+  let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement | null;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, name);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
+function useDocumentSeo(lang: "de" | "en") {
+  useEffect(() => {
+    const m = SEO_META[lang];
+    document.documentElement.lang = m.lang;
+    document.title = m.title;
+    setMeta("title", m.title);
+    setMeta("description", m.description);
+    setMeta("og:title", m.ogTitle, "property");
+    setMeta("og:description", m.ogDescription, "property");
+    setMeta("og:locale", m.ogLocale, "property");
+    setMeta("twitter:title", m.ogTitle);
+    setMeta("twitter:description", m.ogDescription);
+  }, [lang]);
+}
+
 import LandingPage from "./pages/LandingPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
@@ -13,10 +57,15 @@ import ImprintPage from "./pages/ImprintPage";
 
 const queryClient = new QueryClient();
 
-// A wrapper to handle the language prefix
+function SeoUpdater({ lang }: { lang: "de" | "en" }) {
+  useDocumentSeo(lang);
+  return null;
+}
+
 function RouteWrapper({ component: Component, lang }: { component: any, lang: "de" | "en" }) {
   return (
     <LanguageProvider initialLang={lang}>
+      <SeoUpdater lang={lang} />
       <Component />
     </LanguageProvider>
   );

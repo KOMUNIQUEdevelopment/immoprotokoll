@@ -1,43 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- Root – redirects to language version -->
+  <url>
+    <loc>https://immoprotokoll.com/</loc>
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/" />
+  </url>
+
+  <!-- Startseite DE -->
   <url>
     <loc>https://immoprotokoll.com/de</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/" />
   </url>
+
+  <!-- Homepage EN -->
   <url>
     <loc>https://immoprotokoll.com/en</loc>
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de" />
     <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/" />
   </url>
+
+  <!-- Datenschutz DE -->
   <url>
     <loc>https://immoprotokoll.com/de/datenschutz</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/privacy" />
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/datenschutz" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/de/datenschutz" />
   </url>
+
+  <!-- Privacy EN -->
   <url>
     <loc>https://immoprotokoll.com/en/privacy</loc>
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/datenschutz" />
     <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/en/privacy" />
   </url>
+
+  <!-- AGB DE -->
   <url>
     <loc>https://immoprotokoll.com/de/agb</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/terms" />
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/agb" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/de/agb" />
   </url>
+
+  <!-- Terms EN -->
   <url>
     <loc>https://immoprotokoll.com/en/terms</loc>
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/agb" />
     <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/en/terms" />
   </url>
+
+  <!-- Impressum DE -->
   <url>
     <loc>https://immoprotokoll.com/de/impressum</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/imprint" />
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/impressum" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/imprint" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/de/impressum" />
   </url>
+
+  <!-- Imprint EN -->
   <url>
     <loc>https://immoprotokoll.com/en/imprint</loc>
+    <lastmod>2025-04-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
     <xhtml:link rel="alternate" hreflang="de" href="https://immoprotokoll.com/de/impressum" />
     <xhtml:link rel="alternate" hreflang="en" href="https://immoprotokoll.com/en/imprint" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://immoprotokoll.com/en/imprint" />
   </url>
+
 </urlset>
