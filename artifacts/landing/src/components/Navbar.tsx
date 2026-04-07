@@ -70,11 +70,11 @@ export default function Navbar() {
               </button>
             ))}
           </div>
-          <a href="/app/" className="text-sm font-medium hover:underline">
+          <a href="https://app.immoprotokoll.com/" className="text-sm font-medium hover:underline">
             {t.nav.login}
           </a>
           <a 
-            href="/app/" 
+            href="https://app.immoprotokoll.com/" 
             className="bg-black text-white px-5 py-2 text-sm font-bold rounded-lg hover:bg-black/80 transition-colors"
           >
             {t.nav.start_free}
@@ -120,13 +120,13 @@ export default function Navbar() {
                 </button>
               ))}
             </div>
-            <a href="/app/" className="font-medium">
+            <a href="https://app.immoprotokoll.com/" className="font-medium">
               {t.nav.login}
             </a>
           </div>
           
           <a 
-            href="/app/" 
+            href="https://app.immoprotokoll.com/" 
             className="bg-black text-white text-center py-3 mt-2 font-bold w-full rounded-lg"
           >
             {t.nav.start_free}

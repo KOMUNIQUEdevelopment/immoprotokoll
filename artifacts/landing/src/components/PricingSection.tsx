@@ -77,7 +77,7 @@ export default function PricingSection() {
             period=""
             limits={t.pricing.free.limits.split(", ")}
             cta={t.pricing.free.cta}
-            href="/app/"
+            href="https://app.immoprotokoll.com/"
             delay={0}
           />
 
@@ -89,7 +89,7 @@ export default function PricingSection() {
             period={isAnnual ? "/yr" : "/mo"}
             limits={t.pricing.privat.limits.split(", ")}
             cta={t.pricing.privat.cta}
-            href="/app/#/register"
+            href="https://app.immoprotokoll.com/#/register"
             highlight
             delay={0.1}
           />
@@ -102,7 +102,7 @@ export default function PricingSection() {
             period={isAnnual ? "/yr" : "/mo"}
             limits={t.pricing.agentur.limits.split(", ")}
             cta={t.pricing.agentur.cta}
-            href="/app/#/register"
+            href="https://app.immoprotokoll.com/#/register"
             delay={0.2}
           />
 

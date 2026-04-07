@@ -76,6 +76,12 @@ if (isProduction) {
   const serveApp = express.static(appDir);
   const serveLanding = express.static(landingDir);
 
+  // Redirect legacy /app/* paths to app subdomain
+  app.use("/app", (req: Request, res: Response) => {
+    const rest = req.path === "/" ? "" : req.path;
+    return res.redirect(301, `https://app.immoprotokoll.com${rest}`);
+  });
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.hostname.startsWith("app.")) {
       return serveApp(req, res, () => {
