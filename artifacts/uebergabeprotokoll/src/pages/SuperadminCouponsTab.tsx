@@ -360,31 +360,53 @@ export default function SuperadminCouponsTab() {
       )}
 
       {!loading && entries.length > 0 && (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-3">
           {entries.map(({ coupon, promoCodes }) => (
             <div key={coupon.id} className="bg-white border border-[hsl(0,0%,88%)] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[hsl(0,0%,92%)] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-lg font-bold text-[hsl(0,0%,8%)]">{coupon.percent_off}%</span>
-                    <span className="text-xs text-[hsl(0,0%,50%)]">Rabatt</span>
-                  </div>
+
+              {/* Coupon header */}
+              <div className="px-4 py-3 flex items-center gap-4">
+                {/* Discount badge */}
+                <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-[hsl(0,0%,8%)] text-white flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold leading-none">{coupon.percent_off}%</span>
+                  <span className="text-[10px] opacity-60 mt-0.5">Rabatt</span>
+                </div>
+
+                {/* Name + codes preview */}
+                <div className="flex-1 min-w-0">
                   {coupon.name && (
-                    <span className="text-sm text-[hsl(0,0%,30%)] font-medium">{coupon.name}</span>
+                    <p className="text-sm font-semibold text-[hsl(0,0%,10%)] truncate">{coupon.name}</p>
                   )}
+                  {/* Show active codes inline */}
+                  {promoCodes.filter((pc) => pc.active).length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {promoCodes.filter((pc) => pc.active).map((pc) => (
+                        <span key={pc.id} className="inline-flex items-center gap-1 font-mono text-xs font-bold bg-[hsl(0,0%,93%)] text-[hsl(0,0%,10%)] px-2 py-0.5 rounded">
+                          {pc.code}
+                          <CopyButton text={pc.code} />
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[hsl(0,0%,60%)] mt-0.5 italic">Kein aktiver Code</p>
+                  )}
+                </div>
+
+                {/* Stats + delete */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-[hsl(0,0%,10%)]">{coupon.times_redeemed}×</p>
+                    <p className="text-xs text-[hsl(0,0%,55%)]">
+                      {coupon.max_redemptions ? `von ${coupon.max_redemptions}` : "eingelöst"}
+                    </p>
+                  </div>
                   {!coupon.valid && (
                     <span className="text-xs px-2 py-0.5 bg-[hsl(0,0%,90%)] text-[hsl(0,0%,50%)] rounded-full">Abgelaufen</span>
                   )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[hsl(0,0%,60%)]">
-                    {coupon.times_redeemed}× eingelöst
-                    {coupon.max_redemptions ? ` / ${coupon.max_redemptions}` : ""}
-                  </span>
                   <button
                     onClick={() => deleteCoupon(coupon.id)}
                     disabled={deletingCoupon === coupon.id}
-                    className="p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)] text-[hsl(0,0%,60%)] hover:text-[hsl(0,0%,20%)]"
+                    className="p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)] text-[hsl(0,0%,70%)] hover:text-[hsl(0,0%,20%)]"
                     title="Coupon löschen"
                   >
                     {deletingCoupon === coupon.id
@@ -395,55 +417,47 @@ export default function SuperadminCouponsTab() {
                 </div>
               </div>
 
-              <div className="divide-y divide-[hsl(0,0%,94%)]">
-                {promoCodes.length === 0 && (
-                  <p className="px-4 py-3 text-xs text-[hsl(0,0%,60%)] italic">Keine Promotion Codes verknüpft.</p>
-                )}
-                {promoCodes.map((pc) => (
-                  <div key={pc.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${!pc.active ? "opacity-50" : ""}`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-sm font-semibold text-[hsl(0,0%,8%)]">{pc.code}</span>
-                        <CopyButton text={pc.code} />
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {!pc.active && (
-                          <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,90%)] text-[hsl(0,0%,50%)] rounded">Deaktiviert</span>
-                        )}
-                        {pc.customer_email && (
-                          <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)] rounded">
-                            Nur: {pc.customer_email}
-                          </span>
-                        )}
-                        {pc.first_time_transaction && (
-                          <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)] rounded">Erstkauf</span>
-                        )}
-                        {pc.expires_at && (
-                          <span className="text-xs text-[hsl(0,0%,55%)]">
-                            bis {new Date(pc.expires_at * 1000).toLocaleDateString("de-CH")}
-                          </span>
-                        )}
-                        <span className="text-xs text-[hsl(0,0%,60%)]">
-                          {pc.times_redeemed}×{pc.max_redemptions ? ` / ${pc.max_redemptions}` : ""}
-                        </span>
-                      </div>
-                    </div>
-                    {pc.active && (
+              {/* Promo codes detail rows */}
+              {(promoCodes.length > 0 || true) && (
+                <div className="border-t border-[hsl(0,0%,94%)] divide-y divide-[hsl(0,0%,96%)]">
+                  {promoCodes.length === 0 && (
+                    <div className="px-4 py-2.5 flex items-center justify-between">
+                      <p className="text-xs text-[hsl(0,0%,65%)]">Kein Promo-Code verknüpft — Coupon kann nicht eingelöst werden.</p>
                       <button
-                        onClick={() => deactivateCode(pc.id)}
-                        disabled={deactivatingCode === pc.id}
-                        className="flex-shrink-0 p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)] text-[hsl(0,0%,60%)] hover:text-[hsl(0,0%,20%)]"
-                        title="Code deaktivieren"
+                        onClick={() => setShowCreate(true)}
+                        className="text-xs font-medium text-[hsl(0,0%,30%)] hover:text-black underline underline-offset-2"
                       >
-                        {deactivatingCode === pc.id
-                          ? <RefreshCw size={13} className="animate-spin" />
-                          : <ShieldOff size={13} />
-                        }
+                        + Neuen Code erstellen
                       </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  )}
+                  {promoCodes.map((pc) => (
+                    <div key={pc.id} className={`px-4 py-2.5 flex items-center justify-between gap-3 ${!pc.active ? "opacity-40" : ""}`}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="font-mono text-sm font-bold text-[hsl(0,0%,8%)]">{pc.code}</span>
+                        <CopyButton text={pc.code} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {!pc.active && <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,90%)] text-[hsl(0,0%,50%)] rounded">Deaktiviert</span>}
+                          {pc.customer_email && <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)] rounded">Nur: {pc.customer_email}</span>}
+                          {pc.first_time_transaction && <span className="text-xs px-1.5 py-0.5 bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)] rounded">Erstkauf</span>}
+                          {pc.expires_at && <span className="text-xs text-[hsl(0,0%,55%)]">bis {new Date(pc.expires_at * 1000).toLocaleDateString("de-CH")}</span>}
+                          <span className="text-xs text-[hsl(0,0%,60%)]">{pc.times_redeemed}×{pc.max_redemptions ? ` / ${pc.max_redemptions}` : ""} eingelöst</span>
+                        </div>
+                      </div>
+                      {pc.active && (
+                        <button
+                          onClick={() => deactivateCode(pc.id)}
+                          disabled={deactivatingCode === pc.id}
+                          className="flex-shrink-0 p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)] text-[hsl(0,0%,60%)] hover:text-[hsl(0,0%,20%)]"
+                          title="Code deaktivieren"
+                        >
+                          {deactivatingCode === pc.id ? <RefreshCw size={13} className="animate-spin" /> : <ShieldOff size={13} />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
