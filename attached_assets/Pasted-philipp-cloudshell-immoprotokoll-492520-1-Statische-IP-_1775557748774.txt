@@ -1,0 +1,62 @@
+philipp@cloudshell:~ (immoprotokoll-492520)$ # 1. Statische IP reservieren
+gcloud compute addresses create www-redirect-ip --global
+
+# 2. URL-Map mit 301-Redirect erstellen
+cat > /tmp/redirect-map.yaml << 'EOF'
+defaultUrlRedirect:
+  httpsRedirect: true
+  redirectResponseCode: MOVED_PERMANENTLY_DEFAULT
+  hostRedirect: immoprotokoll.com
+  prefixRedirect: /
+  pathRedirect: /
+  stripQuery: false
+EOF
+gcloud compute url-maps import www-redirect-map \
+  --source /tmp/redirect-map.yaml --global
+
+# 3. SSL-Zertifikat für www anlegen
+gcloud compute ssl-certificates create www-cert \
+  --domains=www.immoprotokoll.com --global
+
+# 4. HTTPS-Proxy erstellen
+gcloud compute target-https-proxies create www-https-proxy \
+  --url-map=www-redirect-map \
+  --ssl-certificates=www-cert --global
+
+# 5. Forwarding Rule (IP → Proxy)
+gcloud compute forwarding-rules create www-https-rule \
+  --address=www-redirect-ip \
+  --target-https-proxy=www-https-proxy \
+  --ports=443 --global
+
+# IP anzeigen → für DNS-Record
+gcloud compute addresses describe www-redirect-ip --global --format="value(address)"
+Created [https://www.googleapis.com/compute/v1/projects/immoprotokoll-492520/global/addresses/www-redirect-ip].
+WARNING: The name of the Url Map must match the value of the 'name' attribute in the YAML file. Future versions of gcloud will fail with an error.
+ERROR: (gcloud.compute.url-maps.import) HTTPError 400: Invalid value for field 'resource.name': ''. Must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
+Invalid value for field 'resource.name': ''. Must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
+- '@type': type.googleapis.com/google.rpc.ErrorInfo
+  domain: compute.googleapis.com
+  metadata:
+    field: resource.name
+    reason: Must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
+    value: ''
+  reason: INVALID_FIELD_VALUE
+Created [https://www.googleapis.com/compute/v1/projects/immoprotokoll-492520/global/sslCertificates/www-cert].
+NAME: www-cert
+TYPE: MANAGED
+CREATION_TIMESTAMP: 2026-04-07T03:28:20.962-07:00
+EXPIRE_TIME: 
+REGION: 
+MANAGED_STATUS: PROVISIONING
+
+www.immoprotokoll.com: PROVISIONING
+
+ERROR: (gcloud.compute.target-https-proxies.create) Could not fetch resource:
+ - The resource 'projects/immoprotokoll-492520/global/urlMaps/www-redirect-map' was not found
+
+ERROR: (gcloud.compute.forwarding-rules.create) Could not fetch resource:
+ - The resource 'projects/immoprotokoll-492520/global/targetHttpsProxies/www-https-proxy' was not found
+
+34.110.175.198
+philipp@cloudshell:~ (immoprotokoll-492520)$ 
