@@ -226,7 +226,7 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
           ]);
           const id = crypto.randomUUID();
 
-          // Upload to server immediately — photos stored by ID, retrieved via URL
+          // Upload to server immediately — stored separately in sync_photos table
           const res = await fetch("/api/photos", {
             method: "POST",
             credentials: "include",
@@ -235,8 +235,9 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
           });
           if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
 
-          // No dataUrl in state — photo is on the server, displayed via /api/photos/:id
-          return { id, dataUrl: "", timestamp } satisfies RoomPhoto;
+          // Keep dataUrl in state for instant display.
+          // stripSingleProtocol() removes it before saving to DB — no duplicate storage.
+          return { id, dataUrl, timestamp } satisfies RoomPhoto;
         })
       ).then((newPhotos) => {
         onChange([...photos, ...newPhotos]);
