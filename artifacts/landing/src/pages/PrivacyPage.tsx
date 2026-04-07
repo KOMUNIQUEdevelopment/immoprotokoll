@@ -1,13 +1,34 @@
+import { useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useLanguage } from "../i18n";
 import { useSEO } from "../hooks/useSEO";
 
+function CookieScriptReport() {
+  useEffect(() => {
+    const existing = document.querySelector("script[data-cookiescriptreport='report']");
+    if (existing) existing.remove();
+
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.charset = "UTF-8";
+    script.setAttribute("data-cookiescriptreport", "report");
+    script.src = "//report.cookie-script.com/r/94830153c5c717c8441e590155108bd7.js";
+    document.getElementById("cookie-script-report-container")?.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
+  }, []);
+
+  return <div id="cookie-script-report-container" className="not-prose mt-4" />;
+}
+
 export default function PrivacyPage() {
   const { lang } = useLanguage();
 
   const title = lang === 'de' ? "Datenschutzerklärung - ImmoProtokoll" : "Privacy Policy - ImmoProtokoll";
-  const description = lang === 'de' 
+  const description = lang === 'de'
     ? "Datenschutzerklärung für die Nutzung der ImmoProtokoll Software."
     : "Privacy policy for the use of the ImmoProtokoll software.";
 
@@ -68,10 +89,16 @@ export default function PrivacyPage() {
               Sie können der Erhebung durch Google Analytics widersprechen, indem Sie das <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Browser-Add-on zur Deaktivierung von Google Analytics</a> installieren.
             </p>
 
-            <h2>8. Datenlöschung und Aufbewahrungsfristen</h2>
+            <h2>8. Cookies</h2>
+            <p>
+              Wir verwenden Cookies und ähnliche Technologien, um die Funktionalität unserer Website zu gewährleisten und die Nutzererfahrung zu verbessern. Sie können Ihre Cookie-Einstellungen jederzeit anpassen. Eine Übersicht der eingesetzten Cookies finden Sie nachfolgend:
+            </p>
+            <CookieScriptReport />
+
+            <h2>9. Datenlöschung und Aufbewahrungsfristen</h2>
             <p>Ihre Daten werden so lange gespeichert, wie Ihr Account besteht. Nach Löschung Ihres Accounts werden alle zugehörigen Daten innerhalb von 30 Tagen vollständig aus unseren Systemen entfernt auf Anfrage.</p>
 
-            <h2>9. Ihre Rechte</h2>
+            <h2>10. Ihre Rechte</h2>
             <p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer Daten. Anfragen richten Sie bitte an <a href="mailto:support@immoprotokoll.com">support@immoprotokoll.com</a>.</p>
           </>
         ) : (
@@ -120,10 +147,16 @@ export default function PrivacyPage() {
               You may opt out of Google Analytics data collection by installing the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Google Analytics opt-out browser add-on</a>.
             </p>
 
-            <h2>8. Data Retention and Deletion</h2>
+            <h2>8. Cookies</h2>
+            <p>
+              We use cookies and similar technologies to ensure the functionality of our website and to improve the user experience. You can adjust your cookie preferences at any time. An overview of the cookies we use can be found below:
+            </p>
+            <CookieScriptReport />
+
+            <h2>9. Data Retention and Deletion</h2>
             <p>Your data is stored as long as your account exists. Upon account deletion, all associated data will be completely removed from our systems within 30 days upon request.</p>
 
-            <h2>9. Your Rights</h2>
+            <h2>10. Your Rights</h2>
             <p>You have the right to access, correct, delete, and restrict the processing of your data. Please direct requests to <a href="mailto:support@immoprotokoll.com">support@immoprotokoll.com</a>.</p>
           </>
         )}
