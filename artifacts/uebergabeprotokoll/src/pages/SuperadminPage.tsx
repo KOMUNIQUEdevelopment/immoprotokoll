@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Search, ChevronLeft, ChevronRight, Users, FileText, Building2,
-  Settings, LogOut, Shield, ArrowLeft, Check, X,
-  RefreshCw, Eye, CreditCard, AlertTriangle, CheckCircle2,
-  MessageSquare, Map, Tag,
+  MessageSquare, Map, Tag, Building2, LogOut, Shield,
+  ChevronLeft, ChevronRight, Search, Settings, Eye,
+  RefreshCw, X, Check, CreditCard, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,6 @@ import SuperadminRoadmapTab from "./SuperadminRoadmapTab";
 import SuperadminCouponsTab from "./SuperadminCouponsTab";
 
 const API = "/api";
-
 async function apiFetch(path: string, options?: RequestInit) {
   return fetch(`${API}${path}`, {
     credentials: "include",
@@ -20,6 +18,8 @@ async function apiFetch(path: string, options?: RequestInit) {
     ...options,
   });
 }
+
+type AdminSection = "support" | "roadmap" | "coupons" | "accounts";
 
 interface AccountRow {
   id: string;
@@ -38,14 +38,7 @@ interface AccountRow {
 }
 
 interface AccountDetail extends AccountRow {
-  users: Array<{
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-    createdAt: string;
-  }>;
+  users: Array<{ id: string; email: string; firstName: string; lastName: string; role: string; createdAt: string }>;
 }
 
 interface Stats {
@@ -55,471 +48,210 @@ interface Stats {
   planBreakdown: Record<string, number>;
 }
 
-const PLAN_BADGE: Record<string, string> = {
-  free: "bg-[hsl(0,0%,88%)] text-[hsl(0,0%,30%)]",
-  privat: "bg-[hsl(0,0%,20%)] text-[hsl(0,0%,95%)]",
-  agentur: "bg-[hsl(0,0%,10%)] text-[hsl(0,0%,95%)]",
-  custom: "bg-[hsl(0,0%,0%)] text-[hsl(0,0%,100%)]",
-};
+interface StripeStatus {
+  mode: "live" | "test";
+  live: { keyConfigured: boolean };
+  test: { keyConfigured: boolean; publishableKeyConfigured: boolean; webhookSecretConfigured: boolean; pricesConfigured: number; pricesExpected: number };
+}
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "text-[hsl(0,0%,20%)]",
-  trialing: "text-[hsl(0,0%,40%)]",
-  past_due: "text-[hsl(0,0%,20%)] font-semibold",
-  canceled: "text-[hsl(0,0%,60%)]",
-  unpaid: "text-[hsl(0,0%,20%)] font-semibold",
-  incomplete: "text-[hsl(0,0%,60%)]",
+const PLAN_BADGE: Record<string, string> = {
+  free: "bg-neutral-100 text-neutral-500",
+  privat: "bg-neutral-800 text-white",
+  agentur: "bg-black text-white",
+  custom: "bg-black text-white ring-1 ring-black",
 };
 
 function PlanBadge({ plan }: { plan: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${PLAN_BADGE[plan] ?? "bg-[hsl(0,0%,88%)] text-[hsl(0,0%,30%)]"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${PLAN_BADGE[plan] ?? "bg-neutral-100 text-neutral-500"}`}>
       {plan.charAt(0).toUpperCase() + plan.slice(1)}
     </span>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="bg-[hsl(0,0%,97%)] border border-[hsl(0,0%,88%)] rounded-lg p-4">
-      <p className="text-xs font-medium text-[hsl(0,0%,50%)] uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-[hsl(0,0%,8%)] mt-1">{value}</p>
-    </div>
-  );
-}
-
-interface StripeStatus {
-  mode: "live" | "test";
-  live: { keyConfigured: boolean };
-  test: {
-    keyConfigured: boolean;
-    publishableKeyConfigured: boolean;
-    webhookSecretConfigured: boolean;
-    pricesConfigured: number;
-    pricesExpected: number;
-  };
-}
-
-function StripePanel() {
-  const [status, setStatus] = useState<StripeStatus | null>(null);
-  const [switchingMode, setSwitchingMode] = useState(false);
-  const [settingUp, setSettingUp] = useState(false);
-  const [setupMsg, setSetupMsg] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const r = await apiFetch("/superadmin/stripe");
-      if (r.ok) setStatus(await r.json() as StripeStatus);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const switchMode = async (mode: "live" | "test") => {
-    setSwitchingMode(true);
-    setSetupMsg(null);
-    try {
-      await apiFetch("/superadmin/stripe/mode", {
-        method: "POST",
-        body: JSON.stringify({ mode }),
-      });
-      await load();
-    } finally {
-      setSwitchingMode(false);
-    }
-  };
-
-  const setupTest = async () => {
-    setSettingUp(true);
-    setSetupMsg(null);
-    try {
-      const r = await apiFetch("/superadmin/stripe/setup-test", { method: "POST" });
-      const d = await r.json() as { ok?: boolean; count?: number; error?: string };
-      if (r.ok) {
-        setSetupMsg(`${d.count} Preise angelegt/bestätigt.`);
-        await load();
-      } else {
-        setSetupMsg(`Fehler: ${d.error}`);
-      }
-    } finally {
-      setSettingUp(false);
-    }
-  };
-
-  if (!status) return null;
-
-  const isTest = status.mode === "test";
-  const testReady = status.test.keyConfigured && status.test.publishableKeyConfigured;
-  const pricesReady = status.test.pricesConfigured >= status.test.pricesExpected;
-
-  return (
-    <div className="p-4 border-b border-[hsl(0,0%,90%)] bg-white">
-      <div className="flex items-center gap-2 mb-3">
-        <CreditCard size={14} className="text-[hsl(0,0%,40%)]" />
-        <span className="text-xs font-semibold text-[hsl(0,0%,30%)] uppercase tracking-wide">Stripe Modus</span>
-        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded ${isTest ? "bg-[hsl(0,0%,93%)] text-[hsl(0,0%,30%)]" : "bg-[hsl(0,0%,8%)] text-white"}`}>
-          {isTest ? "TEST" : "LIVE"}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2 mb-3">
-        <button
-          onClick={() => switchMode("live")}
-          disabled={switchingMode || !isTest}
-          className={`flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors ${!isTest ? "bg-[hsl(0,0%,8%)] text-white border-[hsl(0,0%,8%)]" : "bg-white text-[hsl(0,0%,40%)] border-[hsl(0,0%,80%)] hover:border-[hsl(0,0%,50%)]"}`}
-        >
-          Live
-        </button>
-        <button
-          onClick={() => switchMode("test")}
-          disabled={switchingMode || isTest}
-          className={`flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors ${isTest ? "bg-[hsl(0,0%,8%)] text-white border-[hsl(0,0%,8%)]" : "bg-white text-[hsl(0,0%,40%)] border-[hsl(0,0%,80%)] hover:border-[hsl(0,0%,50%)]"}`}
-        >
-          Sandbox (Test)
-        </button>
-      </div>
-
-      {isTest && (
-        <div className="space-y-1.5 mb-3">
-          <StatusRow label="STRIPE_SECRET_KEY_TEST" ok={status.test.keyConfigured} />
-          <StatusRow label="STRIPE_PUBLISHABLE_KEY_TEST" ok={status.test.publishableKeyConfigured} />
-          <StatusRow label="STRIPE_WEBHOOK_SECRET_TEST" ok={status.test.webhookSecretConfigured} />
-          <StatusRow
-            label={`Testpreise (${status.test.pricesConfigured}/${status.test.pricesExpected})`}
-            ok={pricesReady}
-          />
-        </div>
-      )}
-
-      {isTest && testReady && !pricesReady && (
-        <Button
-          size="sm"
-          className="w-full h-7 text-xs bg-[hsl(0,0%,8%)] text-white hover:bg-[hsl(0,0%,20%)]"
-          onClick={setupTest}
-          disabled={settingUp}
-        >
-          {settingUp ? <RefreshCw size={11} className="animate-spin mr-1" /> : null}
-          Testprodukte in Stripe anlegen
-        </Button>
-      )}
-
-      {isTest && pricesReady && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full h-7 text-xs border-[hsl(0,0%,80%)]"
-          onClick={setupTest}
-          disabled={settingUp}
-        >
-          {settingUp ? <RefreshCw size={11} className="animate-spin mr-1" /> : <RefreshCw size={11} className="mr-1" />}
-          Preise aktualisieren
-        </Button>
-      )}
-
-      {setupMsg && (
-        <p className="mt-2 text-xs text-[hsl(0,0%,40%)]">{setupMsg}</p>
-      )}
-
-      {isTest && !testReady && (
-        <div className="mt-2 flex items-start gap-1.5 bg-[hsl(0,0%,96%)] rounded-md p-2">
-          <AlertTriangle size={12} className="text-[hsl(0,0%,40%)] shrink-0 mt-0.5" />
-          <p className="text-xs text-[hsl(0,0%,40%)] leading-snug">
-            Bitte <strong>STRIPE_SECRET_KEY_TEST</strong> und <strong>STRIPE_PUBLISHABLE_KEY_TEST</strong> in den Replit-Secrets eintragen.
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
 
 function StatusRow({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className="flex items-center gap-2">
-      {ok
-        ? <CheckCircle2 size={12} className="text-[hsl(0,0%,30%)] shrink-0" />
-        : <X size={12} className="text-[hsl(0,0%,60%)] shrink-0" />}
-      <span className="text-xs font-mono text-[hsl(0,0%,40%)]">{label}</span>
+      {ok ? <CheckCircle2 size={12} className="text-neutral-500 shrink-0" /> : <X size={12} className="text-neutral-400 shrink-0" />}
+      <span className="text-xs font-mono text-neutral-500">{label}</span>
     </div>
   );
 }
 
-interface CustomPlanEditorProps {
-  account: AccountRow;
-  onSave: (updates: Partial<AccountRow>) => Promise<void>;
-  onClose: () => void;
-}
+// ── Accounts Section ─────────────────────────────────────────────────────────
 
-function CustomPlanEditor({ account, onSave, onClose }: CustomPlanEditorProps) {
-  const [plan, setPlan] = useState(account.plan);
-  const [maxProps, setMaxProps] = useState(account.customMaxProperties?.toString() ?? "");
-  const [maxProtos, setMaxProtos] = useState(account.customMaxProtocols?.toString() ?? "");
-  const [maxUsers, setMaxUsers] = useState(account.customMaxUsers?.toString() ?? "");
-  const [notes, setNotes] = useState(account.customPricingNotes ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await onSave({
-        plan,
-        customMaxProperties: maxProps ? parseInt(maxProps, 10) : null,
-        customMaxProtocols: maxProtos ? parseInt(maxProtos, 10) : null,
-        customMaxUsers: maxUsers ? parseInt(maxUsers, 10) : null,
-        customPricingNotes: notes || null,
-      });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-[hsl(0,0%,88%)]">
-        <div className="flex items-center justify-between p-5 border-b border-[hsl(0,0%,90%)]">
-          <div>
-            <h2 className="text-base font-semibold text-[hsl(0,0%,8%)]">Plan konfigurieren</h2>
-            <p className="text-xs text-[hsl(0,0%,50%)] mt-0.5">{account.name}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)]"><X size={16} /></button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[hsl(0,0%,40%)] mb-1.5">Plan</label>
-            <div className="grid grid-cols-4 gap-2">
-              {(["free", "privat", "agentur", "custom"] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPlan(p)}
-                  className={`py-1.5 px-2 rounded-md border text-xs font-medium transition-colors ${
-                    plan === p
-                      ? "bg-[hsl(0,0%,8%)] text-white border-[hsl(0,0%,8%)]"
-                      : "bg-white text-[hsl(0,0%,30%)] border-[hsl(0,0%,80%)] hover:border-[hsl(0,0%,60%)]"
-                  }`}
-                >
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {plan === "custom" && (
-            <div className="space-y-3 bg-[hsl(0,0%,97%)] rounded-lg p-4 border border-[hsl(0,0%,90%)]">
-              <p className="text-xs font-semibold text-[hsl(0,0%,30%)] mb-2">Custom-Limits (leer = unbegrenzt)</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs text-[hsl(0,0%,50%)] mb-1">Liegenschaften</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={maxProps}
-                    onChange={(e) => setMaxProps(e.target.value)}
-                    placeholder="∞"
-                    className="text-sm h-8"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[hsl(0,0%,50%)] mb-1">Protokolle</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={maxProtos}
-                    onChange={(e) => setMaxProtos(e.target.value)}
-                    placeholder="∞"
-                    className="text-sm h-8"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[hsl(0,0%,50%)] mb-1">Benutzer</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={maxUsers}
-                    onChange={(e) => setMaxUsers(e.target.value)}
-                    placeholder="∞"
-                    className="text-sm h-8"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-[hsl(0,0%,40%)] mb-1.5">Preisnotizen (intern)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="z.B. CHF 299/Jahr, Vertrag bis 2026-12-31"
-              className="w-full rounded-md border border-[hsl(0,0%,80%)] text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-[hsl(0,0%,40%)]"
-            />
-          </div>
-
-          {error && <p className="text-xs text-[hsl(0,0%,30%)] bg-[hsl(0,0%,93%)] rounded px-3 py-2">{error}</p>}
-        </div>
-
-        <div className="flex justify-end gap-2 p-5 border-t border-[hsl(0,0%,90%)]">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Abbrechen</Button>
-          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
-            {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
-            Speichern
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface AccountDetailPanelProps {
-  accountId: string;
-  onClose: () => void;
-  onImpersonate: (accountId: string) => Promise<void>;
-  onEdit: (account: AccountRow) => void;
-}
-
-function AccountDetailPanel({ accountId, onClose, onImpersonate, onEdit }: AccountDetailPanelProps) {
+function AccountDetailModal({ accountId, onClose, onImpersonate, onPlanSaved }: {
+  accountId: string; onClose: () => void;
+  onImpersonate: (id: string) => void;
+  onPlanSaved: () => void;
+}) {
   const [detail, setDetail] = useState<AccountDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [impersonating, setImpersonating] = useState(false);
+  const [editPlan, setEditPlan] = useState(false);
+  const [plan, setPlan] = useState<AccountRow["plan"]>("free");
+  const [maxProps, setMaxProps] = useState("");
+  const [maxProtos, setMaxProtos] = useState("");
+  const [maxUsers, setMaxUsers] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     apiFetch(`/superadmin/accounts/${accountId}`)
       .then((r) => r.json())
       .then((d: { account: AccountDetail; users: AccountDetail["users"]; protocolCount: number; propertyCount: number }) => {
-        setDetail({ ...d.account, users: d.users, protocolCount: d.protocolCount, propertyCount: d.propertyCount });
+        const acc = { ...d.account, users: d.users, protocolCount: d.protocolCount, propertyCount: d.propertyCount };
+        setDetail(acc);
+        setPlan(acc.plan);
+        setMaxProps(acc.customMaxProperties?.toString() ?? "");
+        setMaxProtos(acc.customMaxProtocols?.toString() ?? "");
+        setMaxUsers(acc.customMaxUsers?.toString() ?? "");
+        setNotes(acc.customPricingNotes ?? "");
       })
       .finally(() => setLoading(false));
   }, [accountId]);
 
-  const handleImpersonate = async () => {
-    setImpersonating(true);
+  const handleSavePlan = async () => {
+    if (!detail) return;
+    setSaving(true); setSaveError(null);
     try {
-      await onImpersonate(accountId);
-    } finally {
-      setImpersonating(false);
-    }
+      const r = await apiFetch(`/superadmin/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          plan,
+          customMaxProperties: maxProps ? parseInt(maxProps, 10) : null,
+          customMaxProtocols: maxProtos ? parseInt(maxProtos, 10) : null,
+          customMaxUsers: maxUsers ? parseInt(maxUsers, 10) : null,
+          customPricingNotes: notes || null,
+        }),
+      });
+      if (!r.ok) { const d = await r.json() as { error: string }; throw new Error(d.error); }
+      onPlanSaved();
+      setEditPlan(false);
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Fehler"); }
+    finally { setSaving(false); }
   };
 
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center text-[hsl(0,0%,60%)] text-sm">
-      <RefreshCw size={16} className="animate-spin mr-2" /> Wird geladen…
-    </div>
-  );
-
-  if (!detail) return null;
-
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-5 border-b border-[hsl(0,0%,90%)] flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-[hsl(0,0%,8%)]">{detail.name}</h2>
-          <p className="text-xs text-[hsl(0,0%,50%)] mt-0.5">
-            Erstellt {new Date(detail.createdAt).toLocaleDateString("de-CH")}
-          </p>
-        </div>
-        <button onClick={onClose} className="p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)] flex-shrink-0"><X size={16} /></button>
-      </div>
-
-      <div className="p-5 space-y-5">
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Liegenschaften" value={detail.propertyCount} />
-          <StatCard label="Protokolle" value={detail.protocolCount} />
-          <StatCard label="Benutzer" value={detail.userCount} />
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-neutral-200 flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
+          <h2 className="text-sm font-semibold text-neutral-800">{loading ? "…" : detail?.name}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-neutral-100"><X size={16} /></button>
         </div>
 
-        <div className="bg-[hsl(0,0%,97%)] rounded-lg p-4 border border-[hsl(0,0%,90%)]">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-[hsl(0,0%,30%)] uppercase tracking-wide">Plan</p>
-            <PlanBadge plan={detail.plan} />
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-neutral-400 text-sm gap-2">
+            <RefreshCw size={16} className="animate-spin" /> Wird geladen…
           </div>
-          {detail.subscriptionStatus && (
-            <p className={`text-xs mt-1 ${STATUS_BADGE[detail.subscriptionStatus] ?? ""}`}>
-              Status: {detail.subscriptionStatus}
-            </p>
-          )}
-          {detail.currentPeriodEnd && (
-            <p className="text-xs text-[hsl(0,0%,50%)] mt-1">
-              Periode bis: {new Date(detail.currentPeriodEnd).toLocaleDateString("de-CH")}
-            </p>
-          )}
-          {detail.plan === "custom" && (
-            <div className="mt-2 pt-2 border-t border-[hsl(0,0%,88%)] space-y-1">
-              {detail.customMaxProperties != null && (
-                <p className="text-xs text-[hsl(0,0%,40%)]">Max. Liegenschaften: <strong>{detail.customMaxProperties}</strong></p>
-              )}
-              {detail.customMaxProtocols != null && (
-                <p className="text-xs text-[hsl(0,0%,40%)]">Max. Protokolle: <strong>{detail.customMaxProtocols}</strong></p>
-              )}
-              {detail.customMaxUsers != null && (
-                <p className="text-xs text-[hsl(0,0%,40%)]">Max. Benutzer: <strong>{detail.customMaxUsers}</strong></p>
-              )}
-              {detail.customPricingNotes && (
-                <p className="text-xs text-[hsl(0,0%,40%)] italic mt-1">{detail.customPricingNotes}</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {detail.users.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-[hsl(0,0%,30%)] uppercase tracking-wide mb-2">Benutzer</p>
-            <div className="space-y-1.5">
-              {detail.users.map((u) => (
-                <div key={u.id} className="flex items-center justify-between bg-[hsl(0,0%,98%)] border border-[hsl(0,0%,90%)] rounded-lg px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium text-[hsl(0,0%,10%)]">
-                      {u.firstName || u.lastName ? `${u.firstName} ${u.lastName}`.trim() : u.email}
-                    </p>
-                    <p className="text-xs text-[hsl(0,0%,50%)]">{u.email}</p>
-                  </div>
-                  <span className="text-xs text-[hsl(0,0%,50%)] bg-[hsl(0,0%,93%)] px-2 py-0.5 rounded">{u.role}</span>
+        ) : detail ? (
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="grid grid-cols-3 gap-3">
+              {[["Liegenschaften", detail.propertyCount], ["Protokolle", detail.protocolCount], ["Benutzer", detail.userCount]].map(([l, v]) => (
+                <div key={String(l)} className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-center">
+                  <p className="text-xs text-neutral-400 mb-1">{l}</p>
+                  <p className="text-xl font-bold text-neutral-900">{v}</p>
                 </div>
               ))}
             </div>
+
+            <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Plan</span>
+                <div className="flex items-center gap-2">
+                  <PlanBadge plan={detail.plan} />
+                  <button onClick={() => setEditPlan((v) => !v)} className="text-xs text-neutral-400 hover:text-neutral-700 underline">
+                    {editPlan ? "Abbrechen" : "Ändern"}
+                  </button>
+                </div>
+              </div>
+              {detail.subscriptionStatus && (
+                <p className="text-xs text-neutral-500">Status: {detail.subscriptionStatus}</p>
+              )}
+              {detail.currentPeriodEnd && (
+                <p className="text-xs text-neutral-400">Periode bis: {new Date(detail.currentPeriodEnd).toLocaleDateString("de-CH")}</p>
+              )}
+            </div>
+
+            {editPlan && (
+              <div className="border border-neutral-200 rounded-xl p-4 space-y-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {(["free", "privat", "agentur", "custom"] as const).map((p) => (
+                    <button key={p} onClick={() => setPlan(p)}
+                      className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${plan === p ? "bg-black text-white border-black" : "border-neutral-200 text-neutral-500 hover:border-neutral-400"}`}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {plan === "custom" && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(
+                      [
+                        { label: "Liegenschaften", val: maxProps, setter: setMaxProps },
+                        { label: "Protokolle",      val: maxProtos, setter: setMaxProtos },
+                        { label: "Benutzer",        val: maxUsers,  setter: setMaxUsers  },
+                      ] as { label: string; val: string; setter: (v: string) => void }[]
+                    ).map(({ label, val, setter }) => (
+                      <div key={label}>
+                        <label className="block text-xs text-neutral-400 mb-1">{label}</label>
+                        <Input type="number" min="0" value={val} onChange={(e) => setter(e.target.value)} placeholder="∞" className="h-8 text-sm" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Notizen (intern)</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+                    placeholder="z.B. CHF 299/Jahr, Vertrag bis 2026-12-31"
+                    className="w-full rounded-lg border border-neutral-200 text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-neutral-400" />
+                </div>
+                {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleSavePlan} disabled={saving} className="gap-1.5">
+                    {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
+                    Speichern
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {detail.users.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Benutzer</p>
+                <div className="space-y-1.5">
+                  {detail.users.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-neutral-800">
+                          {u.firstName || u.lastName ? `${u.firstName} ${u.lastName}`.trim() : u.email}
+                        </p>
+                        <p className="text-xs text-neutral-400">{u.email}</p>
+                      </div>
+                      <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-md">{u.role}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {detail && (
+          <div className="px-6 py-4 border-t border-neutral-100 flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => onImpersonate(accountId)}>
+              <Eye size={14} /> Als dieses Konto
+            </Button>
           </div>
         )}
-
-        <div className="flex flex-col gap-2 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 justify-start"
-            onClick={() => onEdit(detail)}
-          >
-            <Settings size={14} /> Plan konfigurieren
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5 justify-start bg-[hsl(0,0%,8%)] text-white hover:bg-[hsl(0,0%,15%)]"
-            onClick={handleImpersonate}
-            disabled={impersonating}
-          >
-            {impersonating ? <RefreshCw size={14} className="animate-spin" /> : <Eye size={14} />}
-            Als dieses Konto anzeigen
-          </Button>
-        </div>
       </div>
     </div>
   );
 }
 
-interface Props {
-  onBack: () => void;
-  isImpersonating: boolean;
-  onEndImpersonation: () => Promise<void>;
-}
-
-type AdminTab = "accounts" | "coupons" | "support" | "roadmap";
-
-export default function SuperadminPage({ onBack, isImpersonating, onEndImpersonation }: Props) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
+function AccountsSection() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -527,288 +259,290 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null);
-  const [endingImpersonation, setEndingImpersonation] = useState(false);
+  const [switchingStripeMode, setSwitchingStripeMode] = useState(false);
+  const [settingUpStripe, setSettingUpStripe] = useState(false);
+  const [stripeMsg, setStripeMsg] = useState<string | null>(null);
 
   const limit = 20;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  const loadStats = useCallback(async () => {
-    try {
-      const r = await apiFetch("/superadmin/stats");
-      if (r.ok) setStats(await r.json() as Stats);
-    } catch { /* ignore */ }
-  }, []);
-
-  const loadAccounts = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page) });
       if (search) params.set("search", search);
-      const r = await apiFetch(`/superadmin/accounts?${params}`);
-      if (r.ok) {
-        const d = await r.json() as { accounts: AccountRow[]; total: number };
-        setAccounts(d.accounts);
-        setTotal(d.total);
+      const [statsRes, accountsRes, stripeRes] = await Promise.all([
+        apiFetch("/superadmin/stats"),
+        apiFetch(`/superadmin/accounts?${params}`),
+        apiFetch("/superadmin/stripe"),
+      ]);
+      if (statsRes.ok) setStats(await statsRes.json() as Stats);
+      if (accountsRes.ok) {
+        const d = await accountsRes.json() as { accounts: AccountRow[]; total: number };
+        setAccounts(d.accounts); setTotal(d.total);
       }
-    } catch { /* ignore */ } finally {
-      setLoading(false);
-    }
+      if (stripeRes.ok) setStripeStatus(await stripeRes.json() as StripeStatus);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }, [page, search]);
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+  useEffect(() => { void loadAll(); }, [loadAll]);
 
-  useEffect(() => {
-    loadAccounts();
-  }, [loadAccounts]);
+  const switchStripeMode = async (mode: "live" | "test") => {
+    setSwitchingStripeMode(true);
+    try {
+      await apiFetch("/superadmin/stripe/mode", { method: "POST", body: JSON.stringify({ mode }) });
+      await loadAll();
+    } finally { setSwitchingStripeMode(false); }
+  };
 
-  const handleSearch = () => {
-    setSearch(searchInput);
-    setPage(1);
-    setSelectedAccountId(null);
+  const setupTestStripe = async () => {
+    setSettingUpStripe(true); setStripeMsg(null);
+    try {
+      const r = await apiFetch("/superadmin/stripe/setup-test", { method: "POST" });
+      const d = await r.json() as { ok?: boolean; count?: number; error?: string };
+      setStripeMsg(r.ok ? `${d.count} Preise angelegt.` : `Fehler: ${d.error}`);
+      await loadAll();
+    } finally { setSettingUpStripe(false); }
   };
 
   const handleImpersonate = async (accountId: string) => {
     const r = await apiFetch(`/superadmin/impersonate/${accountId}`, { method: "POST" });
-    if (r.ok) {
-      window.location.href = "/";
-    } else {
-      const d = await r.json() as { error: string };
-      alert(d.error ?? "Impersonation failed");
-    }
-  };
-
-  const handleEndImpersonation = async () => {
-    setEndingImpersonation(true);
-    try {
-      await onEndImpersonation();
-    } finally {
-      setEndingImpersonation(false);
-    }
-  };
-
-  const handleSaveAccountPlan = async (updates: Partial<AccountRow>) => {
-    if (!editingAccount) return;
-    const r = await apiFetch(`/superadmin/accounts/${editingAccount.id}`, {
-      method: "PATCH",
-      body: JSON.stringify(updates),
-    });
-    if (!r.ok) {
-      const d = await r.json() as { error: string };
-      throw new Error(d.error ?? "Failed to save");
-    }
-    await loadAccounts();
-    await loadStats();
+    if (r.ok) { window.location.href = "/"; }
+    else { const d = await r.json() as { error: string }; alert(d.error ?? "Fehler"); }
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(0,0%,98%)] flex flex-col">
-      {isImpersonating && (
-        <div className="bg-[hsl(0,0%,8%)] text-white px-4 py-2 flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2">
-            <Eye size={14} />
-            <span>Superadmin-Modus: Ansicht als anderes Konto</span>
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {stats && (
+        <div className="grid grid-cols-4 gap-4">
+          {[
+            ["Konten", stats.accountCount],
+            ["Benutzer", stats.userCount],
+            ["Protokolle", stats.protocolCount],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="bg-white border border-neutral-200 rounded-xl p-4">
+              <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-1">{label}</p>
+              <p className="text-2xl font-bold text-neutral-900">{value}</p>
+            </div>
+          ))}
+          <div className="bg-white border border-neutral-200 rounded-xl p-4">
+            <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">Pläne</p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(stats.planBreakdown).map(([plan, cnt]) => (
+                <span key={plan} className="text-xs text-neutral-600"><span className="font-bold">{cnt}</span> {plan}</span>
+              ))}
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleEndImpersonation}
-            disabled={endingImpersonation}
-            className="border-white/30 text-white hover:bg-white/10 h-7 text-xs"
-          >
-            {endingImpersonation ? <RefreshCw size={12} className="animate-spin mr-1" /> : <LogOut size={12} className="mr-1" />}
-            Impersonation beenden
+        </div>
+      )}
+
+      {stripeStatus && (
+        <div className="bg-white border border-neutral-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CreditCard size={14} className="text-neutral-400" />
+            <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Stripe</span>
+            <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded ${stripeStatus.mode === "test" ? "bg-neutral-100 text-neutral-500" : "bg-black text-white"}`}>
+              {stripeStatus.mode === "test" ? "TEST" : "LIVE"}
+            </span>
+          </div>
+          <div className="flex gap-2 mb-3">
+            {(["live", "test"] as const).map((m) => (
+              <button key={m} onClick={() => switchStripeMode(m)} disabled={switchingStripeMode || stripeStatus.mode === m}
+                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${stripeStatus.mode === m ? "bg-black text-white border-black" : "border-neutral-200 text-neutral-400 hover:border-neutral-400"}`}>
+                {m === "live" ? "Live" : "Sandbox (Test)"}
+              </button>
+            ))}
+          </div>
+          {stripeStatus.mode === "test" && (
+            <div className="space-y-1.5 mb-3">
+              <StatusRow label="STRIPE_SECRET_KEY_TEST" ok={stripeStatus.test.keyConfigured} />
+              <StatusRow label="STRIPE_PUBLISHABLE_KEY_TEST" ok={stripeStatus.test.publishableKeyConfigured} />
+              <StatusRow label="STRIPE_WEBHOOK_SECRET_TEST" ok={stripeStatus.test.webhookSecretConfigured} />
+              <StatusRow label={`Testpreise (${stripeStatus.test.pricesConfigured}/${stripeStatus.test.pricesExpected})`} ok={stripeStatus.test.pricesConfigured >= stripeStatus.test.pricesExpected} />
+            </div>
+          )}
+          {stripeStatus.mode === "test" && stripeStatus.test.keyConfigured && (
+            <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1.5" onClick={setupTestStripe} disabled={settingUpStripe}>
+              {settingUpStripe ? <RefreshCw size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+              Testpreise {stripeStatus.test.pricesConfigured > 0 ? "aktualisieren" : "anlegen"}
+            </Button>
+          )}
+          {stripeMsg && <p className="mt-2 text-xs text-neutral-400">{stripeMsg}</p>}
+          {stripeStatus.mode === "test" && !stripeStatus.test.keyConfigured && (
+            <div className="flex items-start gap-1.5 bg-neutral-50 rounded-lg p-2 mt-2">
+              <AlertTriangle size={12} className="text-neutral-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-neutral-500">Bitte <strong>STRIPE_SECRET_KEY_TEST</strong> in den Replit-Secrets eintragen.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-neutral-100 flex gap-2">
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Konto suchen…" className="flex-1 text-sm h-9"
+            onKeyDown={(e) => e.key === "Enter" && (setSearch(searchInput), setPage(1))} />
+          <Button size="sm" onClick={() => { setSearch(searchInput); setPage(1); }} className="h-9 gap-1.5">
+            <Search size={14} /> Suchen
           </Button>
         </div>
-      )}
 
-      <header className="bg-white border-b border-[hsl(0,0%,88%)] px-4 py-3 flex items-center gap-3">
-        <button onClick={onBack} className="p-1.5 rounded-md hover:bg-[hsl(0,0%,93%)]">
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex items-center gap-2">
-          <Shield size={16} className="text-[hsl(0,0%,30%)]" />
-          <h1 className="text-sm font-semibold text-[hsl(0,0%,10%)]">Superadmin Dashboard</h1>
-        </div>
-        <div className="ml-auto flex items-center gap-1 border border-[hsl(0,0%,88%)] rounded-lg p-0.5">
-          <button
-            onClick={() => setActiveTab("accounts")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "accounts"
-                ? "bg-[hsl(0,0%,8%)] text-white"
-                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
-            }`}
-          >
-            <Building2 size={13} /> Konten
-          </button>
-          <button
-            onClick={() => setActiveTab("coupons")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "coupons"
-                ? "bg-[hsl(0,0%,8%)] text-white"
-                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
-            }`}
-          >
-            <Tag size={13} /> Rabattcodes
-          </button>
-          <button
-            onClick={() => setActiveTab("support")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "support"
-                ? "bg-[hsl(0,0%,8%)] text-white"
-                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
-            }`}
-          >
-            <MessageSquare size={13} /> Support
-          </button>
-          <button
-            onClick={() => setActiveTab("roadmap")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "roadmap"
-                ? "bg-[hsl(0,0%,8%)] text-white"
-                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
-            }`}
-          >
-            <Map size={13} /> Roadmap
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 flex overflow-hidden">
-        {activeTab === "support" ? (
-          <SuperadminSupportTab />
-        ) : activeTab === "roadmap" ? (
-          <SuperadminRoadmapTab />
-        ) : activeTab === "coupons" ? (
-          <SuperadminCouponsTab />
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-neutral-400 text-sm gap-2">
+            <RefreshCw size={14} className="animate-spin" /> Wird geladen…
+          </div>
         ) : (
-        <>
-        <div className={`flex flex-col ${selectedAccountId ? "w-1/2 border-r border-[hsl(0,0%,88%)]" : "w-full"}`}>
-          {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b border-[hsl(0,0%,90%)]">
-              <StatCard label="Konten" value={stats.accountCount} />
-              <StatCard label="Benutzer" value={stats.userCount} />
-              <StatCard label="Protokolle" value={stats.protocolCount} />
-              <div className="bg-[hsl(0,0%,97%)] border border-[hsl(0,0%,88%)] rounded-lg p-4">
-                <p className="text-xs font-medium text-[hsl(0,0%,50%)] uppercase tracking-wide mb-1">Pläne</p>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(stats.planBreakdown).map(([plan, cnt]) => (
-                    <span key={plan} className="text-xs text-[hsl(0,0%,30%)]">
-                      <span className="font-medium">{cnt}</span> {plan}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-neutral-50 border-b border-neutral-100">
+                {["Konto", "Plan", "Status", "Lieg.", "Protos", "Benutzer", "Seit"].map((h) => (
+                  <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-neutral-400 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((a) => (
+                <tr key={a.id} onClick={() => setSelectedAccountId(a.id)}
+                  className="border-b border-neutral-100 cursor-pointer hover:bg-neutral-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-neutral-800">{a.name}</td>
+                  <td className="px-4 py-3"><PlanBadge plan={a.plan} /></td>
+                  <td className="px-4 py-3 text-xs text-neutral-400">{a.subscriptionStatus ?? "—"}</td>
+                  <td className="px-4 py-3 text-neutral-600">{a.propertyCount}</td>
+                  <td className="px-4 py-3 text-neutral-600">{a.protocolCount}</td>
+                  <td className="px-4 py-3 text-neutral-600">{a.userCount}</td>
+                  <td className="px-4 py-3 text-xs text-neutral-400">
+                    {new Date(a.createdAt).toLocaleDateString("de-CH")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100 text-xs text-neutral-400">
+            <span>Seite {page} / {totalPages} · {total} Konten</span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="h-7 w-7 p-0"><ChevronLeft size={14} /></Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 w-7 p-0"><ChevronRight size={14} /></Button>
             </div>
-          )}
-
-          <StripePanel />
-
-          <div className="p-4 border-b border-[hsl(0,0%,90%)] flex gap-2">
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Konto suchen…"
-              className="flex-1 text-sm h-9"
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            <Button size="sm" onClick={handleSearch} className="gap-1.5 h-9">
-              <Search size={14} /> Suchen
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="flex items-center justify-center py-12 text-[hsl(0,0%,50%)] text-sm gap-2">
-                <RefreshCw size={14} className="animate-spin" /> Wird geladen…
-              </div>
-            ) : accounts.length === 0 ? (
-              <div className="flex items-center justify-center py-12 text-[hsl(0,0%,50%)] text-sm">
-                Keine Konten gefunden
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[hsl(0,0%,90%)] bg-[hsl(0,0%,97%)]">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-[hsl(0,0%,45%)] uppercase tracking-wide">Konto</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-[hsl(0,0%,45%)] uppercase tracking-wide">Plan</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-medium text-[hsl(0,0%,45%)] uppercase tracking-wide">
-                      <Building2 size={12} className="inline mr-1" />Liegesch.
-                    </th>
-                    <th className="text-center px-4 py-2.5 text-xs font-medium text-[hsl(0,0%,45%)] uppercase tracking-wide">
-                      <FileText size={12} className="inline mr-1" />Proto.
-                    </th>
-                    <th className="text-center px-4 py-2.5 text-xs font-medium text-[hsl(0,0%,45%)] uppercase tracking-wide">
-                      <Users size={12} className="inline mr-1" />User
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((acc) => (
-                    <tr
-                      key={acc.id}
-                      onClick={() => setSelectedAccountId(acc.id === selectedAccountId ? null : acc.id)}
-                      className={`border-b border-[hsl(0,0%,92%)] cursor-pointer transition-colors ${
-                        acc.id === selectedAccountId
-                          ? "bg-[hsl(0,0%,92%)]"
-                          : "hover:bg-[hsl(0,0%,95%)]"
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-[hsl(0,0%,10%)]">{acc.name}</p>
-                        <p className="text-xs text-[hsl(0,0%,55%)]">{new Date(acc.createdAt).toLocaleDateString("de-CH")}</p>
-                      </td>
-                      <td className="px-4 py-3"><PlanBadge plan={acc.plan} /></td>
-                      <td className="px-4 py-3 text-center text-[hsl(0,0%,30%)] font-mono">{acc.propertyCount}</td>
-                      <td className="px-4 py-3 text-center text-[hsl(0,0%,30%)] font-mono">{acc.protocolCount}</td>
-                      <td className="px-4 py-3 text-center text-[hsl(0,0%,30%)] font-mono">{acc.userCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[hsl(0,0%,90%)] bg-white">
-              <span className="text-xs text-[hsl(0,0%,50%)]">
-                Seite {page} von {totalPages} · {total} Konten
-              </span>
-              <div className="flex gap-1">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="h-7 w-7 p-0">
-                  <ChevronLeft size={14} />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 w-7 p-0">
-                  <ChevronRight size={14} />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {selectedAccountId && (
-          <div className="w-1/2 flex flex-col overflow-hidden bg-white">
-            <AccountDetailPanel
-              accountId={selectedAccountId}
-              onClose={() => setSelectedAccountId(null)}
-              onImpersonate={handleImpersonate}
-              onEdit={(acc) => setEditingAccount(acc)}
-            />
           </div>
         )}
-        </>
-        )}
-      </main>
+      </div>
 
-      {editingAccount && (
-        <CustomPlanEditor
-          account={editingAccount}
-          onSave={handleSaveAccountPlan}
-          onClose={() => setEditingAccount(null)}
+      {selectedAccountId && (
+        <AccountDetailModal
+          accountId={selectedAccountId}
+          onClose={() => setSelectedAccountId(null)}
+          onImpersonate={handleImpersonate}
+          onPlanSaved={() => { setSelectedAccountId(null); void loadAll(); }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
+interface Props {
+  onBack: () => void;
+  isImpersonating: boolean;
+  onEndImpersonation: () => Promise<void>;
+}
+
+const NAV: { id: AdminSection; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { id: "support",  label: "Support",     Icon: MessageSquare },
+  { id: "roadmap",  label: "Roadmap",     Icon: Map           },
+  { id: "coupons",  label: "Rabattcodes", Icon: Tag           },
+  { id: "accounts", label: "Konten",      Icon: Building2     },
+];
+
+export default function SuperadminPage({ onBack, isImpersonating, onEndImpersonation }: Props) {
+  const [section, setSection] = useState<AdminSection>("support");
+  const [endingImpersonation, setEndingImpersonation] = useState(false);
+
+  const handleEndImpersonation = async () => {
+    setEndingImpersonation(true);
+    try { await onEndImpersonation(); } finally { setEndingImpersonation(false); }
+  };
+
+  const activeNav = NAV.find((n) => n.id === section);
+
+  return (
+    <div className="h-screen flex overflow-hidden bg-neutral-50">
+
+      {/* ── Sidebar ── */}
+      <aside className="w-56 flex-shrink-0 bg-white border-r border-neutral-200 flex flex-col">
+        <div className="h-14 flex items-center gap-2 px-4 border-b border-neutral-100">
+          <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center">
+            <Shield size={14} className="text-white" />
+          </div>
+          <span className="text-sm font-semibold text-neutral-800">Admin</span>
+        </div>
+
+        <nav className="flex-1 py-2 overflow-y-auto">
+          {NAV.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setSection(id)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
+                section === id
+                  ? "bg-neutral-100 text-neutral-900"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <Icon size={16} className={section === id ? "text-neutral-800" : "text-neutral-400"} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-neutral-100 space-y-1">
+          {isImpersonating && (
+            <button
+              onClick={handleEndImpersonation}
+              disabled={endingImpersonation}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-black text-white hover:bg-neutral-800 transition-colors"
+            >
+              {endingImpersonation ? <RefreshCw size={13} className="animate-spin" /> : <Eye size={13} />}
+              Impersonation beenden
+            </button>
+          )}
+          <button
+            onClick={onBack}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 transition-colors"
+          >
+            <LogOut size={13} />
+            Zurück zur App
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Content ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Top bar */}
+        <header className="h-14 bg-white border-b border-neutral-200 flex items-center justify-between px-6 flex-shrink-0">
+          <h1 className="text-sm font-semibold text-neutral-800 flex items-center gap-2">
+            {activeNav && <activeNav.Icon size={15} className="text-neutral-500" />}
+            {activeNav?.label}
+          </h1>
+          {isImpersonating && (
+            <span className="text-xs bg-neutral-900 text-white px-2.5 py-1 rounded-full font-medium">
+              Impersonation aktiv
+            </span>
+          )}
+        </header>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {section === "support"  && <SuperadminSupportTab />}
+          {section === "roadmap"  && <SuperadminRoadmapTab />}
+          {section === "coupons"  && <SuperadminCouponsTab />}
+          {section === "accounts" && <AccountsSection />}
+        </div>
+      </div>
     </div>
   );
 }

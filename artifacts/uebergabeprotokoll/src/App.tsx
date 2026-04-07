@@ -482,7 +482,6 @@ function AppContent({
             onDeleteProperty={deleteProtocolsForProperty}
             onShowBilling={() => setAppScreen("billing")}
             onShowPricing={() => setAppScreen("pricing")}
-            onShowSuperadmin={isSuperAdmin ? () => setAppScreen("superadmin") : undefined}
             onShowSecurity={() => setAppScreen("security")}
             mfaEnabled={mfaEnabled}
             onShowTeam={
@@ -702,7 +701,7 @@ function hashToInitialScreen(hash: string, pathname: string): AppScreen {
   if (hash === "#/billing") return "billing";
   if (hash === "#/billing/success") return "billing-success";
   if (hash === "#/billing/cancel") return "billing-cancel";
-  if (hash === "#/superadmin") return "superadmin";
+  if (hash === "#/admin") return "superadmin";
   return "protocols";
 }
 
