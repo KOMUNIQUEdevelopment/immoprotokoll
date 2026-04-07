@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ProtocolData, ProtocolSeeds, createDefaultProtocol, migrateProtocol } from "./types";
 import i18n from "./i18n";
-import { uploadPhotosToServer, fetchMissingPhotosFromServer } from "./photoDb";
+import { uploadPhotosToServer, fetchMissingPhotosFromServer, retryPendingPhotoUploads } from "./photoDb";
 
 export interface TrashedEntry {
   protocol: ProtocolData;
@@ -153,6 +153,18 @@ export function useProtocolsStore(accountId: string | null) {
   // Per-protocol debounced save timers
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // ── Retry pending photo uploads when tab becomes visible (handles mobile backgrounding) ──
+  useEffect(() => {
+    if (!accountId) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        retryPendingPhotoUploads().catch(console.warn);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [accountId]);
+
   // ── Load from server on mount / accountId change ───────────────────────────
   useEffect(() => {
     if (!accountId) {
@@ -167,6 +179,9 @@ export function useProtocolsStore(accountId: string | null) {
 
     // One-time migration: upload any locally-stored (unsynced) protocols to cloud
     migrateLocalStorageToCloud(accountId).catch(console.warn);
+
+    // Retry any photos that failed to upload in a previous session
+    retryPendingPhotoUploads().catch(console.warn);
 
     Promise.all([
       fetch("/api/protocols", { credentials: "include" }).then((r) => r.json() as Promise<{ protocols: Record<string, Record<string, unknown>> }>),
@@ -463,9 +478,11 @@ export function useProtocolsStore(accountId: string | null) {
         uploadPhotosToServer(photoEntries).catch(console.warn);
       }
 
+      // Apply updater inside setProtocols to always work on the latest state
+      // (guards against concurrent updates from WebSocket sync etc.)
       setProtocols((p) => {
         if (!p[id]) return p;
-        return { ...p, [id]: updated };
+        return { ...p, [id]: updater(p[id]) };
       });
       setTimeout(() => scheduleSave(id), 0);
     },
