@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -144,6 +144,7 @@ function AppContent({
     renameProtocol,
     updateProtocol,
     manualSave,
+    refreshCurrentProtocol,
     isSaving,
     lastSaved,
   } = useProtocolsStore(accountId);
@@ -151,10 +152,46 @@ function AppContent({
   const [activeTab, setActiveTab] = useState<EditorTab>("protokoll");
   const [isExporting, setIsExporting] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [appScreen, setAppScreen] = useState<AppScreen>(initialScreen);
   const { toast } = useToast();
   const billing = useBilling();
+
+  const NAV_KEY = `immo_nav_${accountId}`;
+
+  // ── Persist navigation in localStorage so reload stays in place ──────────
+  useEffect(() => {
+    if (appScreen !== "protocols") return;
+    localStorage.setItem(
+      NAV_KEY,
+      JSON.stringify({ property: selectedProperty ?? null, protocolId: currentId })
+    );
+  }, [selectedProperty, currentId, appScreen, NAV_KEY]);
+
+  // ── Restore navigation after protocols have loaded ───────────────────────
+  const navRestoredRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || navRestoredRef.current || appScreen !== "protocols") return;
+    navRestoredRef.current = true;
+    try {
+      const raw = localStorage.getItem(NAV_KEY);
+      if (!raw) return;
+      const { property, protocolId } = JSON.parse(raw) as {
+        property?: Property | null;
+        protocolId?: string | null;
+      };
+      if (property) {
+        setSelectedProperty(property);
+      }
+      if (protocolId && protocols[protocolId]) {
+        switchTo(protocolId);
+      }
+    } catch {
+      // corrupt storage — ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
   const { needsUpdate, applyUpdate, dismiss: dismissUpdate } = useSwUpdate();
 
@@ -206,6 +243,16 @@ function AppContent({
   const handleSave = () => {
     manualSave();
     toast({ title: tr.protocols.savedMsg, description: tr.protocols.savedMsgHint });
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await refreshCurrentProtocol();
+      toast({ title: "Synchronisiert", description: "Neueste Version vom Server geladen." });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleCreate = () => {
@@ -501,6 +548,17 @@ function AppContent({
                   <Save size={14} />
                 )}
                 <span className="hidden sm:inline">{isSaving ? tr.common.ok : tr.common.save}</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { void handleSync(); }}
+                disabled={isSyncing}
+                className="gap-1.5 border-neutral-200 hover:bg-neutral-50"
+                title="Vom Server synchronisieren"
+              >
+                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
               </Button>
 
               <Button

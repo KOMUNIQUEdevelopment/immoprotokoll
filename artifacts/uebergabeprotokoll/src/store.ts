@@ -324,6 +324,27 @@ export function useProtocolsStore(accountId: string | null) {
     }).catch(console.warn);
   }, []);
 
+  // ── refreshCurrentProtocol — pull latest from server (cross-device sync) ───
+  const refreshCurrentProtocol = useCallback(async (): Promise<void> => {
+    if (!currentId) return;
+    const id = currentId;
+    try {
+      const resp = await fetch(`/api/protocols/${id}`, { credentials: "include" });
+      if (!resp.ok) {
+        console.error("[store] refreshCurrentProtocol: HTTP", resp.status);
+        return;
+      }
+      const { protocol: serverData } = await resp.json() as { protocol: Record<string, unknown> };
+      const fresh = migrateProtocol(serverData as ProtocolData);
+      setProtocols((prev) => {
+        if (!prev[id]) return prev;
+        return { ...prev, [id]: fresh };
+      });
+    } catch (err) {
+      console.error("[store] refreshCurrentProtocol error:", err);
+    }
+  }, [currentId]);
+
   // ── manualSave ─────────────────────────────────────────────────────────────
   const manualSave = useCallback(() => {
     if (!currentId) return;
@@ -424,6 +445,7 @@ export function useProtocolsStore(accountId: string | null) {
     addRoom,
     deleteRoom,
     manualSave,
+    refreshCurrentProtocol,
     isSaving,
     lastSaved,
   };

@@ -176,6 +176,30 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── GET /api/protocols/:id — fetch single protocol ───────────────────────────
+router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+  const accountId = req.user!.accountId;
+  const { id } = req.params;
+  try {
+    const [row] = await db
+      .select()
+      .from(syncProtocolsTable)
+      .where(and(
+        eq(syncProtocolsTable.id, id as string),
+        eq(syncProtocolsTable.accountId, accountId),
+        isNull(syncProtocolsTable.deletedAt)
+      ))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ error: "Protocol not found" });
+      return;
+    }
+    res.json({ protocol: row.data });
+  } catch {
+    res.status(500).json({ error: "Failed to fetch protocol" });
+  }
+});
+
 // ── PUT /api/protocols/:id — update protocol ──────────────────────────────────
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const accountId = req.user!.accountId;
