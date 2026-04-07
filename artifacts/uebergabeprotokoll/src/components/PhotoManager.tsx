@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,13 +16,95 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Camera, ImagePlus, Trash2, GripVertical, Loader2 } from "lucide-react";
+import { Camera, ImagePlus, Trash2, GripVertical, Loader2, ImageOff } from "lucide-react";
 import { RoomPhoto } from "../types";
 import { Button } from "@/components/ui/button";
 import exifr from "exifr";
 import { type SupportedLanguage, getTranslations } from "../i18n";
 import { type Translations } from "../i18n/de-CH";
 import i18n from "../i18n";
+
+// ── PhotoImage ────────────────────────────────────────────────────────────────
+// Renders a single photo. If `dataUrl` is already in state (just captured), it
+// displays instantly. If dataUrl is empty (loaded from DB), it fetches the image
+// from the server using explicit credentials — so auth cookies work cross-device
+// and across environments, unlike a plain <img> tag whose cookie forwarding can
+// be blocked by proxies or PWA service workers.
+
+interface PhotoImageProps {
+  photoId: string;
+  dataUrl: string;
+  alt: string;
+  className?: string;
+}
+
+function PhotoImage({ photoId, dataUrl, alt, className }: PhotoImageProps) {
+  const [src, setSrc] = useState<string | null>(dataUrl || null);
+  const [error, setError] = useState(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (dataUrl) {
+      // Fresh from camera — display directly from state, no fetch needed
+      setSrc(dataUrl);
+      setError(false);
+      return;
+    }
+
+    // Loaded from DB (dataUrl is "") — fetch from server with auth credentials
+    let cancelled = false;
+    setSrc(null);
+    setError(false);
+
+    fetch(`/api/photos/${photoId}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        // Revoke any previous object URL to avoid memory leaks
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photoId, dataUrl]);
+
+  // Cleanup object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className={`${className ?? ""} flex items-center justify-center bg-neutral-100`}>
+        <ImageOff size={24} className="text-neutral-400" />
+      </div>
+    );
+  }
+
+  if (!src) {
+    return (
+      <div className={`${className ?? ""} flex items-center justify-center bg-neutral-100`}>
+        <Loader2 size={20} className="animate-spin text-neutral-400" />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} />;
+}
+
+// ── SortablePhoto ─────────────────────────────────────────────────────────────
 
 interface SortablePhotoProps {
   photo: RoomPhoto;
@@ -59,8 +141,9 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel, tr, locale }: So
       style={style}
       className="relative group rounded-lg overflow-hidden border border-border bg-card shadow-sm"
     >
-      <img
-        src={photo.dataUrl || `/api/photos/${photo.id}`}
+      <PhotoImage
+        photoId={photo.id}
+        dataUrl={photo.dataUrl}
         alt={`${tr.roomPhotos} ${ts}`}
         className="w-full aspect-[4/3] object-cover bg-neutral-100"
       />
@@ -89,6 +172,8 @@ function SortablePhoto({ photo, onDelete, roomName, floorLabel, tr, locale }: So
     </div>
   );
 }
+
+// ── Image compression ─────────────────────────────────────────────────────────
 
 interface PhotoManagerProps {
   photos: RoomPhoto[];
@@ -130,9 +215,8 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-// Parse a raw EXIF date value (Date object or EXIF string "YYYY:MM:DD HH:MM:SS").
-// EXIF timestamps have NO timezone info → treat them as local device time by
-// constructing an explicit local-time string (no trailing "Z").
+// ── EXIF timestamp extraction ─────────────────────────────────────────────────
+
 function parseExifDate(raw: unknown): string | null {
   if (raw instanceof Date && !isNaN(raw.getTime())) {
     return raw.toISOString();
@@ -177,7 +261,7 @@ async function getPhotoTimestamp(file: File): Promise<string> {
       }
     }
   } catch {
-    // EXIF parsing failed – proceed to fallbacks
+    // EXIF parsing failed — proceed to fallbacks
   }
 
   if (file.lastModified) {
@@ -195,6 +279,8 @@ function langToLocale(lang: string): string {
   if (lang === "de-DE") return "de-DE";
   return "en-GB";
 }
+
+// ── PhotoManager ──────────────────────────────────────────────────────────────
 
 export default function PhotoManager({ photos, onChange, roomName, floorLabel, language }: PhotoManagerProps) {
   const effectiveLang = language ?? (i18n.language as SupportedLanguage) ?? "de-CH";
@@ -226,26 +312,27 @@ export default function PhotoManager({ photos, onChange, roomName, floorLabel, l
           ]);
           const id = crypto.randomUUID();
 
-          // Upload to server immediately — stored separately in sync_photos table
-          const res = await fetch("/api/photos", {
+          // Upload to server — photos are stored by ID in sync_photos table.
+          // We do NOT await errors here to ensure the photo always appears in UI;
+          // syncPhotosToServer() in the debounced save will retry any failures.
+          fetch("/api/photos", {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ photos: [{ id, dataUrl }] }),
-          });
-          if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
+          }).catch(console.warn);
 
-          // Keep dataUrl in state for instant display.
-          // stripSingleProtocol() removes it before saving to DB — no duplicate storage.
+          // Keep dataUrl in state for instant real-time display.
+          // stripSingleProtocol() removes it before writing to the DB — no duplicate storage.
           return { id, dataUrl, timestamp } satisfies RoomPhoto;
         })
       ).then((newPhotos) => {
         onChange([...photos, ...newPhotos]);
       }).catch((err) => {
-        console.error("Photo upload failed:", err);
+        console.error("Photo processing failed:", err);
         alert(effectiveLang.startsWith("en")
-          ? "Photo upload failed. Please check your connection and try again."
-          : "Foto-Upload fehlgeschlagen. Bitte Verbindung prüfen und nochmal versuchen.");
+          ? "Photo processing failed. Please check your connection and try again."
+          : "Foto-Verarbeitung fehlgeschlagen. Bitte Verbindung prüfen und nochmal versuchen.");
       }).finally(() => {
         setUploadingCount((n) => Math.max(0, n - validFiles.length));
       });
