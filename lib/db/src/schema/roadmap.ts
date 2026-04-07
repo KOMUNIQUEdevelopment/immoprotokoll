@@ -17,6 +17,8 @@ export const roadmapItemsTable = pgTable("roadmap_items", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
+  titleEn: text("title_en"),
+  descriptionEn: text("description_en"),
   status: roadmapStatusEnum("status").notNull().default("planned"),
   source: roadmapSourceEnum("source").notNull().default("manual"),
   isPublished: boolean("is_published").notNull().default(false),

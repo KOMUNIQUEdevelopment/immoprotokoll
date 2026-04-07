@@ -6,6 +6,8 @@ interface RoadmapItem {
   id: string;
   title: string;
   description: string;
+  titleEn: string | null;
+  descriptionEn: string | null;
   status: "planned" | "in_progress" | "done";
   category: string | null;
 }
@@ -155,7 +157,9 @@ export default function RoadmapSection({ lang }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3 flex-wrap mb-1">
-                      <h3 className="font-semibold text-[hsl(0,0%,8%)] text-base">{item.title}</h3>
+                      <h3 className="font-semibold text-[hsl(0,0%,8%)] text-base">
+                        {(!isDE && item.titleEn) ? item.titleEn : item.title}
+                      </h3>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {item.category && (
                           <span className="text-xs text-[hsl(0,0%,50%)] bg-[hsl(0,0%,93%)] px-2 py-0.5 rounded">
@@ -169,8 +173,10 @@ export default function RoadmapSection({ lang }: Props) {
                         )}
                       </div>
                     </div>
-                    {item.description && (
-                      <p className="text-sm text-[hsl(0,0%,40%)] leading-relaxed">{item.description}</p>
+                    {(item.description || item.descriptionEn) && (
+                      <p className="text-sm text-[hsl(0,0%,40%)] leading-relaxed">
+                        {(!isDE && item.descriptionEn) ? item.descriptionEn : item.description}
+                      </p>
                     )}
                   </div>
                 </motion.div>

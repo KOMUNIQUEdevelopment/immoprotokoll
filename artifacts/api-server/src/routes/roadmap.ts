@@ -104,9 +104,11 @@ adminRouter.get("/", async (req: AuthRequest, res: Response) => {
 
 // POST /api/superadmin/roadmap — manual creation
 adminRouter.post("/", async (req: AuthRequest, res: Response) => {
-  const { title, description, status, isPublished, category, sortOrder } = req.body as {
+  const { title, description, titleEn, descriptionEn, status, isPublished, category, sortOrder } = req.body as {
     title?: string;
     description?: string;
+    titleEn?: string;
+    descriptionEn?: string;
     status?: string;
     isPublished?: boolean;
     category?: string;
@@ -127,6 +129,8 @@ adminRouter.post("/", async (req: AuthRequest, res: Response) => {
       .values({
         title: title.trim(),
         description: description?.trim() ?? "",
+        titleEn: titleEn?.trim() || null,
+        descriptionEn: descriptionEn?.trim() || null,
         status: safeStatus,
         source: "manual",
         isPublished: isPublished ?? false,
@@ -143,9 +147,11 @@ adminRouter.post("/", async (req: AuthRequest, res: Response) => {
 // PATCH /api/superadmin/roadmap/:id
 adminRouter.patch("/:id", async (req: AuthRequest, res: Response) => {
   const { id } = req.params as { id: string };
-  const { title, description, status, isPublished, category, sortOrder } = req.body as {
+  const { title, description, titleEn, descriptionEn, status, isPublished, category, sortOrder } = req.body as {
     title?: string;
     description?: string;
+    titleEn?: string;
+    descriptionEn?: string;
     status?: string;
     isPublished?: boolean;
     category?: string;
@@ -162,6 +168,8 @@ adminRouter.patch("/:id", async (req: AuthRequest, res: Response) => {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (title !== undefined) updates.title = title.trim();
     if (description !== undefined) updates.description = description.trim();
+    if (titleEn !== undefined) updates.titleEn = titleEn.trim() || null;
+    if (descriptionEn !== undefined) updates.descriptionEn = descriptionEn.trim() || null;
     if (status !== undefined) updates.status = status;
     if (isPublished !== undefined) updates.isPublished = isPublished;
     if (category !== undefined) updates.category = category?.trim() || null;

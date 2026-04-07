@@ -883,6 +883,39 @@ async function runStartupMigrations() {
       used_at       TIMESTAMPTZ
     )
   `);
+  await db.execute(sql`
+    ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS title_en TEXT
+  `);
+  await db.execute(sql`
+    ALTER TABLE roadmap_items ADD COLUMN IF NOT EXISTS description_en TEXT
+  `);
+  await db.execute(sql`
+    INSERT INTO roadmap_items (id, title, description, title_en, description_en, status, source, is_published, sort_order)
+    VALUES
+      (
+        'roadmap-google-auth',
+        'Google Login',
+        'Anmelden mit dem eigenen Google-Konto direkt über OAuth – schnell, sicher und ohne separates Passwort.',
+        'Google Login',
+        'Sign in with your Google account via OAuth – fast, secure, and without a separate password.',
+        'planned',
+        'manual',
+        true,
+        10
+      ),
+      (
+        'roadmap-abnahmeprotokoll',
+        'Abnahmeprotokoll',
+        'Als Gegenstück zum Übergabeprotokoll dokumentiert das Abnahmeprotokoll den Zustand einer Immobilie bei der Rückgabe – mit Vergleichsfunktion zu den Einzugsdaten.',
+        'Acceptance Protocol',
+        'As the counterpart to the handover protocol, the acceptance protocol documents the property''s condition at return – with comparison to the move-in data.',
+        'planned',
+        'manual',
+        true,
+        20
+      )
+    ON CONFLICT (id) DO NOTHING
+  `);
 }
 
 server.listen(port, (err?: Error) => {
