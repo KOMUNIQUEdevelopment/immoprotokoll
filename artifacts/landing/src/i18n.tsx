@@ -9,22 +9,17 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children, initialLang }: { children: ReactNode, initialLang?: Language }) {
-  const [lang, setLang] = useState<Language>(initialLang || "en");
+export function LanguageProvider({ children, initialLang }: { children: ReactNode; initialLang: Language }) {
+  const [lang, setLang] = useState<Language>(initialLang);
 
   useEffect(() => {
-    if (!initialLang) {
-      const browserLang = navigator.language.toLowerCase();
-      if (browserLang.startsWith("de")) {
-        setLang("de");
-      }
-    }
+    setLang(initialLang);
   }, [initialLang]);
 
   const value = {
     lang,
     setLang,
-    t: translations[lang]
+    t: translations[lang],
   };
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
