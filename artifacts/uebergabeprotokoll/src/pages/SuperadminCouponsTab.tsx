@@ -95,9 +95,15 @@ function CreateForm({ mode, onCreated, onCancel }: CreateFormProps) {
       if (r.ok) {
         onCreated();
       } else {
-        const d = await r.json() as { error?: string };
-        setError(d.error ?? "Fehler beim Erstellen");
+        let msg = "Fehler beim Erstellen";
+        try {
+          const d = await r.json() as { error?: string };
+          msg = d.error ?? msg;
+        } catch { /* ignore json parse error */ }
+        setError(`${r.status}: ${msg}`);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Netzwerkfehler — bitte nochmals versuchen");
     } finally {
       setSaving(false);
     }
@@ -117,6 +123,12 @@ function CreateForm({ mode, onCreated, onCancel }: CreateFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && (
+            <div className="rounded-lg bg-neutral-100 border border-neutral-200 px-3 py-2.5 text-xs text-neutral-700 font-medium">
+              {error}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-[hsl(0,0%,40%)] mb-1.5">Rabatt (%)*</label>
@@ -239,10 +251,6 @@ function CreateForm({ mode, onCreated, onCancel }: CreateFormProps) {
               />
             </div>
           </div>
-
-          {error && (
-            <p className="text-xs text-[hsl(0,0%,30%)] bg-[hsl(0,0%,93%)] rounded px-3 py-2">{error}</p>
-          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={saving}>Abbrechen</Button>
