@@ -9,6 +9,7 @@ const DE_TO_EN: Record<string, string> = {
   "/datenschutz": "/en/privacy",
   "/agb": "/en/terms",
   "/impressum": "/en/imprint",
+  "/hilfe": "/en/help",
 };
 
 const EN_TO_DE: Record<string, string> = {
@@ -16,6 +17,7 @@ const EN_TO_DE: Record<string, string> = {
   "/en/privacy": "/datenschutz",
   "/en/terms": "/agb",
   "/en/imprint": "/impressum",
+  "/en/help": "/hilfe",
 };
 
 export default function Navbar() {
@@ -70,6 +72,9 @@ export default function Navbar() {
           <button onClick={() => scrollToSection("roadmap")} className="hover:opacity-60 transition-opacity">
             {t.nav.roadmap}
           </button>
+          <Link href={lang === "de" ? "/hilfe" : "/en/help"} className="hover:opacity-60 transition-opacity">
+            {lang === "de" ? "Hilfe" : "Help"}
+          </Link>
           <button onClick={() => scrollToSection("contact")} className="hover:opacity-60 transition-opacity">
             {t.nav.contact}
           </button>
@@ -121,6 +126,9 @@ export default function Navbar() {
           <button onClick={() => scrollToSection("roadmap")} className="text-left font-medium text-lg py-2 border-b border-black/5">
             {t.nav.roadmap}
           </button>
+          <Link href={lang === "de" ? "/hilfe" : "/en/help"} onClick={() => setMobileMenuOpen(false)} className="text-left font-medium text-lg py-2 border-b border-black/5 block">
+            {lang === "de" ? "Hilfe" : "Help"}
+          </Link>
           <button onClick={() => scrollToSection("contact")} className="text-left font-medium text-lg py-2 border-b border-black/5">
             {t.nav.contact}
           </button>

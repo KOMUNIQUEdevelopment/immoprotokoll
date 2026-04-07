@@ -54,6 +54,7 @@ import LandingPage from "./pages/LandingPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
 import ImprintPage from "./pages/ImprintPage";
+import HelpPage from "./pages/HelpPage";
 
 const queryClient = new QueryClient();
 
@@ -99,6 +100,14 @@ function Router() {
       </Route>
       <Route path="/impressum">
         {() => <RouteWrapper component={ImprintPage} lang="de" />}
+      </Route>
+
+      {/* Help pages */}
+      <Route path="/hilfe">
+        {() => <RouteWrapper component={HelpPage} lang="de" />}
+      </Route>
+      <Route path="/en/help">
+        {() => <RouteWrapper component={HelpPage} lang="en" />}
       </Route>
 
       {/* EN sub-pages */}

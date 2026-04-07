@@ -48,17 +48,25 @@ export function useSEO({ title, description, lang, path, schema }: SEOProps) {
 
     const otherLang = lang === 'de' ? 'en' : 'de';
     // Naive path switch for standard routes
-    let otherPath = path;
-    if (path.startsWith('/de')) {
-      otherPath = path.replace('/de', '/en');
-      if (otherPath === '/en/datenschutz') otherPath = '/en/privacy';
-      if (otherPath === '/en/agb') otherPath = '/en/terms';
-      if (otherPath === '/en/impressum') otherPath = '/en/imprint';
-    } else if (path.startsWith('/en')) {
-      otherPath = path.replace('/en', '/de');
-      if (otherPath === '/de/privacy') otherPath = '/de/datenschutz';
-      if (otherPath === '/de/terms') otherPath = '/de/agb';
-      if (otherPath === '/de/imprint') otherPath = '/de/impressum';
+    const DE_TO_EN: Record<string, string> = {
+      '/': '/en',
+      '/datenschutz': '/en/privacy',
+      '/agb': '/en/terms',
+      '/impressum': '/en/imprint',
+      '/hilfe': '/en/help',
+    };
+    const EN_TO_DE: Record<string, string> = {
+      '/en': '/',
+      '/en/privacy': '/datenschutz',
+      '/en/terms': '/agb',
+      '/en/imprint': '/impressum',
+      '/en/help': '/hilfe',
+    };
+    let otherPath: string;
+    if (lang === 'de') {
+      otherPath = DE_TO_EN[path] ?? path.replace(/^\//, '/en/');
+    } else {
+      otherPath = EN_TO_DE[path] ?? (path.replace(/^\/en/, '') || '/');
     }
 
     let linkDe = document.querySelector('link[hreflang="de"]');

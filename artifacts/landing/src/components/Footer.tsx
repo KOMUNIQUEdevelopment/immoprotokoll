@@ -7,6 +7,7 @@ const DE_TO_EN: Record<string, string> = {
   "/datenschutz": "/en/privacy",
   "/agb": "/en/terms",
   "/impressum": "/en/imprint",
+  "/hilfe": "/en/help",
 };
 
 const EN_TO_DE: Record<string, string> = {
@@ -14,6 +15,7 @@ const EN_TO_DE: Record<string, string> = {
   "/en/privacy": "/datenschutz",
   "/en/terms": "/agb",
   "/en/imprint": "/impressum",
+  "/en/help": "/hilfe",
 };
 
 export default function Footer() {
