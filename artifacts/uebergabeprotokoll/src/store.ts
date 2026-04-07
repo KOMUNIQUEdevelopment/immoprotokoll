@@ -7,46 +7,18 @@ export interface TrashedEntry {
   deletedAt: string;
 }
 
-// Strip photo dataUrls before sending to server — photos are stored separately by ID
-// and served via /api/photos/:id URL. Only signatures are kept (they may still use dataUrls).
+// Normalise a protocol before saving to the server.
+// Photos keep their dataUrl — they are stored directly in the protocol JSON so
+// every device can display them with a plain <img src="data:..."> without any
+// separate authenticated endpoint. Signatures are preserved as-is.
 function stripSingleProtocol(p: ProtocolData): ProtocolData {
   return {
     ...p,
-    meterPhotos: (p.meterPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
-    kitchenPhotos: (p.kitchenPhotos ?? []).map((ph) => ({ ...ph, dataUrl: "" })),
-    rooms: p.rooms.map((r) => ({
-      ...r,
-      photos: r.photos.map((ph) => ({ ...ph, dataUrl: "" })),
-    })),
     personSignatures: (p.personSignatures ?? []).map((s) => ({
       ...s,
       signatureDataUrl: s.signatureDataUrl ?? null,
     })),
   };
-}
-
-// Collect all photos with non-empty dataUrls that need to be synced to syncPhotosTable.
-// This handles both new photos (just taken) and old photos migrating from the embedded format.
-async function syncPhotosToServer(p: ProtocolData): Promise<void> {
-  const entries: { id: string; dataUrl: string }[] = [];
-  for (const ph of p.meterPhotos ?? []) {
-    if (ph.id && ph.dataUrl) entries.push({ id: ph.id, dataUrl: ph.dataUrl });
-  }
-  for (const ph of p.kitchenPhotos ?? []) {
-    if (ph.id && ph.dataUrl) entries.push({ id: ph.id, dataUrl: ph.dataUrl });
-  }
-  for (const r of p.rooms) {
-    for (const ph of r.photos) {
-      if (ph.id && ph.dataUrl) entries.push({ id: ph.id, dataUrl: ph.dataUrl });
-    }
-  }
-  if (entries.length === 0) return;
-  await fetch("/api/photos", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ photos: entries }),
-  });
 }
 
 // ── One-time migration: upload any localStorage protocols to the cloud ─────────
@@ -163,11 +135,9 @@ export function useProtocolsStore(accountId: string | null) {
   // ── Internal: save a single protocol to server (debounced 1.5s) ───────────
   const scheduleSave = useCallback((id: string) => {
     if (autoSaveTimers.current[id]) clearTimeout(autoSaveTimers.current[id]);
-    autoSaveTimers.current[id] = setTimeout(async () => {
+    autoSaveTimers.current[id] = setTimeout(() => {
       const p = latestProtocols.current[id];
       if (!p) return;
-      // Upload any photos that have dataUrls in state (new or migrating from old format)
-      await syncPhotosToServer(p).catch(console.warn);
       fetch(`/api/protocols/${id}`, {
         method: "PUT",
         credentials: "include",
@@ -187,19 +157,14 @@ export function useProtocolsStore(accountId: string | null) {
     }
     const p = latestProtocols.current[id];
     if (!p) return;
-    // Upload any photos that have dataUrls in state (new or migrating from old format)
-    syncPhotosToServer(p)
-      .catch(console.warn)
-      .finally(() => {
-        fetch(`/api/protocols/${id}`, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
-        })
-          .then(() => setLastSaved(new Date()))
-          .catch(console.warn);
-      });
+    fetch(`/api/protocols/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ protocol: stripSingleProtocol(p) }),
+    })
+      .then(() => setLastSaved(new Date()))
+      .catch(console.warn);
   }, []);
 
   const currentProtocol = currentId ? (protocols[currentId] ?? null) : null;

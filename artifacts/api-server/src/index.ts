@@ -600,8 +600,8 @@ app.post("/api/protocol/:id/send-tenant-invite", requireAuth, async (req, res) =
       .from(syncProtocolsTable)
       .where(
         and(
-          eq(syncProtocolsTable.id, id),
-          eq(syncProtocolsTable.accountId, authReq.accountId!)
+          eq(syncProtocolsTable.id, id as string),
+          eq(syncProtocolsTable.accountId, authReq.account!.id)
         )
       )
       .limit(1);
@@ -621,8 +621,8 @@ app.post("/api/protocol/:id/send-tenant-invite", requireAuth, async (req, res) =
         .set({ data: protocol, updatedAt: new Date() })
         .where(
           and(
-            eq(syncProtocolsTable.accountId, authReq.accountId!),
-            eq(syncProtocolsTable.id, id)
+            eq(syncProtocolsTable.accountId, authReq.account!.id),
+            eq(syncProtocolsTable.id, id as string)
           )
         );
     }
@@ -647,7 +647,7 @@ app.post("/api/protocol/:id/send-tenant-invite", requireAuth, async (req, res) =
     const accountRows = await db
       .select({ name: accountsTable.name })
       .from(accountsTable)
-      .where(eq(accountsTable.id, authReq.accountId!))
+      .where(eq(accountsTable.id, authReq.account!.id))
       .limit(1);
     const senderAccountName = accountRows[0]?.name ?? "ImmoProtokoll";
 
@@ -790,7 +790,6 @@ app.get("/api/photos/:id", requireAuth, async (req: AuthRequest, res) => {
 app.post(
   "/api/photos",
   requireAuth,
-  express.json({ limit: "50mb" }),
   async (req: AuthRequest, res) => {
     const photos = (req.body as { photos?: { id: string; dataUrl: string }[] }).photos;
     if (!Array.isArray(photos)) {

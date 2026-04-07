@@ -57,15 +57,11 @@ app.use(
   (_req: Request, _res: Response, next: NextFunction) => next()
 );
 
-// Skip global body parsers for photo upload — it uses its own 50mb parser
-const skipForPhotoUpload = (
-  middleware: ReturnType<typeof express.json>
-) => (req: Request, res: Response, next: NextFunction) => {
-  if (req.method === "POST" && req.path === "/api/photos") return next();
-  middleware(req, res, next);
-};
-app.use(skipForPhotoUpload(express.json({ limit: "5mb" })));
-app.use(skipForPhotoUpload(express.urlencoded({ extended: true, limit: "5mb" })));
+// Protocols now include photo dataUrls directly in the JSON payload (up to ~50MB
+// for many high-res photos). The photo upload endpoint also uses 50MB. Keep both
+// limits in sync.
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use("/api", router);
 
