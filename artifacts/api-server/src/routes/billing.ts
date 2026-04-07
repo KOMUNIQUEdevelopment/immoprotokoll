@@ -55,7 +55,7 @@ function getStripeWebhookSecret(mode: "live" | "test"): string | undefined {
     : process.env.STRIPE_WEBHOOK_SECRET;
 }
 
-function makeStripe(mode: "live" | "test"): Stripe {
+export function makeStripe(mode: "live" | "test"): Stripe {
   const key = getStripeSecretKey(mode);
   if (!key) throw new Error(`Stripe ${mode} secret key not configured`);
   return new Stripe(key, { apiVersion: "2026-03-25.dahlia" });
