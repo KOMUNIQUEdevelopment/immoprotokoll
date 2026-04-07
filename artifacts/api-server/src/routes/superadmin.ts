@@ -486,7 +486,17 @@ router.post("/coupons", async (req: AuthRequest, res: Response) => {
       restrictions: { first_time_transaction: first_time_only ?? false },
     };
 
-    const promoCode = await stripe.promotionCodes.create(promoParams);
+    let promoCode;
+    try {
+      promoCode = await stripe.promotionCodes.create(promoParams);
+    } catch (promoErr) {
+      // Rollback: delete the coupon so Stripe stays clean
+      try { await stripe.coupons.del(coupon.id); } catch { /* best-effort */ }
+      const msg = promoErr instanceof Error ? promoErr.message : String(promoErr);
+      logger.error({ err: promoErr, couponId: coupon.id }, "Failed to create promo code (coupon rolled back)");
+      res.status(400).json({ error: `Promo-Code konnte nicht erstellt werden: ${msg}` });
+      return;
+    }
 
     logger.info({ couponId: coupon.id, promoCodeId: promoCode.id, code: promoCode.code }, "Coupon + promo code created");
     res.json({ ok: true, coupon, promoCode });
