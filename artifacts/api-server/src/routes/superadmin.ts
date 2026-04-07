@@ -12,6 +12,7 @@ import { eq, ilike, count } from "drizzle-orm";
 import Stripe from "stripe";
 import { requireAuth, requireSuperAdmin, type AuthRequest } from "../middleware/auth";
 import { getStripeMode, makeStripe, PLAN_PRICES } from "./billing";
+import { logger } from "../lib/logger";
 
 const router = Router();
 const SESSION_COOKIE = "immo_session";
@@ -477,7 +478,7 @@ router.post("/coupons", async (req: AuthRequest, res: Response) => {
     }
 
     const promoParams: Parameters<typeof stripe.promotionCodes.create>[0] = {
-      coupon: coupon.id,
+      promotion: { type: "coupon", coupon: coupon.id },
       ...(code ? { code } : {}),
       ...(max_redemptions ? { max_redemptions } : {}),
       ...(expires_at ? { expires_at: Math.floor(new Date(expires_at).getTime() / 1000) } : {}),
@@ -511,7 +512,7 @@ router.delete("/coupons/:id", async (req: AuthRequest, res: Response) => {
   try {
     const mode = await getStripeMode();
     const stripe = makeStripe(mode);
-    await stripe.coupons.del(req.params.id);
+    await stripe.coupons.del(req.params["id"] as string);
     res.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -524,7 +525,7 @@ router.patch("/promo-codes/:id/deactivate", async (req: AuthRequest, res: Respon
   try {
     const mode = await getStripeMode();
     const stripe = makeStripe(mode);
-    await stripe.promotionCodes.update(req.params.id, { active: false });
+    await stripe.promotionCodes.update(req.params["id"] as string, { active: false });
     res.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -112,4 +112,17 @@ if (isProduction) {
   logger.info("Production mode: serving static files from dist/public directories");
 }
 
+// ── Global JSON error handler ─────────────────────────────────────────────────
+// Must be registered AFTER all routes. Catches any error passed via next(err)
+// (e.g. unhandled throws in async middleware) and returns JSON instead of
+// Express's default HTML error page.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  logger.error({ err }, "Unhandled Express error");
+  const msg = err?.message || "Internal Server Error";
+  if (!res.headersSent) {
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default app;
