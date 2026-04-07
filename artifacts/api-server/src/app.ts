@@ -8,6 +8,16 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// ── www → apex 301 redirect ───────────────────────────────────────────────────
+// Must run before every other middleware so the redirect is served immediately.
+// req.url preserves the full path + query string, e.g. /en?utm_source=x
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.hostname === "www.immoprotokoll.com") {
+    return res.redirect(301, `https://immoprotokoll.com${req.url}`);
+  }
+  next();
+});
+
 app.use(
   pinoHttp({
     logger,
