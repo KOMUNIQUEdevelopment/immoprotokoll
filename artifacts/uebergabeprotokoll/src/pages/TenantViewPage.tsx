@@ -185,6 +185,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  const hasEverLoadedRef = useRef(false);
   const fetchedPhotoIds = useRef<Set<string>>(new Set());
 
   const tr = getTranslations(propertyLanguage) as Translations;
@@ -242,6 +243,7 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
       });
       return { ...withPhotos, personSignatures: mergedSigs };
     });
+    hasEverLoadedRef.current = true;
     setLoadState("loaded");
   }, [collectMissingIds, applyPhotoMap, protocolId]);
 
@@ -293,11 +295,13 @@ export default function TenantViewPage({ protocolId }: TenantViewPageProps) {
           setRetryAttempt(retryCountRef.current);
 
           if (err.status === 404 && attempt >= 20) {
-            setLoadState("not-found");
+            if (!hasEverLoadedRef.current) setLoadState("not-found");
             return;
           }
 
-          if (attempt >= 1) setLoadState("waiting");
+          // Only show "waiting" screen if the protocol has never been successfully loaded.
+          // After a successful load, silently retry in the background to avoid confusing users.
+          if (attempt >= 1 && !hasEverLoadedRef.current) setLoadState("waiting");
 
           const delay = Math.min(4000 * Math.pow(2, Math.max(0, attempt - 1)), 30000);
           retryTimerRef.current = setTimeout(doFetch, delay);
