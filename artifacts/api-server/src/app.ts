@@ -67,20 +67,26 @@ app.use("/api", router);
 // In production (Cloud Run), Express serves all static assets directly.
 if (isProduction) {
   const cwd = process.cwd();
-
-  // Übergabeprotokoll PWA at /app/ (built to artifacts/uebergabeprotokoll/dist/public/)
   const appDir = path.join(cwd, "artifacts/uebergabeprotokoll/dist/public");
-  app.use("/app", express.static(appDir));
-  // SPA catch-all: unmatched paths (e.g. deep hash-routes) → index.html
-  app.use("/app", (_req: Request, res: Response) => {
-    res.sendFile(path.join(appDir, "index.html"));
+  const landingDir = path.join(cwd, "artifacts/landing/dist/public");
+
+  // Route by hostname:
+  //   app.immoprotokoll.com  → Übergabeprotokoll PWA (built with BASE_PATH=/)
+  //   everything else        → Marketing Landing Page
+  const serveApp = express.static(appDir);
+  const serveLanding = express.static(landingDir);
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.hostname.startsWith("app.")) {
+      return serveApp(req, res, () => {
+        res.sendFile(path.join(appDir, "index.html"));
+      });
+    }
+    next();
   });
 
-  // Landing page at / (built to artifacts/landing/dist/public/)
-  const landingDir = path.join(cwd, "artifacts/landing/dist/public");
-  app.use("/", express.static(landingDir));
-  // SPA catch-all for landing
-  app.use("/", (_req: Request, res: Response) => {
+  app.use(serveLanding);
+  app.use((_req: Request, res: Response) => {
     res.sendFile(path.join(landingDir, "index.html"));
   });
 

@@ -40,7 +40,8 @@ RUN PORT=3000 BASE_PATH=/ NODE_ENV=production \
     pnpm --filter @workspace/landing run build
 
 # ── Build: Übergabeprotokoll PWA (Vite → artifacts/uebergabeprotokoll/dist/public/) ──
-RUN PORT=3001 BASE_PATH=/app/ NODE_ENV=production \
+# BASE_PATH=/ because the app is served at the root of app.immoprotokoll.com
+RUN PORT=3001 BASE_PATH=/ NODE_ENV=production \
     pnpm --filter @workspace/uebergabeprotokoll run build
 
 # ============================================================
