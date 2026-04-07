@@ -15,6 +15,7 @@ import {
   sendTeamInviteEmail,
   sendPasswordResetEmail,
 } from "../lib/email";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -323,18 +324,18 @@ router.post(
       })
       .returning();
 
-    const { passwordHash: _pw, ...safeUser } = user;
-    res.status(201).json({ user: safeUser });
-
-    // Send team-invite email async (include temp password in plaintext once — they should change it)
+    // Send team-invite email before responding — Cloud Run throttles CPU after response
     const inviterName = [req.user!.firstName, req.user!.lastName].filter(Boolean).join(" ") || req.user!.email;
-    sendTeamInviteEmail(
+    await sendTeamInviteEmail(
       email.trim().toLowerCase(),
       firstName?.trim() ?? "",
       req.account?.name ?? "",
       inviterName,
       password,
-    ).catch(() => {});
+    ).catch((err) => logger.error({ err }, "team-invite email failed"));
+
+    const { passwordHash: _pw, ...safeUser } = user;
+    res.status(201).json({ user: safeUser });
   }
 );
 
@@ -348,9 +349,8 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  // Always respond with success to prevent user enumeration
-  res.json({ ok: true });
-
+  // Do all work BEFORE responding — Cloud Run throttles CPU after response is sent,
+  // which would kill background async operations silently.
   try {
     const users = await db
       .select()
@@ -358,43 +358,45 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
       .where(eq(usersTable.email, normalizedEmail))
       .limit(1);
 
-    if (users.length === 0) return; // Silently skip — don't reveal existence
+    if (users.length > 0) {
+      const user = users[0];
 
-    const user = users[0];
+      // Expire any existing unused tokens for this user
+      await db
+        .update(passwordResetTokensTable)
+        .set({ usedAt: new Date() })
+        .where(
+          and(
+            eq(passwordResetTokensTable.userId, user.id),
+            isNull(passwordResetTokensTable.usedAt),
+          )
+        );
 
-    // Expire any existing unused tokens for this user
-    await db
-      .update(passwordResetTokensTable)
-      .set({ usedAt: new Date() })
-      .where(
-        and(
-          eq(passwordResetTokensTable.userId, user.id),
-          isNull(passwordResetTokensTable.usedAt),
-        )
-      );
+      // Generate a secure random token
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
 
-    // Generate a secure random token
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
 
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
+      await db.insert(passwordResetTokensTable).values({
+        userId: user.id,
+        email: normalizedEmail,
+        token,
+        expiresAt,
+      });
 
-    await db.insert(passwordResetTokensTable).values({
-      userId: user.id,
-      email: normalizedEmail,
-      token,
-      expiresAt,
-    });
+      const APP_APP_URL = process.env.APP_APP_URL ?? "https://app.immoprotokoll.com";
+      const resetUrl = `${APP_APP_URL}/#/reset-password/${token}`;
 
-    const APP_APP_URL = process.env.APP_APP_URL ?? "https://app.immoprotokoll.com";
-    const resetUrl = `${APP_APP_URL}/#/reset-password/${token}`;
-
-    await sendPasswordResetEmail(normalizedEmail, user.firstName, resetUrl);
+      await sendPasswordResetEmail(normalizedEmail, user.firstName, resetUrl);
+    }
   } catch (err) {
-    // Log but don't surface errors — response already sent
-    console.error("forgot-password error:", err);
+    logger.error({ err }, "forgot-password error");
   }
+
+  // Always respond with success to prevent user enumeration
+  res.json({ ok: true });
 });
 
 // ── Reset password — consume token and set new password ───────────────────────
