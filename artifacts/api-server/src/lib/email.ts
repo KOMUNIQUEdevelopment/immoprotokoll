@@ -419,6 +419,29 @@ export async function sendSupportTicketAssignedEmail(opts: {
   await send(agentEmail, `[Support assigned] ${subject}`, html);
 }
 
+/** Sent during login when MFA is enabled — contains the 6-digit verification code */
+export async function sendMfaCodeEmail(
+  email: string,
+  firstName: string,
+  code: string,
+): Promise<void> {
+  const name = firstName || "there";
+  const html = emailShell(`
+    ${heading("Ihr Anmeldecode")}
+    ${body(`Guten Tag ${name},`)}
+    ${body("Geben Sie den folgenden Code ein, um sich bei ImmoProtokoll anzumelden:")}
+    <div style="margin:28px 0;text-align:center;">
+      <div style="display:inline-block;background:#f5f5f5;border-radius:12px;padding:20px 40px;">
+        <span style="font-size:40px;font-weight:700;letter-spacing:16px;color:#000;font-variant-numeric:tabular-nums;">${code}</span>
+      </div>
+    </div>
+    ${body("Der Code ist <strong>10 Minuten</strong> gültig und kann nur einmal verwendet werden.")}
+    ${divider()}
+    ${body(`<span style="font-size:13px;color:#888;">Falls Sie sich nicht einloggen wollten, können Sie diese E-Mail ignorieren — Ihr Konto bleibt sicher.</span>`)}
+  `);
+  await send(email, "Ihr ImmoProtokoll Anmeldecode", html);
+}
+
 /** Sent when a plan is changed (upgrade or downgrade) */
 export async function sendPlanChangedEmail(
   email: string,

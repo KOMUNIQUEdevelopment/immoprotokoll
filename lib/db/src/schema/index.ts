@@ -9,3 +9,4 @@ export * from "./passwordResetTokens";
 export * from "./supportTickets";
 export * from "./supportAgents";
 export * from "./roadmap";
+export * from "./mfa";

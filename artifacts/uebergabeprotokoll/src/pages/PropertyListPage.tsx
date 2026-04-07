@@ -4,7 +4,7 @@ import { Property, ProtocolData, UNASSIGNED_PROPERTY } from "../types";
 import {
   Plus, Building2, Pencil, Trash2, MapPin, LogOut, X, Check,
   AlertTriangle, ClipboardList, Archive, ShieldCheck, Search, Camera, ArrowUpRight,
-  HelpCircle, Globe, Users,
+  HelpCircle, Globe, Users, Lock, ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,8 @@ interface PropertyListPageProps {
   onShowPricing?: () => void;
   onShowSuperadmin?: () => void;
   onShowTeam?: () => void;
+  onShowSecurity?: () => void;
+  mfaEnabled?: boolean;
   currentPlan?: string;
   userLang?: string;
   onChangeLang?: (lang: SupportedLanguage) => void;
@@ -284,6 +286,8 @@ export default function PropertyListPage({
   onShowPricing,
   onShowSuperadmin,
   onShowTeam,
+  onShowSecurity,
+  mfaEnabled = true,
   currentPlan = "free",
   userLang = "de-CH",
   onChangeLang,
@@ -411,6 +415,16 @@ export default function PropertyListPage({
                 <Users size={16} />
               </button>
             )}
+            {onShowSecurity && (
+              <button
+                type="button"
+                onClick={onShowSecurity}
+                className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-black transition-colors"
+                title="Sicherheitseinstellungen"
+              >
+                <Lock size={16} />
+              </button>
+            )}
             {onShowSuperadmin && (
               <button
                 type="button"
@@ -479,6 +493,24 @@ export default function PropertyListPage({
           </div>
         </div>
       </header>
+
+      {!mfaEnabled && onShowSecurity && (
+        <div
+          className="bg-neutral-50 border-b border-neutral-200 px-4 py-2.5 cursor-pointer hover:bg-neutral-100 transition-colors"
+          onClick={onShowSecurity}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && onShowSecurity()}
+        >
+          <div className="max-w-2xl mx-auto flex items-center gap-2.5">
+            <ShieldAlert size={14} className="text-neutral-500 shrink-0" />
+            <p className="text-xs text-neutral-600">
+              <span className="font-medium">Zwei-Faktor-Authentifizierung ist deaktiviert.</span>{" "}
+              <span className="underline">Jetzt aktivieren</span> um Ihr Konto besser zu schützen.
+            </p>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
         <div className="flex items-center justify-between mb-5">

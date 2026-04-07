@@ -870,6 +870,19 @@ async function runStartupMigrations() {
       PRIMARY KEY (account_id, id)
     )
   `);
+  await db.execute(sql`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS mfa_codes (
+      id            TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      user_id       TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      pending_token TEXT        NOT NULL UNIQUE,
+      code_hash     TEXT        NOT NULL,
+      expires_at    TIMESTAMPTZ NOT NULL,
+      used_at       TIMESTAMPTZ
+    )
+  `);
 }
 
 server.listen(port, (err?: Error) => {

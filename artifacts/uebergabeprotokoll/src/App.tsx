@@ -13,6 +13,7 @@ import PricingPage from "./pages/PricingPage";
 import BillingPage from "./pages/BillingPage";
 import SuperadminPage from "./pages/SuperadminPage";
 import TeamPage from "./pages/TeamPage";
+import SecurityPage from "./pages/SecurityPage";
 import TenantViewPage from "./pages/TenantViewPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -53,7 +54,7 @@ function formatRelative(date: Date | null, t: (key: string, opts?: Record<string
 
 type EditorTab = "protokoll" | "unterschriften";
 
-type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel" | "superadmin" | "team";
+type AppScreen = "protocols" | "pricing" | "billing" | "billing-success" | "billing-cancel" | "superadmin" | "team" | "security";
 
 function LanguageSelector({
   currentLang,
@@ -108,6 +109,8 @@ function AppContent({
   userLang,
   initialScreen = "protocols",
   onChangeLang,
+  mfaEnabled,
+  onSetMfaEnabled,
   isSuperAdmin,
   isImpersonating,
   onEndImpersonation,
@@ -120,6 +123,8 @@ function AppContent({
   userLang: string;
   initialScreen?: AppScreen;
   onChangeLang: (lang: SupportedLanguage) => void;
+  mfaEnabled: boolean;
+  onSetMfaEnabled: (enabled: boolean) => void;
   isSuperAdmin?: boolean;
   isImpersonating?: boolean;
   onEndImpersonation?: () => Promise<void>;
@@ -454,6 +459,18 @@ function AppContent({
       );
     }
 
+    if (appScreen === "security") {
+      return (
+        <SecurityPage
+          mfaEnabled={mfaEnabled}
+          onBack={() => setAppScreen("protocols")}
+          onMfaChange={(enabled) => {
+            onSetMfaEnabled(enabled);
+          }}
+        />
+      );
+    }
+
     if (!selectedProperty) {
       return (
         <>
@@ -466,6 +483,8 @@ function AppContent({
             onShowBilling={() => setAppScreen("billing")}
             onShowPricing={() => setAppScreen("pricing")}
             onShowSuperadmin={isSuperAdmin ? () => setAppScreen("superadmin") : undefined}
+            onShowSecurity={() => setAppScreen("security")}
+            mfaEnabled={mfaEnabled}
             onShowTeam={
               (account?.plan === "agentur" || account?.plan === "custom") &&
               (userRole === "owner" || userRole === "administrator")
@@ -694,7 +713,7 @@ export default function App() {
   const resetMatch = hash.match(/^#\/reset-password\/(.+)$/);
   const isPricingPage = pathname.endsWith("/pricing") || hash === "#/pricing";
 
-  const { user, account, loading, login, register, logout, updateLanguage, isImpersonating, endImpersonation } = useAuth();
+  const { user, account, loading, login, verifyMfa, setMfaEnabled, register, logout, updateLanguage, isImpersonating, endImpersonation } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const { t } = useTranslation();
 
@@ -760,6 +779,7 @@ export default function App() {
         {authScreen === "login" ? (
           <LoginPage
             onLogin={login}
+            onVerifyMfa={verifyMfa}
             onGoToRegister={() => setAuthScreen("register")}
             onGoToForgotPassword={() => setAuthScreen("forgot-password")}
           />
@@ -789,6 +809,8 @@ export default function App() {
         userLang={user.preferredLanguage ?? "de-CH"}
         initialScreen={hashToInitialScreen(hash, pathname)}
         onChangeLang={handleChangeLang}
+        mfaEnabled={user.mfaEnabled ?? false}
+        onSetMfaEnabled={setMfaEnabled}
         isSuperAdmin={user.isSuperAdmin}
         isImpersonating={isImpersonating}
         onEndImpersonation={endImpersonation}

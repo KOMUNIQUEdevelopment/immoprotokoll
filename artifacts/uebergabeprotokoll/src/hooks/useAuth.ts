@@ -9,6 +9,7 @@ export interface AuthUser {
   lastName: string;
   role: "owner" | "administrator" | "property_manager";
   isSuperAdmin: boolean;
+  mfaEnabled: boolean;
   preferredLanguage: string;
 }
 
@@ -71,12 +72,20 @@ export function useAuth() {
     checkSession();
   }, [checkSession]);
 
-  const login = useCallback(async (email: string, password: string): Promise<{ error?: string }> => {
+  const login = useCallback(async (
+    email: string,
+    password: string,
+  ): Promise<{ error?: string; mfaRequired?: boolean; mfaPendingToken?: string }> => {
     try {
       const res = await apiFetch("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+      if (res.status === 202) {
+        // MFA required — server sent code to email
+        const data = await res.json() as { mfaRequired: boolean; mfaPendingToken: string };
+        return { mfaRequired: true, mfaPendingToken: data.mfaPendingToken };
+      }
       if (res.ok) {
         const data = await res.json() as { user: AuthUser; account: AuthAccount };
         setLanguage(data.user.preferredLanguage ?? "de-CH");
@@ -89,6 +98,35 @@ export function useAuth() {
     } catch {
       return { error: i18n.t("auth.connectionError") };
     }
+  }, []);
+
+  const verifyMfa = useCallback(async (
+    mfaPendingToken: string,
+    code: string,
+  ): Promise<{ error?: string }> => {
+    try {
+      const res = await apiFetch("/auth/login/verify-mfa", {
+        method: "POST",
+        body: JSON.stringify({ mfaPendingToken, code }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { user: AuthUser; account: AuthAccount };
+        setLanguage(data.user.preferredLanguage ?? "de-CH");
+        setState({ user: data.user, account: data.account, loading: false, isImpersonating: false, impersonatedAccountId: null });
+        return {};
+      } else {
+        const err = await res.json() as { error: string };
+        return { error: err.error ?? "Ungültiger Code" };
+      }
+    } catch {
+      return { error: i18n.t("auth.connectionError") };
+    }
+  }, []);
+
+  const setMfaEnabled = useCallback((enabled: boolean) => {
+    setState((prev) =>
+      prev.user ? { ...prev, user: { ...prev.user, mfaEnabled: enabled } } : prev
+    );
   }, []);
 
   const register = useCallback(async (opts: {
@@ -152,6 +190,8 @@ export function useAuth() {
     ...state,
     isAuthenticated: !!state.user,
     login,
+    verifyMfa,
+    setMfaEnabled,
     register,
     logout,
     checkSession,

@@ -16,6 +16,7 @@ export const usersTable = pgTable("users", {
   lastName: text("last_name").notNull().default(""),
   role: userRoleEnum("role").notNull().default("owner"),
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   preferredLanguage: text("preferred_language").notNull().default("de-CH"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
