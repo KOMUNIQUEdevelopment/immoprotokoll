@@ -267,14 +267,16 @@ router.post(
 
       const customerId = await createOrFetchCustomer(account.stripeCustomerId);
 
+      const APP_URL = process.env.APP_APP_URL ?? "https://app.immoprotokoll.com";
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         currency: cur,
-        success_url: `${APP_BASE_URL}/app/#/billing/success`,
-        cancel_url: `${APP_BASE_URL}/app/#/billing/cancel`,
+        allow_promotion_codes: true,
+        success_url: `${APP_URL}/#/billing/success`,
+        cancel_url: `${APP_URL}/#/billing/cancel`,
         metadata: { accountId, plan, interval, currency: cur },
         subscription_data: {
           metadata: { accountId, plan, interval, currency: cur },

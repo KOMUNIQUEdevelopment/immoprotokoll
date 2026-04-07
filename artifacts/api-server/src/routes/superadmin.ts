@@ -384,4 +384,143 @@ router.post("/stripe/setup-test", async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// ── GET /api/superadmin/coupons — list all coupons + promotion codes ──────────
+router.get("/coupons", async (_req: AuthRequest, res: Response) => {
+  try {
+    const mode = await getStripeMode();
+    const stripe = makeStripe(mode);
+    const couponsPage = await stripe.coupons.list({ limit: 100 });
+
+    const result = await Promise.all(
+      couponsPage.data.map(async (coupon) => {
+        const promoCodes = await stripe.promotionCodes.list({ coupon: coupon.id, limit: 100 });
+        return {
+          coupon: {
+            id: coupon.id,
+            name: coupon.name,
+            percent_off: coupon.percent_off,
+            max_redemptions: coupon.max_redemptions,
+            times_redeemed: coupon.times_redeemed,
+            valid: coupon.valid,
+            created: coupon.created,
+          },
+          promoCodes: promoCodes.data.map((pc) => ({
+            id: pc.id,
+            code: pc.code,
+            active: pc.active,
+            customer_email: typeof pc.customer === "object" && pc.customer !== null
+              ? (pc.customer as { email?: string }).email ?? null
+              : null,
+            first_time_transaction: pc.restrictions?.first_time_transaction ?? false,
+            times_redeemed: pc.times_redeemed,
+            max_redemptions: pc.max_redemptions,
+            expires_at: pc.expires_at,
+          })),
+        };
+      })
+    );
+
+    res.json({ coupons: result, mode });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err }, "Failed to list coupons");
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ── POST /api/superadmin/coupons — create coupon + promotion code ──────────────
+router.post("/coupons", async (req: AuthRequest, res: Response) => {
+  const {
+    name,
+    percent_off,
+    code,
+    max_redemptions,
+    expires_at,
+    restrict_to_email,
+    first_time_only,
+    duration = "once",
+  } = req.body as {
+    name?: string;
+    percent_off?: number;
+    code?: string;
+    max_redemptions?: number;
+    expires_at?: string;
+    restrict_to_email?: string;
+    first_time_only?: boolean;
+    duration?: "once" | "repeating" | "forever";
+  };
+
+  if (!percent_off || percent_off <= 0 || percent_off > 100) {
+    res.status(400).json({ error: "percent_off must be between 1 and 100" });
+    return;
+  }
+
+  try {
+    const mode = await getStripeMode();
+    const stripe = makeStripe(mode);
+
+    const coupon = await stripe.coupons.create({
+      name: name || undefined,
+      percent_off,
+      duration,
+      ...(max_redemptions ? { max_redemptions } : {}),
+    });
+
+    let customerId: string | undefined;
+    if (restrict_to_email) {
+      const customers = await stripe.customers.list({ email: restrict_to_email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+      } else {
+        const newCustomer = await stripe.customers.create({ email: restrict_to_email });
+        customerId = newCustomer.id;
+      }
+    }
+
+    const promoParams: Parameters<typeof stripe.promotionCodes.create>[0] = {
+      coupon: coupon.id,
+      ...(code ? { code } : {}),
+      ...(max_redemptions ? { max_redemptions } : {}),
+      ...(expires_at ? { expires_at: Math.floor(new Date(expires_at).getTime() / 1000) } : {}),
+      ...(customerId ? { customer: customerId } : {}),
+      restrictions: { first_time_transaction: first_time_only ?? false },
+    };
+
+    const promoCode = await stripe.promotionCodes.create(promoParams);
+
+    logger.info({ couponId: coupon.id, promoCodeId: promoCode.id, code: promoCode.code }, "Coupon + promo code created");
+    res.json({ ok: true, coupon, promoCode });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err }, "Failed to create coupon");
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ── DELETE /api/superadmin/coupons/:id — delete coupon ───────────────────────
+router.delete("/coupons/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const mode = await getStripeMode();
+    const stripe = makeStripe(mode);
+    await stripe.coupons.del(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ── PATCH /api/superadmin/promo-codes/:id/deactivate ─────────────────────────
+router.patch("/promo-codes/:id/deactivate", async (req: AuthRequest, res: Response) => {
+  try {
+    const mode = await getStripeMode();
+    const stripe = makeStripe(mode);
+    await stripe.promotionCodes.update(req.params.id, { active: false });
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default router;

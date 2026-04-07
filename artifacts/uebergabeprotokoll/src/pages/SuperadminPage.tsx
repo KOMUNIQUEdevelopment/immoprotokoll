@@ -3,12 +3,13 @@ import {
   Search, ChevronLeft, ChevronRight, Users, FileText, Building2,
   Settings, LogOut, Shield, ArrowLeft, Check, X,
   RefreshCw, Eye, CreditCard, AlertTriangle, CheckCircle2,
-  MessageSquare, Map,
+  MessageSquare, Map, Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import SuperadminSupportTab from "./SuperadminSupportTab";
 import SuperadminRoadmapTab from "./SuperadminRoadmapTab";
+import SuperadminCouponsTab from "./SuperadminCouponsTab";
 
 const API = "/api";
 
@@ -514,7 +515,7 @@ interface Props {
   onEndImpersonation: () => Promise<void>;
 }
 
-type AdminTab = "accounts" | "support" | "roadmap";
+type AdminTab = "accounts" | "coupons" | "support" | "roadmap";
 
 export default function SuperadminPage({ onBack, isImpersonating, onEndImpersonation }: Props) {
   const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
@@ -643,6 +644,16 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
             <Building2 size={13} /> Konten
           </button>
           <button
+            onClick={() => setActiveTab("coupons")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "coupons"
+                ? "bg-[hsl(0,0%,8%)] text-white"
+                : "text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,15%)]"
+            }`}
+          >
+            <Tag size={13} /> Rabattcodes
+          </button>
+          <button
             onClick={() => setActiveTab("support")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               activeTab === "support"
@@ -670,6 +681,8 @@ export default function SuperadminPage({ onBack, isImpersonating, onEndImpersona
           <SuperadminSupportTab />
         ) : activeTab === "roadmap" ? (
           <SuperadminRoadmapTab />
+        ) : activeTab === "coupons" ? (
+          <SuperadminCouponsTab />
         ) : (
         <>
         <div className={`flex flex-col ${selectedAccountId ? "w-1/2 border-r border-[hsl(0,0%,88%)]" : "w-full"}`}>
