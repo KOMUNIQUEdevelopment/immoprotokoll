@@ -17,6 +17,7 @@ import {
   sendSubscriptionCanceledEmail,
   sendPaymentFailedEmail,
   sendPlanChangedEmail,
+  sendInvoiceEmail,
 } from "../lib/email";
 
 const router = Router();
@@ -458,7 +459,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
   try {
     const priceIdLookup = await buildPriceIdLookup(mode);
-    await handleWebhookEvent(event, priceIdLookup);
+    await handleWebhookEvent(event, priceIdLookup, mode);
     res.json({ received: true });
   } catch (err) {
     logger.error({ err, type: event.type }, "Webhook handler error");
@@ -494,7 +495,7 @@ async function getAccountOwnerByCustomerId(customerId: string): Promise<{ email:
 }
 
 // ── Webhook event handler ─────────────────────────────────────────────────────
-async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string, PlanInfo>) {
+async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string, PlanInfo>, mode: "live" | "test") {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
@@ -527,6 +528,54 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
         const owner = await getAccountOwner(accountId);
         if (owner) sendSubscriptionCanceledEmail(owner.email, owner.firstName, oldPlan).catch(() => {});
       }
+      break;
+    }
+    case "invoice.payment_succeeded": {
+      const invoice = event.data.object as Stripe.Invoice;
+      // Skip zero-amount invoices (e.g. trial starts)
+      const amountPaid = (invoice as { amount_paid?: number }).amount_paid ?? 0;
+      if (amountPaid === 0) break;
+      const customerId = invoice.customer as string;
+      if (!customerId) break;
+      const owner = await getAccountOwnerByCustomerId(customerId);
+      if (!owner) break;
+
+      const invoiceNumber = (invoice as { number?: string }).number ?? "-";
+      const invoiceUrl =
+        (invoice as { hosted_invoice_url?: string }).hosted_invoice_url ??
+        (invoice as { invoice_pdf?: string }).invoice_pdf ??
+        "";
+      if (!invoiceUrl) break;
+
+      const currency = invoice.currency ?? "chf";
+      const periodEnd = (invoice as { period_end?: number }).period_end;
+      const periodLabel = periodEnd
+        ? new Date(periodEnd * 1000).toLocaleDateString("de-CH", { month: "long", year: "numeric" })
+        : "-";
+
+      // Resolve plan label from subscription metadata
+      const subId = (invoice as { subscription?: string }).subscription;
+      let planLabel = "Abonnement";
+      if (subId) {
+        try {
+          const stripe = makeStripe(mode);
+          const sub = await stripe.subscriptions.retrieve(subId as string);
+          const rawPlan = sub.metadata?.plan ?? "privat";
+          planLabel = rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1);
+        } catch { /* best-effort */ }
+      }
+
+      logger.info({ invoiceNumber, amountPaid, customerId }, "Invoice paid — sending invoice email");
+      sendInvoiceEmail(
+        owner.email,
+        owner.firstName,
+        amountPaid,
+        currency,
+        invoiceNumber,
+        invoiceUrl,
+        periodLabel,
+        planLabel,
+      ).catch(() => {});
       break;
     }
     case "invoice.payment_failed": {
@@ -631,9 +680,9 @@ async function syncSubscription(sub: Stripe.Subscription, priceIdLookup: Map<str
   if (stripeStatus === "active" || stripeStatus === "trialing") {
     const owner = await getAccountOwner(accountId);
     if (owner) {
-      const nextBillingDate = periodEnd.toLocaleDateString("en-GB", {
-        day: "2-digit", month: "long", year: "numeric",
-      });
+      const nextBillingDate = periodEnd
+        ? periodEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
+        : "-";
       if (previousPlan && previousPlan !== plan) {
         sendPlanChangedEmail(owner.email, owner.firstName, previousPlan, plan).catch(() => {});
       } else {

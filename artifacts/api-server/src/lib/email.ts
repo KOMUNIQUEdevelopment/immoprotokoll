@@ -442,6 +442,46 @@ export async function sendMfaCodeEmail(
   await send(email, "Ihr ImmoProtokoll Anmeldecode", html);
 }
 
+/** Sent when an invoice payment succeeds — contains amount, invoice number and PDF link */
+export async function sendInvoiceEmail(
+  email: string,
+  firstName: string,
+  amountCents: number,
+  currency: string,
+  invoiceNumber: string,
+  invoiceUrl: string,
+  periodLabel: string,
+  planLabel: string,
+): Promise<void> {
+  const name = firstName || "there";
+  const cur = currency.toUpperCase();
+  const amountFormatted = new Intl.NumberFormat("de-CH", {
+    style: "currency",
+    currency: cur,
+    minimumFractionDigits: 2,
+  }).format(amountCents / 100);
+
+  const html = emailShell(`
+    ${heading("Ihre Rechnung von ImmoProtokoll")}
+    ${body(`Guten Tag ${name},`)}
+    ${body("Vielen Dank für Ihr Vertrauen. Anbei finden Sie die Rechnung für Ihr Abonnement:")}
+    ${divider()}
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;width:100%;">
+      ${detail("Rechnungsnummer", invoiceNumber)}
+      ${detail("Plan", planLabel)}
+      ${detail("Periode", periodLabel)}
+      ${detail("Betrag (inkl. MwSt.)", `<strong style="color:#000;">${amountFormatted}</strong>`)}
+    </table>
+    ${button("Rechnung öffnen / herunterladen", invoiceUrl)}
+    ${divider()}
+    ${body(`<span style="font-size:13px;color:#888;">
+      Diese E-Mail dient als Zahlungsbestätigung. Die detaillierte Rechnung können Sie über den obenstehenden Link öffnen oder als PDF herunterladen.<br/><br/>
+      Fragen zur Rechnung? <a href="mailto:${SUPPORT_EMAIL}" style="color:#444;">${SUPPORT_EMAIL}</a>
+    </span>`)}
+  `);
+  await send(email, `Ihre Rechnung ${invoiceNumber} – ${amountFormatted}`, html);
+}
+
 /** Sent when a plan is changed (upgrade or downgrade) */
 export async function sendPlanChangedEmail(
   email: string,
