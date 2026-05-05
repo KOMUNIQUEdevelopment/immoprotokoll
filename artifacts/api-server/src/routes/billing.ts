@@ -468,20 +468,20 @@ router.post("/webhook", async (req: Request, res: Response) => {
 });
 
 // ── Helper: look up the owner of an account ───────────────────────────────────
-async function getAccountOwner(accountId: string): Promise<{ email: string; firstName: string } | null> {
+async function getAccountOwner(accountId: string): Promise<{ email: string; firstName: string; lang: string } | null> {
   try {
     const rows = await db
-      .select({ email: usersTable.email, firstName: usersTable.firstName })
+      .select({ email: usersTable.email, firstName: usersTable.firstName, role: usersTable.role, lang: usersTable.preferredLanguage })
       .from(usersTable)
       .where(eq(usersTable.accountId, accountId))
       .limit(10);
     // Prefer owner role; fall back to first user found
-    const owner = rows.find(r => (r as { role?: string }).role === "owner") ?? rows[0];
-    return owner ?? null;
+    const owner = rows.find(r => r.role === "owner") ?? rows[0];
+    return owner ? { email: owner.email, firstName: owner.firstName, lang: owner.lang ?? "de-CH" } : null;
   } catch { return null; }
 }
 
-async function getAccountOwnerByCustomerId(customerId: string): Promise<{ email: string; firstName: string; accountId: string } | null> {
+async function getAccountOwnerByCustomerId(customerId: string): Promise<{ email: string; firstName: string; accountId: string; lang: string } | null> {
   try {
     const accounts = await db
       .select({ id: accountsTable.id })
@@ -549,23 +549,30 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
 
       const currency = invoice.currency ?? "chf";
       const periodEnd = (invoice as { period_end?: number }).period_end;
+      const ownerLang = owner.lang ?? "de-CH";
+      const isDE = ownerLang.startsWith("de");
+      const dateLocale = isDE ? "de-CH" : "en-GB";
       const periodLabel = periodEnd
-        ? new Date(periodEnd * 1000).toLocaleDateString("de-CH", { month: "long", year: "numeric" })
+        ? new Date(periodEnd * 1000).toLocaleDateString(dateLocale, { month: "long", year: "numeric" })
         : "-";
 
       // Resolve plan label from subscription metadata
       const subId = (invoice as { subscription?: string }).subscription;
-      let planLabel = "Abonnement";
+      const planLabelDE: Record<string, string> = { privat: "Privat", agentur: "Agentur", free: "Free" };
+      const planLabelEN: Record<string, string> = { privat: "Private", agentur: "Agency", free: "Free" };
+      let rawPlan = "privat";
       if (subId) {
         try {
           const stripe = makeStripe(mode);
           const sub = await stripe.subscriptions.retrieve(subId as string);
-          const rawPlan = sub.metadata?.plan ?? "privat";
-          planLabel = rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1);
+          rawPlan = sub.metadata?.plan ?? "privat";
         } catch { /* best-effort */ }
       }
+      const planLabel = isDE
+        ? (planLabelDE[rawPlan] ?? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1))
+        : (planLabelEN[rawPlan] ?? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1));
 
-      logger.info({ invoiceNumber, amountPaid, customerId }, "Invoice paid — sending invoice email");
+      logger.info({ invoiceNumber, amountPaid, customerId, lang: ownerLang }, "Invoice paid — sending invoice email");
       sendInvoiceEmail(
         owner.email,
         owner.firstName,
@@ -575,6 +582,7 @@ async function handleWebhookEvent(event: Stripe.Event, priceIdLookup: Map<string
         invoiceUrl,
         periodLabel,
         planLabel,
+        ownerLang,
       ).catch(() => {});
       break;
     }
