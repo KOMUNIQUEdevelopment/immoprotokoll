@@ -434,32 +434,54 @@ router.post(
 );
 
 // ── POST /api/billing/webhook ─────────────────────────────────────────────────
+// The endpoint accepts both live and test Stripe webhooks. It tries to verify
+// with the live secret first, then falls back to the test secret. The actual
+// processing mode is determined by event.livemode — so a test webhook hitting
+// the production URL is handled correctly without errors.
 router.post("/webhook", async (req: Request, res: Response) => {
-  const mode = await getStripeMode();
-  const webhookSecret = getStripeWebhookSecret(mode);
-  const secretKey = getStripeSecretKey(mode);
+  const sig = req.headers["stripe-signature"] as string;
+  let event: Stripe.Event | null = null;
+  let eventMode: "live" | "test" = "live";
 
-  if (!webhookSecret || !secretKey) {
+  const liveSecret = getStripeWebhookSecret("live");
+  const testSecret = getStripeWebhookSecret("test");
+  const liveKey = getStripeSecretKey("live");
+  const testKey = getStripeSecretKey("test");
+
+  // Try live secret first, then test secret
+  const attempts: Array<{ mode: "live" | "test"; secret: string; key: string }> = [];
+  if (liveSecret && liveKey) attempts.push({ mode: "live", secret: liveSecret, key: liveKey });
+  if (testSecret && testKey) attempts.push({ mode: "test", secret: testSecret, key: testKey });
+
+  if (attempts.length === 0) {
     res.status(503).json({ error: "Stripe not configured" });
     return;
   }
 
-  const sig = req.headers["stripe-signature"] as string;
-  let event: Stripe.Event;
+  let lastError = "";
+  for (const attempt of attempts) {
+    try {
+      const stripe = makeStripe(attempt.mode);
+      event = stripe.webhooks.constructEvent(req.body as Buffer, sig, attempt.secret);
+      // Use event.livemode to determine processing mode regardless of which secret matched
+      eventMode = event.livemode ? "live" : "test";
+      break;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
 
-  try {
-    const stripe = makeStripe(mode);
-    event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ message }, "Webhook signature verification failed");
-    res.status(400).json({ error: `Webhook error: ${message}` });
+  if (!event) {
+    logger.warn({ lastError }, "Webhook signature verification failed with all configured secrets");
+    res.status(400).json({ error: `Webhook error: ${lastError}` });
     return;
   }
 
+  logger.info({ type: event.type, livemode: event.livemode, eventMode }, "Webhook event received");
+
   try {
-    const priceIdLookup = await buildPriceIdLookup(mode);
-    await handleWebhookEvent(event, priceIdLookup, mode);
+    const priceIdLookup = await buildPriceIdLookup(eventMode);
+    await handleWebhookEvent(event, priceIdLookup, eventMode);
     res.json({ received: true });
   } catch (err) {
     logger.error({ err, type: event.type }, "Webhook handler error");
